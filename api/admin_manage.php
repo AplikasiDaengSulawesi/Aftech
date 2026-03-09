@@ -1,0 +1,233 @@
+<?php
+session_start();
+include 'config.php';
+header('Content-Type: application/json');
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+$action = $_GET['action'] ?? '';
+$admin_name = $_SESSION['full_name'] ?? 'Admin';
+
+$response = ['status' => 'error', 'message' => 'Unknown action'];
+
+if ($action == 'save') {
+    $id = $_POST['id'] ?? '';
+    $type = $_GET['type'] ?? '';
+    $sql = "";
+    $log_detail = "";
+
+    if ($type == 'item') {
+        $name = $conn->real_escape_string($_POST['name']);
+        $u_id = (int)$_POST['unit_id'];
+        $sql = (!empty($id)) ? "UPDATE master_items SET name='$name', unit_id=$u_id WHERE id=$id" : "INSERT INTO master_items (name, unit_id) VALUES ('$name', $u_id)";
+        $log_detail = "Admin Update Item: $name";
+    } elseif ($type == 'size') {
+        $val = $conn->real_escape_string($_POST['size_value']);
+        $i_id = (int)$_POST['item_id'];
+        $sql = (!empty($id)) ? "UPDATE master_sizes SET size_value='$val', item_id=$i_id WHERE id=$id" : "INSERT INTO master_sizes (size_value, item_id) VALUES ('$val', $i_id)";
+        $log_detail = "Admin Update Size: $val";
+    } elseif ($type == 'quantity') {
+        $val = $conn->real_escape_string($_POST['qty_value']);
+        $m_id = (int)$_POST['machine_id'];
+        $sql = (!empty($id)) ? "UPDATE master_quantities SET qty_value='$val', machine_id=$m_id WHERE id=$id" : "INSERT INTO master_quantities (qty_value, machine_id) VALUES ('$val', $m_id)";
+        $log_detail = "Admin Update Qty: $val";
+    } elseif ($type == 'machine') {
+        $name = $conn->real_escape_string($_POST['name']);
+        $status = $conn->real_escape_string($_POST['status'] ?? 'active');
+        $sql = (!empty($id)) ? "UPDATE master_machines SET name='$name', status='$status' WHERE id=$id" : "INSERT INTO master_machines (name, status) VALUES ('$name', '$status')";
+        $log_detail = "Admin Update Mesin: $name ($status)";
+    } elseif ($type == 'unit') {
+        $name = $conn->real_escape_string($_POST['name']);
+        $sql = (!empty($id)) ? "UPDATE master_units SET name='$name' WHERE id=$id" : "INSERT INTO master_units (name) VALUES ('$name')";
+        $log_detail = "Admin Update Unit: $name";
+    } elseif ($type == 'shift') {
+        $name = $conn->real_escape_string($_POST['name']);
+        $sql = (!empty($id)) ? "UPDATE master_shifts SET name='$name' WHERE id=$id" : "INSERT INTO master_shifts (name) VALUES ('$name')";
+        $log_detail = "Admin Update Shift: $name";
+    } elseif ($type == 'template') {
+        $name = $conn->real_escape_string($_POST['template_name']);
+        $item = $conn->real_escape_string($_POST['item']);
+        $size = $conn->real_escape_string($_POST['size']);
+        $unit = $conn->real_escape_string($_POST['unit']);
+        $machine = $conn->real_escape_string($_POST['machine']);
+        $shift = $conn->real_escape_string($_POST['shift']);
+        $quantity = $conn->real_escape_string($_POST['quantity']);
+        $sql = (!empty($id)) 
+            ? "UPDATE master_templates SET template_name='$name', item='$item', size='$size', unit='$unit', machine='$machine', shift='$shift', quantity='$quantity' WHERE id=$id" 
+            : "INSERT INTO master_templates (template_name, item, size, unit, machine, shift, quantity) VALUES ('$name', '$item', '$size', '$unit', '$machine', '$shift', '$quantity')";
+        $log_detail = "Admin Update Template: $name";
+    } elseif ($type == 'user') {
+        $username = $conn->real_escape_string($_POST['username']);
+        $full_name = $conn->real_escape_string($_POST['full_name']);
+        $role_user = $conn->real_escape_string($_POST['role']);
+        $pass = $_POST['password'] ?? '';
+        if (!empty($id)) {
+            $sql = "UPDATE users SET username='$username', full_name='$full_name', role='$role_user' WHERE id=$id";
+            if (!empty($pass)) { $h = password_hash($pass, PASSWORD_DEFAULT); $sql = "UPDATE users SET username='$username', full_name='$full_name', role='$role_user', password='$h' WHERE id=$id"; }
+        } else {
+            $h = password_hash($pass ?: $username.'123', PASSWORD_DEFAULT);
+            $sql = "INSERT INTO users (username, full_name, role, password) VALUES ('$username', '$full_name', '$role_user', '$h')";
+        }
+        $log_detail = "Admin Update User: $username";
+    } elseif ($type == 'pin') {
+        $pin = $conn->real_escape_string($_POST['pin_code']);
+        $note = $conn->real_escape_string($_POST['note']);
+        $sql = (!empty($id)) ? "UPDATE app_config SET pin_code='$pin', note='$note' WHERE id=$id" : "INSERT INTO app_config (pin_code, note) VALUES ('$pin', '$note')";
+        $log_detail = "Admin Update Master PIN: $note";
+    } elseif ($type == 'production') {
+        $item = $conn->real_escape_string($_POST['item']);
+        $size = $conn->real_escape_string($_POST['size']);
+        $unit = $conn->real_escape_string($_POST['unit']);
+        $qty = $conn->real_escape_string($_POST['quantity']);
+        $copies = (int)$_POST['copies'];
+        $machine = $conn->real_escape_string($_POST['machine']);
+        $shift = $conn->real_escape_string($_POST['shift']);
+        $operator = $conn->real_escape_string($_POST['operator']);
+        $qc = $conn->real_escape_string($_POST['qc']);
+        $p_date = $conn->real_escape_string($_POST['production_date']);
+        $p_time = $conn->real_escape_string($_POST['production_time']);
+        
+        $batch = $conn->real_escape_string($_POST['batch'] ?? '');
+        $sql = "UPDATE production_labels SET 
+                item='$item', size='$size', unit='$unit', quantity='$qty', copies=$copies, 
+                machine='$machine', shift='$shift', operator='$operator', qc='$qc', 
+                production_date='$p_date', production_time='$p_time' 
+                WHERE id=$id";
+        $log_detail = "Koreksi Data Produksi: Batch #$batch ($item)";
+    }
+
+    if ($sql && $conn->query($sql)) {
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TAMBAH', '$log_detail')");
+        $response = ['status' => 'success'];
+    } else {
+        $response = ['status' => 'error', 'message' => $conn->error ?: 'Query error'];
+    }
+} elseif ($action == 'transfer_partial_warehouse') {
+    $prod_id = (int)$_POST['id'];
+    $labels = json_decode($_POST['labels'], true);
+    if (empty($labels)) { $response = ['status' => 'error', 'message' => 'No labels selected']; }
+    else {
+        $conn->begin_transaction();
+        try {
+            $batch_res = $conn->query("SELECT batch FROM production_labels WHERE id=$prod_id");
+            $batch_name = ($batch_res && $b_row = $batch_res->fetch_assoc()) ? $b_row['batch'] : $prod_id;
+            
+            foreach ($labels as $no) {
+                $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by) VALUES ($prod_id, $no, '$admin_name')");
+            }
+            $conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prod_id, '$admin_name')");
+            $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TRANSFER', 'Kirim ".count($labels)." unit Batch #$batch_name ke Gudang')");
+            $conn->commit();
+            $response = ['status' => 'success'];
+        } catch (Exception $e) { $conn->rollback(); $response = ['status' => 'error', 'message' => $e->getMessage()]; }
+    }
+} elseif ($action == 'return_from_warehouse') {
+    $prod_id = (int)$_POST['id'];
+    $labels = json_decode($_POST['labels'], true);
+    if (!empty($labels)) {
+        $label_list = implode(',', array_map('intval', $labels));
+        if ($conn->query("DELETE FROM warehouse_items WHERE production_id=$prod_id AND label_no IN ($label_list)")) {
+            $batch_res = $conn->query("SELECT batch FROM production_labels WHERE id=$prod_id");
+            $batch_name = ($batch_res && $b_row = $batch_res->fetch_assoc()) ? $b_row['batch'] : $prod_id;
+            
+            $conn->query("INSERT INTO activity_logs (action, details) VALUES ('RETUR', 'Kembalikan ".count($labels)." unit Batch #$batch_name ke Produksi')");
+            $response = ['status' => 'success'];
+        }
+    }
+} elseif ($action == 'clear_logs') {
+    if ($conn->query("TRUNCATE TABLE activity_logs")) {
+        $response = ['status' => 'success'];
+    } else {
+        $response = ['status' => 'error', 'message' => $conn->error];
+    }
+} elseif ($action == 'delete') {
+    $id = (int)$_POST['id'];
+    $type = $_GET['type'] ?? '';
+    $table = ""; $where = "id=$id";
+    
+    if ($type == 'item') $table = "master_items";
+    elseif ($type == 'machine') $table = "master_machines";
+    elseif ($type == 'unit') $table = "master_units";
+    elseif ($type == 'shift') $table = "master_shifts";
+    elseif ($type == 'template') $table = "master_templates";
+    elseif ($type == 'size') $table = "master_sizes";
+    elseif ($type == 'quantity') $table = "master_quantities";
+    elseif ($type == 'user') $table = "users";
+    elseif ($type == 'production') $table = "production_labels";
+    elseif ($type == 'warehouse_batch') { $table = "warehouse_items"; $where = "production_id=$id"; }
+    if ($type == 'shipment' || $type == 'distributor_shipment') {
+    $conn->begin_transaction();
+    try {
+    // Ambil data header untuk log resi
+    $stmtHeader = $conn->query("SELECT customer_name, shipped_at, shipment_date, total_qty FROM outbound_shipments WHERE id=$id");
+    $headerData = $stmtHeader->fetch_assoc();
+    
+    $log_msg = "Batalkan Pengiriman Nota ID #$id";
+    if ($headerData) {
+    // Generate nomor resi
+        $stmtSeq = $conn->prepare("SELECT COUNT(id) as seq FROM outbound_shipments WHERE shipment_date = ? AND id <= ?");
+                $stmtSeq->bind_param("si", $headerData['shipment_date'], $id);
+        $stmtSeq->execute();
+        $seqData = $stmtSeq->get_result()->fetch_assoc();
+        $seq = $seqData['seq'];
+
+                $datetime_str = date('dmYHi', strtotime($headerData['shipped_at']));
+                $name_parts = explode(' ', trim($headerData['customer_name']));
+                $initials = (count($name_parts) >= 2) ? strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[1], 0, 1)) : strtoupper(substr(trim($headerData['customer_name']), 0, 2));
+                $total_paket = $headerData['total_qty'];
+                $no_resi = $seq . '-' . $datetime_str . '-' . $total_paket . '-' . $initials;
+                
+                $log_msg = "Batalkan Pengiriman No. Resi #$no_resi ke " . $headerData['customer_name'];
+            }
+
+            // Hapus detailSerialized (Label per label) agar kembali ke stok gudang
+            $conn->query("DELETE FROM distributor_shipments WHERE shipment_id=$id");
+            // Hapus detail rincian batch (Tabel bantu)
+            $conn->query("DELETE FROM outbound_shipment_batches WHERE shipment_id=$id");
+            // Hapus header nota
+            if (!$conn->query("DELETE FROM outbound_shipments WHERE id=$id")) {
+                throw new Exception($conn->error);
+            }
+
+            $conn->query("INSERT INTO activity_logs (action, details) VALUES ('HAPUS', '$log_msg')");
+            $conn->commit();
+            echo json_encode(['status' => 'success']);
+            exit;
+        } catch (Exception $e) {
+            $conn->rollback();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    if ($table) {
+        $name_field = 'name';
+        if ($type == 'size') $name_field = 'size_value';
+        elseif ($type == 'quantity') $name_field = 'qty_value';
+        elseif ($type == 'user') $name_field = 'username';
+        elseif ($type == 'production') $name_field = 'batch';
+        elseif ($type == 'template') $name_field = 'template_name';
+        
+        $log_delete_detail = "Hapus $type ID $id";
+        if ($type == 'warehouse_batch') {
+            $res = $conn->query("SELECT batch FROM production_labels WHERE id=$id");
+            if ($res && $row = $res->fetch_assoc()) $log_delete_detail = "Hapus Stok Gudang Batch: #" . $row['batch'];
+        } else {
+            $res = $conn->query("SELECT $name_field FROM $table WHERE $where");
+            if ($res && $row = $res->fetch_assoc()) {
+                if ($type == 'production') $log_delete_detail = "Hapus Produksi Batch: #" . $row[$name_field];
+                else $log_delete_detail = "Hapus " . ucfirst($type) . ": " . $row[$name_field];
+            }
+        }
+        
+        if ($conn->query("DELETE FROM $table WHERE $where")) {
+            if ($type == 'warehouse_batch') $conn->query("DELETE FROM warehouse_transfers WHERE production_id=$id");
+            $conn->query("INSERT INTO activity_logs (action, details) VALUES ('HAPUS', '$log_delete_detail')");
+            $response = ['status' => 'success'];
+        }
+    }
+}
+
+echo json_encode($response);
+?>
