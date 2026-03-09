@@ -208,6 +208,7 @@
                 </div>
             </div>
         </div>
+        <?php include '../includes/footer_copyright.php' ?>
     </div>
 
     <?php include '../includes/footer.php' ?>
@@ -220,16 +221,16 @@
                 const res = await fetch(`../api/get_dashboard_stats.php?_nocache=${Date.now()}`);
                 const data = await res.json();
 
-                // 1. STATS
-                const ready = data.total_warehouse - data.total_shipped;
-                const wait = data.total_production - data.total_warehouse;
-                
-                document.getElementById('k-prod').innerText = data.total_production.toLocaleString();
-                document.getElementById('k-pending').innerText = wait.toLocaleString();
-                document.getElementById('k-pending-2').innerText = wait.toLocaleString();
-                document.getElementById('k-stok').innerText = ready.toLocaleString();
-                document.getElementById('k-stok-2').innerText = ready.toLocaleString();
-                document.getElementById('k-ship').innerText = data.total_shipped.toLocaleString();
+                // 2. TAMPILKAN KPI (EXACT NUMBERS)
+                const wait = data.total_production - data.total_verified;
+                const ready = data.total_verified - data.total_shipped;
+
+                document.getElementById('k-prod').innerText = data.total_production.toLocaleString('id-ID');
+                document.getElementById('k-pending').innerText = wait.toLocaleString('id-ID');
+                document.getElementById('k-pending-2').innerText = wait.toLocaleString('id-ID');
+                document.getElementById('k-stok').innerText = ready.toLocaleString('id-ID');
+                document.getElementById('k-stok-2').innerText = ready.toLocaleString('id-ID');
+                document.getElementById('k-ship').innerText = data.total_shipped.toLocaleString('id-ID');
 
                 // 2. DONUT
                 if(!donutChart) {

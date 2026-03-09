@@ -88,7 +88,7 @@ $periode_label = $show_all ? "SEMUA WAKTU" : date('d/m/Y', strtotime($start_date
     <table class="header-table">
         <tr>
             <td style="width: 60%;">
-                <h1 style="margin:0; font-size: 24px;">AFTECH PRODUCTION</h1>
+                <h1 style="margin:0; font-size: 24px;">PT AFTECH MAKASSAR INDONESIA</h1>
                 <p style="margin:2px 0;">Sistem Manajemen Produksi & Inventaris Gudang</p>
             </td>
             <td style="text-align: right;">

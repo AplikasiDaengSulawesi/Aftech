@@ -38,17 +38,17 @@ $statsSql = "
         COUNT(p.id) as total_batch,
         COALESCE(SUM(p.quantity * p.copies), 0) as total_qty,
         COALESCE(SUM(p.copies), 0) as total_copies,
-        COALESCE(SUM( (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) ), 0) as total_in_warehouse
+        COALESCE(SUM( (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) * p.quantity ), 0) as total_in_warehouse
     FROM production_labels p
     $where
-";$statsRes = $conn->query($statsSql);
+";
+$statsRes = $conn->query($statsSql);
 $stats = $statsRes->fetch_assoc();
 
 $total_batch = (int)($stats['total_batch'] ?? 0);
 $total_qty = (int)($stats['total_qty'] ?? 0);
-$total_copies = (int)($stats['total_copies'] ?? 0);
 $total_in_warehouse = (int)($stats['total_in_warehouse'] ?? 0);
-$total_belum_scan = max(0, $total_copies - $total_in_warehouse);
+$total_belum_scan = max(0, $total_qty - $total_in_warehouse);
 
 // Set locale format for bulan in Indonesia
 $bulan_indonesia = [

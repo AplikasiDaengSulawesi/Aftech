@@ -139,7 +139,7 @@ $total_pages = count($pages);
         <table class="header-table">
             <tr>
                 <td>
-                    <div class="title">AFTECH PRODUCTION</div>
+                    <div class="title">PT AFTECH MAKASSAR INDONESIA</div>
                     <div>Sistem Manajemen Gudang & Logistik</div>
                 </td>
                 <td style="text-align: right;">

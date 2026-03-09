@@ -61,7 +61,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                 
                 <!-- PRINT ONLY HEADER -->
                 <div class="print-header">
-                    <h2 style="margin:0; font-weight:900;">AFTECH PRODUCTION SYSTEM</h2>
+                    <h2 style="margin:0; font-weight:900;">PT AFTECH MAKASSAR INDONESIA</h2>
                     <h4 style="margin:5px 0; color:#1A237E;">LAPORAN REKAPITULASI PRODUKSI & GUDANG</h4>
                     <p style="margin:0; font-size:12px; color:#666;">Dicetak pada: <?php echo date('d/m/Y H:i'); ?></p>
                 </div>
@@ -160,28 +160,28 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                         </button>
                                     </div>
                                 </div>
-                                <form id="formFilterReport" class="row g-2">
-                                    <div class="col-12 col-md-4">
+                                <form id="formFilterReport" class="row g-2 align-items-center">
+                                    <div class="col-12 col-md-3">
                                         <input type="text" id="report_daterange" class="form-control form-control-sm daterange-picker" placeholder="Pilih Periode" readonly>
                                         <input type="hidden" name="start_date" id="f_start" value="<?php echo date('Y-m-01'); ?>">
                                         <input type="hidden" name="end_date" id="f_end" value="<?php echo date('Y-m-d'); ?>">
                                     </div>
-                                    <div class="col-12 col-md-4">
+                                    <div class="col-12 col-md-3">
                                         <select name="item" id="f_item" class="form-control form-control-sm default-select auto-filter">
                                             <option value="">Semua Item</option>
                                             <?php foreach($m_items as $i) echo "<option value='".htmlspecialchars($i['name'])."'>".htmlspecialchars($i['name'])."</option>"; ?>
                                         </select>
                                     </div>
-                                    <div class="col-12 col-md-4 d-flex align-items-center px-3">
+                                    <div class="col-12 col-md-3">
+                                        <button type="button" onclick="printFormalReport()" class="btn btn-primary btn-sm w-100 font-w600">
+                                            <i class="fa fa-print me-1"></i> Cetak Laporan
+                                        </button>
+                                    </div>
+                                    <div class="col-12 col-md-3 d-flex align-items-center">
                                         <div class="form-check custom-checkbox">
                                             <input type="checkbox" class="form-check-input auto-filter" id="f_all_time" name="show_all" value="true">
-                                            <label class="form-check-label small font-w700 text-black" for="f_all_time">Tampilkan Semua Data</label>
+                                            <label class="form-check-label small font-w700 text-black" for="f_all_time">Semua Data</label>
                                         </div>
-                                    </div>
-                                    <div class="col-12 mt-2">
-                                        <button type="button" onclick="printFormalReport()" class="btn btn-primary btn-xs w-100 font-w600">
-                                            <i class="fa fa-print me-1"></i> Cetak Laporan Rekapitulasi Kantor
-                                        </button>
                                     </div>
                                 </form>
                             </div>

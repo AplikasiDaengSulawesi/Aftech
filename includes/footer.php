@@ -13,7 +13,7 @@
 <script src="../assets/vendor/apexchart/apexchart.js"></script>
 
 <!-- Dashboard 1 -->
-<script src="../assets/js/dashboard/dashboard-1.js"></script>
+<!-- <script src="../assets/js/dashboard/dashboard-1.js"></script> -->
 <!-- Sweetalert -->
 <script src="../assets/vendor/sweetalert2/dist/sweetalert2.min.js"></script>
 <!-- Toastr -->

@@ -101,8 +101,8 @@ class BluetoothService {
     // Header Tanggal
     tspl += "TEXT 30,25,\"2\",0,1,1,\"$fullDateTime\"\r\n";
     
-    // AFTECH PRODUCTION Vertikal (Magnifikasi 3,3)
-    tspl += "TEXT 560,160,\"3\",90,3,3,\"AFTECH\"\r\n";
+    // PT AFTECH MAKASSAR INDONESIA Vertikal
+    tspl += "TEXT 560,160,\"3\",90,3,3,\"PT AFTECH\"\r\n";
 
     // 2. MANUAL QR RENDERING (OPTION 2: NO PADDING, CUSTOM SIZE)
     String qrData = "$labelIndex-$batch";

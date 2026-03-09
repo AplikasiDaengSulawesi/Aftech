@@ -195,6 +195,32 @@ $display_title = $page_titles[$current_page] ?? 'AFTECH System';
 			}
 		});
 	</script>
+    <style>
+        :root {
+            --af-primary: #1A237E;
+            --af-primary-light: #3F51B5;
+            --af-accent: #FFC107;
+        }
+        
+        /* OVERRIDE PINK/ORANGE HOVERS & BADGES */
+        .btn-primary:hover { background-color: var(--af-primary-light) !important; border-color: var(--af-primary-light) !important; }
+        .btn-primary:active, .btn-primary:focus { background-color: var(--af-primary) !important; border-color: var(--af-primary) !important; }
+        
+        /* Table Hovers */
+        .table.shadow-hover tbody tr:hover { background-color: rgba(26, 35, 126, 0.05) !important; }
+        
+        /* Force Indigo on primary light elements */
+        .badge-primary.light { background-color: rgba(26, 35, 126, 0.1) !important; color: var(--af-primary) !important; }
+        .text-primary { color: var(--af-primary) !important; }
+        .bg-primary { background-color: var(--af-primary) !important; }
+        
+        /* Pagination */
+        .pagination .page-item.active .page-link { background-color: var(--af-primary) !important; border-color: var(--af-primary) !important; }
+        
+        /* Fix for potential pinkish buttons in template */
+        [data-primary="color_1"] .btn-primary:hover,
+        .btn-primary:hover { background-color: var(--af-primary-light) !important; border-color: var(--af-primary-light) !important; }
+    </style>
 </head>
 
 <!--**********************************
