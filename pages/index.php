@@ -208,12 +208,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="footer">
-            <div class="copyright text-center">
-                <p><strong>AFTECH</strong> © 2026</p>
-            </div>
-        </div>
     </div>
 
     <?php include '../includes/footer.php' ?>
