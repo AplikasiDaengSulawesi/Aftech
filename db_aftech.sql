@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 09, 2026 at 09:57 AM
+-- Generation Time: Mar 10, 2026 at 06:52 AM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
@@ -48,7 +48,71 @@ INSERT INTO `activity_logs` (`id`, `action`, `details`, `timestamp`) VALUES
 (7, 'LOGOUT', 'User Administrator Utama (admin) keluar dari sistem', '2026-03-09 08:51:13'),
 (8, 'LOGIN', 'User Staff Gudang (gudang) berhasil login', '2026-03-09 08:51:25'),
 (9, 'LOGOUT', 'User Staff Gudang (gudang) keluar dari sistem', '2026-03-09 08:51:45'),
-(10, 'LOGIN', 'User Tim Quality Control (qc) berhasil login', '2026-03-09 08:51:51');
+(10, 'LOGIN', 'User Tim Quality Control (qc) berhasil login', '2026-03-09 08:51:51'),
+(11, 'LOGOUT', 'User Tim Quality Control (qc) keluar dari sistem', '2026-03-09 09:06:55'),
+(12, 'LOGIN', 'User Administrator Utama (admin) berhasil login', '2026-03-09 09:07:03'),
+(13, 'LOGOUT', 'User Administrator Utama (admin) keluar dari sistem', '2026-03-09 17:39:17'),
+(14, 'LOGIN', 'User Administrator Utama (admin) berhasil login', '2026-03-09 17:44:39'),
+(15, 'LOGOUT', 'User Administrator Utama (admin) keluar dari sistem', '2026-03-09 17:46:22'),
+(16, 'LOGIN', 'User Administrator Utama (admin) berhasil login', '2026-03-09 17:46:39'),
+(17, 'HAPUS', 'Hapus Stok Gudang Batch: #100326-1A-BOT-200-AHSI-600ML', '2026-03-09 18:37:56'),
+(18, 'HAPUS', 'Hapus Stok Gudang Batch: #100326-1A-BOT-200-AHSI-600ML', '2026-03-09 18:41:46'),
+(19, 'TAMBAH', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-09 19:17:12'),
+(20, 'TAMBAH', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-09 19:17:38'),
+(21, 'TAMBAH', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-09 19:18:52'),
+(22, 'TAMBAH', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-09 19:19:46'),
+(23, 'TAMBAH', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-09 19:20:04'),
+(24, 'TAMBAH', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-09 19:22:28'),
+(25, 'EDIT', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-10 02:16:19'),
+(26, 'EDIT', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-10 02:16:39'),
+(27, 'EDIT', 'Koreksi Data Produksi: Batch #100326-1A-BOT-200-AHSI-600ML (BOTOL)', '2026-03-10 02:20:38'),
+(28, 'HAPUS', 'Batalkan Pengiriman No. Resi #1-090320261203-13-RA ke Rahmat', '2026-03-10 02:21:03'),
+(29, 'HAPUS', 'Batalkan Pengiriman No. Resi #1-090320261208-2-RA ke Rahmat', '2026-03-10 02:21:05'),
+(30, 'PENGIRIMAN', 'Kirim 25 paket ke Rahmat (No. Resi #1-100320261023-25-RA)', '2026-03-10 02:23:45'),
+(31, 'HAPUS', 'Batalkan Pengiriman No. Resi #1-100320261023-25-RA ke Rahmat', '2026-03-10 02:31:58'),
+(32, 'PENGIRIMAN', 'Kirim 10 paket ke Rahmat (No. Resi #1-100320261036-10-RA)', '2026-03-10 02:36:35'),
+(33, 'PENGIRIMAN', 'Kirim 1 paket ke Rahmat (No. Resi #2-100320261038-1-RA)', '2026-03-10 02:38:20'),
+(34, 'PENGIRIMAN', 'Kirim 1 paket ke Rahmat (No. Resi #3-100320261039-1-RA)', '2026-03-10 02:39:58'),
+(35, 'HAPUS', 'Batalkan Pengiriman No. Resi #2-100320261038-1-RA ke Rahmat', '2026-03-10 02:41:24'),
+(36, 'HAPUS', 'Batalkan Pengiriman No. Resi #2-100320261039-1-RA ke Rahmat', '2026-03-10 02:41:25'),
+(37, 'HAPUS', 'Batalkan Pengiriman No. Resi #1-100320261036-10-RA ke Rahmat', '2026-03-10 02:41:27'),
+(38, 'PENGIRIMAN', 'Kirim 1 paket ke Rahmat (No. Resi #1-100320261049-1-RA)', '2026-03-10 02:49:31'),
+(39, 'PENGIRIMAN', 'Tambah susulan 1 paket ke No. Resi #1-100320261049-2-RA', '2026-03-10 02:50:02'),
+(40, 'HAPUS', 'Batalkan Pengiriman No. Resi #1-100320261049-2-RA ke Rahmat', '2026-03-10 02:50:18'),
+(41, 'PENGIRIMAN', 'Kirim 3 paket ke Rahmat (No. Resi #1-100320261103-3-RA)', '2026-03-10 03:03:15'),
+(42, 'HAPUS', 'Hapus Item: TESTING', '2026-03-10 03:34:27'),
+(43, 'PRODUKSI', '[SM-A556E] Batch #100326-1A-CUP-100-AHSI-120ML (CUP): +1 Label', '2026-03-10 03:37:52'),
+(44, 'PENGIRIMAN', 'Kirim 3 paket ke Rahmat (No. Resi #2-100320261143-3-RA)', '2026-03-10 03:43:01'),
+(45, 'TAMBAH', 'Admin Update Template: Mamat', '2026-03-10 03:54:46'),
+(46, 'EDIT', 'Admin Update Template: Mamat update', '2026-03-10 03:55:31'),
+(47, 'TAMBAH', 'Admin Update Item: TESTING', '2026-03-10 03:56:18'),
+(48, 'EDIT', 'Admin Update Item: TESTING UPDATE', '2026-03-10 04:01:32'),
+(49, 'TAMBAH', 'Admin Update Template: RAHMAT', '2026-03-10 04:05:21'),
+(50, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 04:06:00'),
+(51, 'SYNC', '[SM-A556E] Batch #100326-2A-BOT-2400-AHSI-50ML (BOTOL): +0 Label', '2026-03-10 04:06:41'),
+(52, 'PRODUKSI', '[SM-A556E] Batch #100326-2A-BOT-2400-AHSI-50ML (BOTOL): +1 Label', '2026-03-10 04:37:11'),
+(53, 'PRODUKSI', '[SM-A556E] Batch #100326-1B-CUP-48-MAYU-240ML (CUP): +1 Label', '2026-03-10 04:42:37'),
+(54, 'PRODUKSI', '[SM-A556E] Batch #100326-1B-CUP-48-MAYU-240ML (CUP): +1 Label', '2026-03-10 04:45:15'),
+(55, 'PRODUKSI', '[SM-A556E] Batch #100326-1B-CUP-48-MAYU-240ML (CUP): +1 Label', '2026-03-10 04:46:19'),
+(56, 'TAMBAH', 'Admin Update Template: SEDOTAN PCS - MACHINE 2', '2026-03-10 05:30:21'),
+(57, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:35'),
+(58, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:36'),
+(59, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:45'),
+(60, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:45'),
+(61, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:46'),
+(62, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:47'),
+(63, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:47'),
+(64, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:47'),
+(65, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:48'),
+(66, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:48'),
+(67, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:48'),
+(68, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:48'),
+(69, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:30:48'),
+(70, 'EDIT', 'Admin Update Template: RAHMAT UPDATE', '2026-03-10 05:35:29'),
+(71, 'TAMBAH', 'Admin Update Template: RAHMAT UPDATE jj', '2026-03-10 05:35:49'),
+(72, 'EDIT', 'Admin Update Template: RAHMAT UPDATE tt', '2026-03-10 05:37:36'),
+(73, 'EDIT', 'Admin Update Template: RAHMAT UPDATE jj gg', '2026-03-10 05:37:46'),
+(74, 'EDIT', 'Admin Update Item: TESTING UPDATE hh', '2026-03-10 05:37:57');
 
 -- --------------------------------------------------------
 
@@ -88,21 +152,12 @@ CREATE TABLE `distributor_shipments` (
 --
 
 INSERT INTO `distributor_shipments` (`id`, `shipment_id`, `production_id`, `label_no`) VALUES
-(145, 64, 120, 8),
-(146, 64, 120, 4),
-(147, 64, 120, 7),
-(148, 64, 120, 1),
-(149, 64, 120, 5),
-(150, 64, 120, 9),
-(151, 64, 120, 6),
-(152, 64, 120, 3),
-(153, 64, 122, 1),
-(154, 64, 122, 5),
-(155, 64, 122, 2),
-(156, 64, 122, 3),
-(157, 64, 122, 4),
-(158, 65, 120, 2),
-(159, 65, 120, 10);
+(199, 71, 120, 2),
+(200, 71, 127, 2),
+(201, 71, 127, 1),
+(202, 72, 134, 1),
+(203, 72, 134, 2),
+(204, 72, 134, 3);
 
 -- --------------------------------------------------------
 
@@ -124,9 +179,9 @@ CREATE TABLE `master_customers` (
 --
 
 INSERT INTO `master_customers` (`id`, `name`, `contact`, `address`, `created_at`, `total_orders`) VALUES
-(1, 'Rahmat', '085213976352', 'JLN.PERINTIS KEMERDEKAAN VII. LORONG 2', '2026-03-08 07:44:14', 12),
-(2, 'Tri Munazzar Abduh', '1234567890', 'JLN.SUKA-SUKA', '2026-03-08 07:44:14', 7),
-(8, 'Lutfi Rasyid', '085174302323', 'Morowali', '2026-03-08 08:38:56', 3);
+(1, 'Rahmat', '085213976352', 'JLN.PERINTIS KEMERDEKAAN VII. LORONG 2', '2026-03-08 07:44:14', 1),
+(2, 'Tri Munazzar Abduh', '1234567890', 'JLN.SUKA-SUKA', '2026-03-08 07:44:14', 0),
+(8, 'Lutfi Rasyid', '085174302323', 'Morowali', '2026-03-08 08:38:56', 0);
 
 -- --------------------------------------------------------
 
@@ -148,7 +203,7 @@ INSERT INTO `master_items` (`id`, `name`, `unit_id`) VALUES
 (1, 'BOTOL', 1),
 (2, 'SEDOTAN', 3),
 (3, 'CUP', 1),
-(4, 'TESTING', 1);
+(5, 'TESTING UPDATE hh', 5);
 
 -- --------------------------------------------------------
 
@@ -271,7 +326,11 @@ INSERT INTO `master_templates` (`id`, `template_name`, `item`, `size`, `unit`, `
 (1, 'BOTOL 600ML - THERMO 1', 'BOTOL', '600', 'ML', 'THERMO 1', 'SHIFT A', '1200'),
 (2, 'CUP 240ML - MACHINE 1', 'CUP', '240', 'ML', 'MACHINE 1', 'SHIFT B', '48'),
 (3, 'SEDOTAN 100PCS - MACHINE 2', 'SEDOTAN', '100', 'PCS', 'MACHINE 2', 'SHIFT A', '2400'),
-(4, 'CUP 120ML - THERMO 1', 'CUP', '120', 'ML', 'THERMO 1', 'SHIFT A', '100');
+(4, 'CUP 120ML - THERMO 1', 'CUP', '120', 'ML', 'THERMO 1', 'SHIFT A', '100'),
+(5, 'Mamat update', 'BOTOL', '50', 'ML', 'MACHINE 2', 'SHIFT A', '2400'),
+(6, 'RAHMAT UPDATE tt', 'CUP', '50', 'ML', 'THERMO 1', 'SHIFT A', '1500'),
+(7, 'SEDOTAN PCS - MACHINE 2', 'BOTOL', '1000', 'ML', 'THERMO 2', 'SHIFT C', '800'),
+(8, 'RAHMAT UPDATE jj gg', 'CUP', '25', 'KG', 'THERMO TINGGI 01', 'SHIFT C', '1500');
 
 -- --------------------------------------------------------
 
@@ -318,8 +377,8 @@ CREATE TABLE `outbound_shipments` (
 --
 
 INSERT INTO `outbound_shipments` (`id`, `customer_name`, `customer_contact`, `customer_address`, `shipment_date`, `total_qty`, `shipped_by`, `shipped_at`, `total_actual_qty`) VALUES
-(64, 'Rahmat', '085213976352', 'JLN.PERINTIS KEMERDEKAAN VII. LORONG 2', '2026-03-09', 13, 'Administrator Utama', '2026-03-09 04:03:59', 10500),
-(65, 'Rahmat', '085213976352', 'JLN.PERINTIS KEMERDEKAAN VII. LORONG 2', '2026-03-09', 2, 'Administrator Utama', '2026-03-09 04:08:43', 2000);
+(71, 'Rahmat', '085213976352', 'JLN.PERINTIS KEMERDEKAAN VII. LORONG 2', '2026-03-10', 3, 'Administrator Utama', '2026-03-10 03:03:15', 1200),
+(72, 'Rahmat', '085213976352', 'JLN.PERINTIS KEMERDEKAAN VII. LORONG 2', '2026-03-10', 3, 'Administrator Utama', '2026-03-10 03:43:01', 144);
 
 -- --------------------------------------------------------
 
@@ -340,9 +399,9 @@ CREATE TABLE `outbound_shipment_batches` (
 --
 
 INSERT INTO `outbound_shipment_batches` (`id`, `shipment_id`, `production_id`, `label_qty`, `unit_qty`) VALUES
-(9, 64, 120, 8, 8000),
-(10, 64, 122, 5, 2500),
-(11, 65, 120, 2, 2000);
+(23, 71, 120, 1, 1000),
+(24, 71, 127, 2, 200),
+(25, 72, 134, 3, 144);
 
 -- --------------------------------------------------------
 
@@ -378,7 +437,13 @@ INSERT INTO `production_labels` (`id`, `batch`, `item`, `size`, `unit`, `machine
 (123, '090326-2A-SED-2400-FAFA-1PCS', 'SEDOTAN', '1', 'PCS', 'MACHINE 2', 'SHIFT A', '2400', 'Fahrul', 'Fahrul', 2, '2026-03-09', '06:24:19', 'SM-A057F', '2026-03-08 22:29:07'),
 (124, '090326-1A-CUP-100-FAFA-120ML', 'CUP', '120', 'ML', 'THERMO 1', 'SHIFT A', '100', 'Fahrul', 'Fahrul', 2, '2026-03-09', '06:24:11', 'SM-A057F', '2026-03-08 22:29:53'),
 (126, '090326-1B-CUP-48-FARA-240ML', 'CUP', '240', 'ML', 'MACHINE 1', 'SHIFT B', '48', 'Fahrul', 'Rahmat', 2, '2026-03-09', '06:24:16', 'SM-A556E', '2026-03-08 22:31:02'),
-(127, '090326-1A-CUP-100-FARA-120ML', 'CUP', '120', 'ML', 'THERMO 1', 'SHIFT A', '100', 'Fahrul', 'Rahmat', 2, '2026-03-09', '06:32:05', 'SM-A556E', '2026-03-08 22:32:12');
+(127, '090326-1A-CUP-100-FARA-120ML', 'CUP', '120', 'ML', 'THERMO 1', 'SHIFT A', '100', 'Fahrul', 'Rahmat', 2, '2026-03-09', '06:32:05', 'SM-A556E', '2026-03-08 22:32:12'),
+(128, '100326-1A-BOT-200-AHSI-600ML', 'BOTOL', '600', 'ML', 'THERMO 1', 'SHIFT A', '200', 'ahmad', 'siti', 2, '2026-03-10', '01:10:07', 'SM-A556E', '2026-03-09 17:10:14'),
+(132, '100326-1A-BOT-200-AHSI-1000ML', 'BOTOL', '1000', 'ML', 'THERMO 1', 'SHIFT A', '200', 'ahmad', 'siti', 2, '2026-03-10', '11:23:29', 'SM-A556E', '2026-03-10 03:23:40'),
+(134, '100326-1B-CUP-48-AHSI-240ML', 'CUP', '240', 'ML', 'MACHINE 1', 'SHIFT B', '48', 'ahmad', 'siti', 3, '2026-03-10', '11:27:42', 'SM-A556E', '2026-03-10 03:27:49'),
+(137, '100326-1A-CUP-100-AHSI-120ML', 'CUP', '120', 'ML', 'THERMO 1', 'SHIFT A', '100', 'ahmad', 'siti', 1, '2026-03-10', '11:35:21', 'SM-A556E', '2026-03-10 03:35:41'),
+(139, '100326-2A-BOT-2400-AHSI-50ML', 'BOTOL', '50', 'ML', 'MACHINE 2', 'SHIFT A', '2400', 'ahmad', 'siti', 1, '2026-03-10', '12:06:38', 'SM-A556E', '2026-03-10 04:06:41'),
+(141, '100326-1B-CUP-48-MAYU-240ML', 'CUP', '240', 'ML', 'MACHINE 1', 'SHIFT B', '48', 'mamay', 'yu', 3, '2026-03-10', '12:41:03', 'SM-A556E', '2026-03-10 04:42:37');
 
 -- --------------------------------------------------------
 
@@ -445,7 +510,15 @@ INSERT INTO `warehouse_items` (`id`, `production_id`, `label_no`, `transferred_b
 (240, 122, 4, 'Administrator Utama', '2026-03-09 02:50:33'),
 (241, 122, 3, 'Administrator Utama', '2026-03-09 02:50:36'),
 (242, 122, 2, 'Administrator Utama', '2026-03-09 02:50:40'),
-(243, 122, 5, 'Administrator Utama', '2026-03-09 02:50:42');
+(243, 122, 5, 'Administrator Utama', '2026-03-09 02:50:42'),
+(248, 128, 2, 'Administrator Utama', '2026-03-09 19:05:04'),
+(249, 128, 1, 'Administrator Utama', '2026-03-10 02:20:11'),
+(250, 137, 1, 'Administrator Utama', '2026-03-10 03:39:45'),
+(251, 134, 3, 'Administrator Utama', '2026-03-10 03:40:17'),
+(252, 134, 2, 'Administrator Utama', '2026-03-10 03:40:22'),
+(253, 132, 2, 'Administrator Utama', '2026-03-10 03:40:26'),
+(254, 132, 1, 'Administrator Utama', '2026-03-10 03:40:29'),
+(255, 134, 1, 'Administrator Utama', '2026-03-10 03:42:39');
 
 -- --------------------------------------------------------
 
@@ -591,25 +664,25 @@ ALTER TABLE `warehouse_transfers`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=75;
 
 --
 -- AUTO_INCREMENT for table `distributor_shipments`
 --
 ALTER TABLE `distributor_shipments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=160;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=205;
 
 --
 -- AUTO_INCREMENT for table `master_customers`
 --
 ALTER TABLE `master_customers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `master_items`
 --
 ALTER TABLE `master_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `master_machines`
@@ -639,31 +712,31 @@ ALTER TABLE `master_sizes`
 -- AUTO_INCREMENT for table `master_templates`
 --
 ALTER TABLE `master_templates`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `master_units`
 --
 ALTER TABLE `master_units`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `outbound_shipments`
 --
 ALTER TABLE `outbound_shipments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
 
 --
 -- AUTO_INCREMENT for table `outbound_shipment_batches`
 --
 ALTER TABLE `outbound_shipment_batches`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `production_labels`
 --
 ALTER TABLE `production_labels`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=128;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=144;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -675,7 +748,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `warehouse_items`
 --
 ALTER TABLE `warehouse_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=244;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=256;
 
 --
 -- AUTO_INCREMENT for table `warehouse_transfers`
