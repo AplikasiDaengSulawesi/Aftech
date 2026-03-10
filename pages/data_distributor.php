@@ -45,6 +45,8 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
     .action-item i { width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-right: 12px; font-size: 14px; }
     .icon-view { background: #e8eaf6; color: #1A237E; }
     .icon-delete { background: #ffebee; color: #d32f2f; }
+    .icon-append { background: #fff8e1; color: #ffa000; }
+    .icon-print { background: #e3f2fd; color: #1976d2; }
     
     .swal2-close-custom {
         position: absolute; top: 12px; right: 12px; background: #f5f5f5; border-radius: 50%; width: 26px; height: 26px;
@@ -65,7 +67,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                 
                 <!-- KPI WIDGETS -->
                 <div class="row mb-4">
-                    <div class="col-xl-4 col-lg-4 col-sm-12">
+                    <div class="col-xl-3 col-lg-6 col-sm-6">
                         <div class="widget-stat card bg-primary shadow-sm card-kpi">
                             <div class="card-body p-4">
                                 <div class="media">
@@ -73,14 +75,14 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                     <div class="media-body text-white text-end">
                                         <p class="mb-1 text-white font-w600">Total Pengiriman</p>
                                         <h3 class="text-white mb-0" id="kpi-pengiriman">0</h3>
-                                        <small class="d-block mb-1">Transaksi Keluar</small>
+                                        <small class="d-block mt-1">Surat Jalan</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-4 col-lg-4 col-sm-6">
+                    <div class="col-xl-3 col-lg-6 col-sm-6">
                         <div class="widget-stat card bg-success shadow-sm card-kpi">
                             <div class="card-body p-4">
                                 <div class="media">
@@ -88,14 +90,14 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                     <div class="media-body text-white text-end">
                                         <p class="mb-1 text-white font-w600">Total Unit Terkirim</p>
                                         <h3 class="text-white mb-0" id="kpi-unit">0</h3>
-                                        <small class="d-block mb-1">Produk Fisik</small>
+                                        <small class="d-block mt-1">Pcs Produk</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-4 col-lg-4 col-sm-6">
+                    <div class="col-xl-3 col-lg-6 col-sm-6">
                         <div class="widget-stat card bg-info shadow-sm card-kpi">
                             <div class="card-body p-4">
                                 <div class="media">
@@ -103,7 +105,22 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                     <div class="media-body text-white text-end">
                                         <p class="mb-1 text-white font-w600">Total Customer</p>
                                         <h3 class="text-white mb-0" id="kpi-customer">0</h3>
-                                        <small class="d-block mb-1">Distributor Penerima</small>
+                                        <small class="d-block mt-1">Retailer/Agen</small>
+                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-lg-6 col-sm-6">
+                        <div class="widget-stat card bg-warning shadow-sm card-kpi">
+                            <div class="card-body p-4">
+                                <div class="media">
+                                    <span class="me-3 text-white"><i class="fa fa-sync-alt"></i></span>
+                                    <div class="media-body text-white text-end">
+                                        <p class="mb-1 text-white font-w600">Repeat Order</p>
+                                        <h3 class="text-white mb-0" id="kpi-repeat">0</h3>
+                                        <small class="d-block mt-1">Loyalitas</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>
@@ -120,7 +137,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                 <div class="filter-card-header">
                                     <div>
                                         <h4 class="text-black mb-0 font-w800">Database Pengiriman Distributor</h4>
-                                        <p class="mb-0 small text-muted">Klik baris untuk opsi cetak nota, tambah pengiriman atau pembatalan</p>
+                                        <p class="mb-0 small text-muted">Klik baris untuk opsi cetak nota, tambah unit susulan atau pembatalan</p>
                                     </div>
                                     <div class="header-btn-group">
                                         <div class="dropdown">
@@ -260,6 +277,9 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                     document.getElementById('kpi-customer').innerText = formatCompactNumber(result.stats.total_customer);
                     document.getElementById('kpi-customer').title = result.stats.total_customer.toLocaleString('id-ID');
 
+                    document.getElementById('kpi-repeat').innerText = formatCompactNumber(result.stats.total_repeat);
+                    document.getElementById('kpi-repeat').title = result.stats.total_repeat.toLocaleString('id-ID');
+
                     if(result.stats.bulan) {
                         const label = result.stats.bulan.includes('Filter') ? result.stats.bulan : `(${result.stats.bulan})`;
                         document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = label);
@@ -330,9 +350,9 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                         <strong class="text-black" style="word-break:break-all;">${row.customer_name}</strong>
                     </div>
                     <div class="action-list">
-                        <button onclick="Swal.close(); viewShipmentDetail(${index})" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Barang</button>
-                        <button onclick="Swal.close(); window.location.href='distributor_scan.php?append_id=${row.id}'" class="action-item"><i class="fa fa-plus text-white" style="background:#00C853;"></i> Tambah Barang Susulan</button>
-                        <button onclick="Swal.close(); window.open('print_invoice.php?id=${row.id}', '_blank')" class="action-item"><i class="fa fa-print" style="background:#e3f2fd; color:#0277bd;"></i> Cetak Nota</button>
+                        <button onclick="Swal.close(); viewShipmentDetail(${index})" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Unit</button>
+                        <button onclick="Swal.close(); window.location.href='distributor_scan.php?append_id=${row.id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Unit Susulan</button>
+                        <button onclick="Swal.close(); window.open('print_invoice.php?id=${row.id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan</button>
                         <button onclick="Swal.close(); deleteShipment(${row.id}, '${row.customer_name}')" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
                 `,
@@ -404,7 +424,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                         </div>
 
                         <div class="mb-3">
-                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Barang</h6>
+                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Unit</h6>
                         </div>
 
                         <div class="table-responsive border rounded">
@@ -418,7 +438,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian batch.</td></tr>'}
+                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian unit.</td></tr>'}
                                 </tbody>
                                 <tfoot class="bg-light">
                                     <tr>

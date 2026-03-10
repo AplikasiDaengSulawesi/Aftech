@@ -291,9 +291,9 @@ $display_title = $page_titles[$current_page] ?? 'AFTECH System';
         try {
             const res = await fetch('../api/get_dashboard_stats.php?_nocache=' + Date.now());
             const data = await res.json();
-            if(data.latest_logs && data.latest_logs.length > 0) {
+            if(data.recent_logs && data.recent_logs.length > 0) {
                 logCont.innerHTML = '';
-                data.latest_logs.forEach(l => {
+                data.recent_logs.forEach(l => {
                     let color = '#64748b'; // Default Grey
                     const action = l.action.toUpperCase();
                     
@@ -310,7 +310,7 @@ $display_title = $page_titles[$current_page] ?? 'AFTECH System';
                                 <div style="flex: 1; overflow: hidden;">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <span style="font-size: 11px; font-weight: 800; color: ${color}; text-transform: uppercase; letter-spacing: 0.5px;">${l.action}</span>
-                                        <span style="font-size: 10px; color: #94a3b8; font-weight: 500;">${l.time_ago}</span>
+                                        <span style="font-size: 10px; color: #94a3b8; font-weight: 500;">${l.time}</span>
                                     </div>
                                     <p style="font-size: 12px; color: #334155; margin: 0; white-space: nowrap; overflow: hidden; text-truncate: ellipsis; font-weight: 500;">${l.details}</p>
                                 </div>

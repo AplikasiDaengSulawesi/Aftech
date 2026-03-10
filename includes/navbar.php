@@ -6,7 +6,7 @@
         <img class="logo-abbr" src="../assets/images/logo.png" alt="Logo" style="width: 45px; border-radius: 4px;">
         <div class="brand-title">
             <img src="../assets/images/logo.png" alt="Logo" style="width: 35px; border-radius: 4px; vertical-align: middle;">
-            <span class="brand-text" style="font-size: 16px; font-weight: 900; color: var(--af-primary); letter-spacing: 1px; margin-left: 10px; vertical-align: middle;">PT AFTECH MAKASSAR INDONESIA</span>
+            <span class="brand-text" style="font-size: 16px; font-weight: 900; color: var(--af-primary); letter-spacing: 1px; margin-left: 10px; vertical-align: middle;">AFTECH</span>
         </div>
     </a>
 

@@ -185,7 +185,7 @@ elseif ($action === 'submit_bulk') {
 
         $conn->commit();
         session_write_close(); // Lepas lock session segera
-        echo json_encode(['status' => 'success', 'message' => "Berhasil mengirim $total_qty barang ke $customer_name"]);
+        echo json_encode(['status' => 'success', 'message' => "Berhasil mengirim $total_qty barang ke $customer_name", 'shipment_id' => $shipment_id]);
     } catch (Exception $e) {
         $conn->rollback();
         echo json_encode(['status' => 'error', 'message' => 'Gagal simpan: ' . $e->getMessage()]);

@@ -1,4 +1,4 @@
-import 'package:aftech/screens/printer_screen.dart';
+import 'package:aftech/screens/splash_screen.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -14,10 +14,10 @@ class MyApp extends StatelessWidget {
       title: 'PT AFTECH MAKASSAR INDONESIA',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A237E)),
         useMaterial3: true,
       ),
-      home: const PrinterScreen(),
+      home: const SplashScreen(),
     );
   }
 }

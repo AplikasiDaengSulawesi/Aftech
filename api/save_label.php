@@ -31,6 +31,11 @@ if ($data) {
             device_model = '$device'";
 
     if ($conn->query($sql) === TRUE) {
+        // --- TAMBAHKAN LOG AKTIVITAS ---
+        $log_action = ($copies > 0) ? "PRODUKSI" : "SYNC";
+        $log_detail = "[$device] Batch #$batch ($item): +$copies Label";
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('$log_action', '$log_detail')");
+        
         echo json_encode(["status" => "success", "message" => "Berhasil Disimpan"]);
     } else {
         echo json_encode(["status" => "error", "message" => $conn->error]);

@@ -5,10 +5,23 @@ header('Content-Type: application/json');
 $stats = [];
 $today = date('Y-m-d');
 
-// 1. Overall Stats (Unit Fisik)
+// 1. Overall Stats (Unit Fisik) - TOTAL OVERALL (No Month Filter)
 $stats['total_production'] = (int)$conn->query("SELECT SUM(quantity * copies) FROM production_labels")->fetch_row()[0];
-$stats['total_warehouse'] = (int)$conn->query("SELECT SUM(p.quantity) FROM warehouse_items w JOIN production_labels p ON w.production_id = p.id")->fetch_row()[0];
+$stats['total_verified'] = (int)$conn->query("SELECT SUM(p.quantity) FROM warehouse_items w JOIN production_labels p ON w.production_id = p.id")->fetch_row()[0];
 $stats['total_shipped'] = (int)$conn->query("SELECT SUM(total_actual_qty) FROM outbound_shipments")->fetch_row()[0];
+
+// Label-based stats (Logic from warehouse_inventory.php) - TOTAL OVERALL
+$label_stats = $conn->query("
+    SELECT COUNT(w.id) as total_stok_labels
+    FROM warehouse_items w
+")->fetch_assoc();
+
+$stats['total_stok_labels'] = (int)($label_stats['total_stok_labels'] ?? 0);
+
+$kap_res = $conn->query("
+    SELECT SUM(copies) FROM production_labels
+");
+$stats['total_kapasitas_labels'] = (int)($kap_res->fetch_row()[0] ?? 0);
 
 // 2. Machine Performance (Produksi Unit)
 $mach_res = $conn->query("SELECT machine, SUM(quantity * copies) as total FROM production_labels GROUP BY machine ORDER BY total DESC LIMIT 5");
@@ -44,36 +57,45 @@ while($r = $log_res->fetch_assoc()) {
 }
 $stats['recent_logs'] = $logs;
 
-// 6. Production Trend (Last 7 Days)
-$trend_res = $conn->query("
-    SELECT d.date, 
-           COALESCE(SUM(p.produced), 0) as produced,
-           COALESCE(SUM(p.verified), 0) as verified,
-           COALESCE(SUM(p.shipped), 0) as shipped
-    FROM (
-        SELECT CURDATE() - INTERVAL (a.a + (10 * b.a)) DAY as date
-        FROM (SELECT 0 as a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) as a
-        CROSS JOIN (SELECT 0 as a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) as b
-    ) d
-    LEFT JOIN (
-        SELECT production_date as act_date, (quantity * copies) as produced, 0 as verified, 0 as shipped FROM production_labels
-        UNION ALL
-        SELECT DATE(w.transferred_at) as act_date, 0 as produced, pl.quantity as verified, 0 as shipped FROM warehouse_items w JOIN production_labels pl ON w.production_id = pl.id
-        UNION ALL
-        SELECT shipment_date as act_date, 0 as produced, 0 as verified, total_actual_qty as shipped FROM outbound_shipments
-    ) p ON d.date = p.act_date
-    WHERE d.date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
-    GROUP BY d.date
-    ORDER BY d.date ASC
-");
-
+// 6. Production Trend (Dynamic Range)
+$range = $_GET['range'] ?? 'week';
 $dates = []; $prod_trend = []; $ver_trend = []; $ship_trend = [];
-while($r = $trend_res->fetch_assoc()) {
-    $dates[] = date('d M', strtotime($r['date']));
-    $prod_trend[] = (int)$r['produced'];
-    $ver_trend[] = (int)$r['verified'];
-    $ship_trend[] = (int)$r['shipped'];
+
+if ($range === 'year') {
+    // Trend by Year for the last 5 years
+    $current_year_num = (int)date('Y');
+    for ($i = 4; $i >= 0; $i--) {
+        $year = $current_year_num - $i;
+        $dates[] = (string)$year;
+        $p = $conn->query("SELECT SUM(quantity * copies) FROM production_labels WHERE YEAR(production_date) = '$year'")->fetch_row()[0] ?? 0;
+        $v = $conn->query("SELECT SUM(pl.quantity) FROM warehouse_items w JOIN production_labels pl ON w.production_id = pl.id WHERE YEAR(w.transferred_at) = '$year'")->fetch_row()[0] ?? 0;
+        $s = $conn->query("SELECT SUM(total_actual_qty) FROM outbound_shipments WHERE YEAR(shipment_date) = '$year'")->fetch_row()[0] ?? 0;
+        $prod_trend[] = (int)$p; $ver_trend[] = (int)$v; $ship_trend[] = (int)$s;
+    }
+} else if ($range === 'month') {
+    // Trend by Month for the last 12 months (e.g., Maret 2026, April 2026)
+    for ($i = 11; $i >= 0; $i--) {
+        $m = date('Y-m', strtotime("-$i months"));
+        $month_start = "$m-01";
+        $month_end = date('Y-m-t', strtotime($month_start));
+        $dates[] = date('M Y', strtotime($month_start));
+        $p = $conn->query("SELECT SUM(quantity * copies) FROM production_labels WHERE production_date BETWEEN '$month_start' AND '$month_end'")->fetch_row()[0] ?? 0;
+        $v = $conn->query("SELECT SUM(pl.quantity) FROM warehouse_items w JOIN production_labels pl ON w.production_id = pl.id WHERE DATE(w.transferred_at) BETWEEN '$month_start' AND '$month_end'")->fetch_row()[0] ?? 0;
+        $s = $conn->query("SELECT SUM(total_actual_qty) FROM outbound_shipments WHERE shipment_date BETWEEN '$month_start' AND '$month_end'")->fetch_row()[0] ?? 0;
+        $prod_trend[] = (int)$p; $ver_trend[] = (int)$v; $ship_trend[] = (int)$s;
+    }
+} else {
+    // Trend by Day for the last 7 days (Week)
+    for ($i = 6; $i >= 0; $i--) {
+        $d = date('Y-m-d', strtotime("-$i days"));
+        $dates[] = date('d M', strtotime($d));
+        $p = $conn->query("SELECT SUM(quantity * copies) FROM production_labels WHERE production_date = '$d'")->fetch_row()[0] ?? 0;
+        $v = $conn->query("SELECT SUM(pl.quantity) FROM warehouse_items w JOIN production_labels pl ON w.production_id = pl.id WHERE DATE(w.transferred_at) = '$d'")->fetch_row()[0] ?? 0;
+        $s = $conn->query("SELECT SUM(total_actual_qty) FROM outbound_shipments WHERE shipment_date = '$d'")->fetch_row()[0] ?? 0;
+        $prod_trend[] = (int)$p; $ver_trend[] = (int)$v; $ship_trend[] = (int)$s;
+    }
 }
+
 $stats['trend'] = ['labels' => $dates, 'produced' => $prod_trend, 'verified' => $ver_trend, 'shipped' => $ship_trend];
 
 echo json_encode($stats);

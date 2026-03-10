@@ -38,7 +38,8 @@ $statsSql = "
         COUNT(p.id) as total_batch,
         COALESCE(SUM(p.quantity * p.copies), 0) as total_qty,
         COALESCE(SUM(p.copies), 0) as total_copies,
-        COALESCE(SUM( (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) * p.quantity ), 0) as total_in_warehouse
+        COALESCE(SUM( (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) * p.quantity ), 0) as total_in_warehouse,
+        COALESCE(SUM( (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) ), 0) as total_scanned_labels
     FROM production_labels p
     $where
 ";
@@ -47,8 +48,12 @@ $stats = $statsRes->fetch_assoc();
 
 $total_batch = (int)($stats['total_batch'] ?? 0);
 $total_qty = (int)($stats['total_qty'] ?? 0);
+$total_copies = (int)($stats['total_copies'] ?? 0);
+$total_scanned_labels = (int)($stats['total_scanned_labels'] ?? 0);
 $total_in_warehouse = (int)($stats['total_in_warehouse'] ?? 0);
-$total_belum_scan = max(0, $total_qty - $total_in_warehouse);
+
+$total_belum_scan_units = max(0, $total_qty - $total_in_warehouse);
+$total_belum_scan_labels = max(0, $total_copies - $total_scanned_labels);
 
 // Set locale format for bulan in Indonesia
 $bulan_indonesia = [
@@ -86,7 +91,9 @@ echo json_encode([
     'stats' => [
         'total_batch' => $total_batch,
         'total_qty' => $total_qty,
-        'belum_scan' => $total_belum_scan,
+        'total_copies' => $total_copies,
+        'belum_scan' => $total_belum_scan_labels, // Default for "Antrian QC" widget
+        'belum_scan_units' => $total_belum_scan_units,
         'in_warehouse' => $total_in_warehouse,
         'bulan' => $bulan_ini
     ]

@@ -1,5 +1,4 @@
 <?php
-header("Content-Type: application/json");
 $host = "localhost";
 $user = "root";
 $pass = "";

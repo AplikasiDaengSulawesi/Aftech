@@ -30,6 +30,8 @@ class InputTab extends StatelessWidget {
   final Function(String?) onShiftChanged;
   final VoidCallback onSave;
   final VoidCallback onGenerateBatch;
+  final VoidCallback onRefresh;
+  final bool isLoading;
 
   const InputTab({
     super.key, required this.isWide, required this.selectedItem, required this.selectedUnit,
@@ -41,21 +43,36 @@ class InputTab extends StatelessWidget {
     required this.opController, required this.qcController, required this.batchController,
     required this.currentTime, required this.selectedDate,
     required this.onItemChanged, required this.onUnitChanged, required this.onMachineChanged,
-    required this.onShiftChanged, required this.onSave, required this.onGenerateBatch
+    required this.onShiftChanged, required this.onSave, required this.onGenerateBatch,
+    required this.onRefresh, required this.isLoading
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(children: [
       _batchHeader(),
-      
+
       Expanded(child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         child: Column(children: [
-          CardGroup(title: "PRODUK & DIMENSI", icon: Icons.inventory_2_rounded, child: Column(children: [
-            _dropdown("Jenis Item", selectedItem, items, onItemChanged),
-            const SizedBox(height: 16),
-            _chips(availableSizes, sizeController, "Pilih Ukuran Cepat:"),
+          CardGroup(
+            title: "PRODUK & DIMENSI", 
+            icon: Icons.inventory_2_rounded, 
+            trailing: InkWell(
+              onTap: isLoading ? null : onRefresh,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(color: Colors.indigo.withOpacity(0.05), shape: BoxShape.circle),
+                child: isLoading 
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.indigo))
+                  : const Icon(Icons.sync_rounded, size: 16, color: Colors.indigo)
+              ),
+            ),
+            child: Column(children: [
+              _dropdown("Jenis Item", selectedItem, items, onItemChanged),
+              const SizedBox(height: 16),
+              _chips(availableSizes, sizeController, "Pilih Ukuran Cepat:"),
             Row(children: [
               Expanded(flex: 2, child: _field(sizeController, "Ukuran Manual", Icons.straighten_rounded)),
               const SizedBox(width: 12),
@@ -124,18 +141,25 @@ class InputTab extends StatelessWidget {
   }
 
   Widget _dropdown(String l, String v, List<String> items, Function(String?) onChanged) {
+    // Validasi agar tidak crash jika value tidak ada di list
+    String? safeValue = items.contains(v) ? v : (items.isNotEmpty ? items.first : null);
+    
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(l, style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
       const SizedBox(height: 6),
-      Container(height: 45, padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[200]!)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: v.isEmpty ? (items.isNotEmpty ? items.first : null) : v, isExpanded: true, icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18), items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)))).toList(), onChanged: (val) { onChanged(val); onGenerateBatch(); })))
+      Container(height: 45, padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[200]!)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: safeValue, isExpanded: true, icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18), items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)))).toList(), onChanged: (val) { onChanged(val); onGenerateBatch(); })))
     ]);
   }
 
   Widget _machineDropdown() {
+    // Cari apakah selectedMachine ada dalam list machineDetails
+    bool exists = machineDetails.any((m) => m['name'] == selectedMachine);
+    String? safeValue = exists ? selectedMachine : (machineDetails.isNotEmpty ? machineDetails.first['name'] : null);
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text("Machine", style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
       const SizedBox(height: 6),
-      Container(height: 45, padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[200]!)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: selectedMachine, isExpanded: true, icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18), items: machineDetails.map((m) {
+      Container(height: 45, padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[200]!)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: safeValue, isExpanded: true, icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18), items: machineDetails.map((m) {
         bool isMaint = m['status'] == 'maintenance';
         return DropdownMenuItem(value: m['name'] as String, child: FittedBox(fit: BoxFit.scaleDown, child: Row(children: [Text(m['name'], style: TextStyle(fontSize: 13, color: isMaint ? Colors.red : Colors.black, fontWeight: FontWeight.bold)), if (isMaint) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.warning_amber_rounded, size: 12, color: Colors.red))])));
       }).toList(), onChanged: (val) { onMachineChanged(val); onGenerateBatch(); })))

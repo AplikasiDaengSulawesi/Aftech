@@ -87,6 +87,8 @@ if ($append_id > 0) {
     .action-item i { width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-right: 12px; font-size: 14px; }
     .icon-view { background: #e8eaf6; color: #1A237E; }
     .icon-delete { background: #ffebee; color: #d32f2f; }
+    .icon-append { background: #fff8e1; color: #ffa000; }
+    .icon-print { background: #e3f2fd; color: #1976d2; }
     
     .swal2-close-custom {
         position: absolute; top: 12px; right: 12px; background: #f5f5f5; border-radius: 50%; width: 26px; height: 26px;
@@ -115,9 +117,14 @@ if ($append_id > 0) {
                         <div class="scanner-container">
                             <div class="card shadow-sm border-0">
                                 <div class="card-header border-0 pb-0">
-                                    <h4 class="card-title text-black">Quick Scan Barang</h4>
+                                    <h4 class="card-title text-black">Quick Scan Unit</h4>
                                 </div>
                                 <div class="card-body">
+                                    <div class="alert alert-info alert-dismissible fade show small py-2 px-3 mb-3 d-flex align-items-center" role="alert">
+                                        <i class="fa fa-info-circle me-2 fs-5"></i>
+                                        <div><strong>Tips:</strong> Untuk kenyamanan, sangat disarankan untuk mengunci rotasi layar HP/Tablet Anda.</div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
+                                    </div>
                                     <div id="reader"></div>
                                     
                                     <div class="cam-controls">
@@ -136,7 +143,7 @@ if ($append_id > 0) {
                                         <div id="status-icon"><i class="fa fa-qrcode fa-2x text-muted"></i></div>
                                         <div id="status-text">
                                             <div class="font-w600 text-black">Siap Scan</div>
-                                            <small class="text-muted">Arahkan ke QR Code Barang</small>
+                                            <small class="text-muted">Arahkan ke QR Code Unit</small>
                                         </div>
                                     </div>
                                     <button class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="resumeScanner()">Resume Scanner</button>
@@ -195,11 +202,11 @@ if ($append_id > 0) {
                                     </div>
                                     
                                     <hr class="mt-1 mb-3">
-                                    <h5 class="text-black mb-3"><i class="fa fa-boxes me-2 text-primary"></i>Daftar Barang Keluar</h5>
+                                    <h5 class="text-black mb-3"><i class="fa fa-boxes me-2 text-primary"></i>Daftar Unit Keluar</h5>
                                     
                                     <div id="empty-cart" class="text-center py-4">
                                         <i class="fa fa-box-open fa-3x text-light mb-3"></i>
-                                        <p class="text-muted">Scan barcode paket barang untuk memasukkannya ke dalam keranjang aktif.</p>
+                                        <p class="text-muted">Scan barcode paket unit untuk memasukkannya ke dalam keranjang aktif.</p>
                                     </div>
 
                                     <div id="cart-container">
@@ -255,6 +262,21 @@ if ($append_id > 0) {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL VIEW DETAIL PENGIRIMAN -->
+        <div class="modal fade" id="modalViewShipment" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-radius: 20px 20px 0 0;">
+                        <h5 class="modal-title text-white font-w700">Rincian Lengkap Pengiriman</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4" id="viewDetailContent">
+                        <!-- Content loaded via AJAX -->
                     </div>
                 </div>
             </div>
@@ -386,16 +408,97 @@ if ($append_id > 0) {
                 html: `
                     <div class="swal2-close-custom" onclick="Swal.close()"><i class="fa fa-times"></i></div>
                     <div class="text-center mb-3">
-                        <small class="text-muted d-block mb-1">Nota Pengiriman</small>
+                        <small class="text-muted d-block mb-1">Customer</small>
                         <strong class="text-black" style="word-break:break-all;">${name}</strong>
                     </div>
                     <div class="action-list">
-                        <a href="print_invoice.php?id=${id}" target="_blank" onclick="Swal.close()" class="action-item"><i class="fa fa-print icon-view"></i> Cetak Nota Pengiriman</a>
+                        <button onclick="Swal.close(); viewShipmentDetail(${id}, '${name.replace(/'/g, "\\'")}')" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Unit</button>
+                        <button onclick="Swal.close(); window.location.href='distributor_scan.php?append_id=${id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Unit Susulan</button>
+                        <button onclick="Swal.close(); window.open('print_invoice.php?id=${id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan</button>
                         <button onclick="Swal.close(); deleteShipment(${id})" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
                 `,
                 showConfirmButton: false, padding: '1.2rem', width: '320px', borderRadius: '15px'
             });
+        };
+
+        window.viewShipmentDetail = async function(id, name) {
+            const modalEl = document.getElementById('modalViewShipment');
+            const contentEl = document.getElementById('viewDetailContent');
+            contentEl.innerHTML = '<div class="text-center py-5"><i class="fa fa-spinner fa-spin fa-2x text-primary"></i><p class="mt-2 text-muted">Memuat rincian...</p></div>';
+            new bootstrap.Modal(modalEl).show();
+
+            try {
+                const res = await fetch(`../api/get_shipment_details.php?id=${id}`);
+                const result = await res.json();
+
+                if (result.status === 'success') {
+                    let tableRows = '';
+                    let totalLabel = 0;
+                    let totalUnit = 0;
+
+                    result.data.forEach((item, i) => {
+                        totalLabel += parseInt(item.label_qty);
+                        totalUnit += parseInt(item.unit_qty);
+                        tableRows += `
+                            <tr>
+                                <td class="text-muted align-middle" style="font-size: 12px;">${i + 1}</td>
+                                <td class="align-middle">
+                                    <div class="text-black font-w700" style="font-size: 13px;">${item.item}</div>
+                                    <div class="text-muted" style="font-size: 11px;">${item.size} ${item.unit} &bull; <span class="text-primary font-w600">#${item.batch}</span></div>
+                                </td>
+                                <td class="text-center align-middle font-w600 text-black" style="font-size: 13px;">
+                                    ${item.label_qty} Paket<br>
+                                    <small class="text-muted font-w500" style="font-size: 10px;">(@ ${item.per_paket} Unit)</small>
+                                </td>
+                                <td class="text-end align-middle font-w800 text-black" style="font-size: 14px;">${item.unit_qty} Unit</td>
+                            </tr>
+                        `;
+                    });
+
+                    contentEl.innerHTML = `
+                        <div class="row mb-4 g-3">
+                            <div class="col-12">
+                                <div class="p-3 bg-light rounded" style="height: 100%;">
+                                    <small class="text-muted text-uppercase d-block mb-2" style="font-size:10px; font-weight:700; letter-spacing:1px;">Customer</small>
+                                    <div class="text-black font-w800" style="font-size: 16px;">${name}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Unit</h6>
+                        </div>
+
+                        <div class="table-responsive border rounded">
+                            <table class="table table-sm table-hover mb-0" style="table-layout: fixed; width: 100%;">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 10%;">NO</th>
+                                        <th class="text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 45%;">ITEM & BATCH</th>
+                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 20%;">JML PAKET</th>
+                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">TOTAL FISIK</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian unit.</td></tr>'}
+                                </tbody>
+                                <tfoot class="bg-light">
+                                    <tr>
+                                        <td colspan="2" class="text-end py-3 text-black font-w800" style="font-size: 12px; border-bottom: 0;">TOTAL KESELURUHAN</td>
+                                        <td class="text-center py-3 text-black font-w800" style="font-size: 14px; border-bottom: 0;">${totalLabel}</td>
+                                        <td class="text-end py-3 text-danger font-w800" style="font-size: 16px; border-bottom: 0;">${totalUnit} Unit</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    `;
+                } else {
+                    contentEl.innerHTML = `<div class="text-center text-danger py-4"><i class="fa fa-exclamation-triangle fa-2x mb-2"></i><br>${result.message}</div>`;
+                }
+            } catch (e) {
+                contentEl.innerHTML = '<div class="text-center text-danger py-4"><i class="fa fa-wifi fa-2x mb-2"></i><br>Gagal terhubung ke server.</div>';
+            }
         };
 
         window.deleteShipment = function(id) {
@@ -412,7 +515,7 @@ if ($append_id > 0) {
                     const res = await fetch(`../api/admin_manage.php?action=delete&type=shipment`, { method: 'POST', body: f });
                     const data = await res.json();
                     if(data.status === 'success') {
-                        toastr.success('Pengiriman berhasil dibatalkan');
+                        toastr.success('Data Berhasil Dibatalkan');
                         window.loadHistory();
                     } else {
                         toastr.error(data.message || 'Gagal membatalkan pengiriman');
@@ -585,28 +688,28 @@ if ($append_id > 0) {
                     if (foundInCartName) break;
                 }
                 if (foundInCartName) {
-                    new Audio('../public/sounds/alert.wav').play().catch(e => {});
+                    new Audio('../assets/sounds/alert.wav').play().catch(e => {});
                     updateStatus('warning', 'SUDAH TERPILIH', `Barang ini sedang berada di ${foundInCartName}!`);
                     setTimeout(resumeScanner, 2000);
                     return;
                 }
             }
             isProcessing = true;
-            updateStatus('info', 'Memeriksa...', 'Mencari data barang...');
+            updateStatus('info', 'Memeriksa...', 'Mencari data unit...');
             try {
                 const res = await fetch(`../api/process_distributor.php?action=get_batch_data&qr=${encodeURIComponent(decodedText)}`);
                 const result = await res.json();
                 if(result.status === 'success') {
-                    new Audio('../public/sounds/success.wav').play().catch(e => {});
-                    updateStatus('success', 'BARANG DITAMBAHKAN', `Paket ditambahkan ke ${carts[activeCartId].name}`);
+                    new Audio('../assets/sounds/success.wav').play().catch(e => {});
+                    updateStatus('success', 'UNIT DITAMBAHKAN', `Paket ditambahkan ke ${carts[activeCartId].name}`);
                     addToCart(result.data);
                     setTimeout(resumeScanner, 800);
                 } else {
-                    new Audio('../public/sounds/reject.wav').play().catch(e => {});
+                    new Audio('../assets/sounds/reject.wav').play().catch(e => {});
                     updateStatus('error', 'DITOLAK', result.message);
                     setTimeout(resumeScanner, 2000);
                 }
-            } catch (e) { new Audio('../public/sounds/alert.wav').play().catch(e => {}); updateStatus('error', 'SERVER ERROR', 'Koneksi terputus'); setTimeout(resumeScanner, 2000); }
+            } catch (e) { new Audio('../assets/sounds/alert.wav').play().catch(e => {}); updateStatus('error', 'SERVER ERROR', 'Koneksi terputus'); setTimeout(resumeScanner, 2000); }
         }
 
         function addToCart(data) {
@@ -630,7 +733,7 @@ if ($append_id > 0) {
             const div = document.createElement('div');
             div.className = 'batch-card'; div.id = `batch-card-${pid}`;
             const availableCount = batchData.in_warehouse.filter(x => !batchData.already_shipped.includes(x)).length;
-            div.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><div><h5 class="text-primary mb-0">#${batchData.batch}</h5><small class="text-black font-w600">${batchData.item} (${batchData.size})</small></div><div class="d-flex align-items-center gap-2"><button type="button" class="btn btn-outline-primary btn-sm" id="btn-selectall-${pid}" onclick="selectAllInBatch(${pid})"><i class="fa fa-check-double me-1"></i> Pilih Semua (${availableCount})</button><div class="badge badge-primary light"><span id="count-${pid}">${batchData.selected.size}</span> Dipilih</div></div></div><div class="cinema-grid-bulk" id="grid-${pid}"></div>`;
+            div.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><div><h5 class="text-primary mb-0">#${batchData.batch}</h5><small class="text-black font-w600">${batchData.item} (${batchData.size})</small></div><div class="d-flex align-items-center gap-2"><button type="button" class="btn btn-outline-primary btn-sm" id="btn-selectall-${pid}" onclick="selectAllInBatch(${pid})"><i class="fa fa-check-double me-1"></i> Pilih Semua (${availableCount})</button><div class="text-primary font-w800" style="font-size: 14px;"><span id="count-${pid}">${batchData.selected.size}</span> Dipilih</div></div></div><div class="cinema-grid-bulk" id="grid-${pid}"></div>`;
             cartContainer.appendChild(div);
             const gridEl = document.getElementById(`grid-${pid}`);
             for (let i = 1; i <= batchData.copies; i++) {
@@ -666,7 +769,11 @@ if ($append_id > 0) {
                 batchData.selected.clear();
                 for (let i = 1; i <= batchData.copies; i++) { const el = document.getElementById(`seat-${pid}-${i}`); if (el) el.classList.remove('selected'); }
             } else {
-                Swal.fire({ title: 'Yakin?', text: `Pilih ${availableCount} unit tanpa scan?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#D50000', confirmButtonText: 'Ya' }).then((res) => {
+                Swal.fire({ 
+                    title: 'Pilih Semua?', 
+                    text: `Tindakan ini berisiko karena Anda memilih ${availableCount} unit tanpa melakukan scan fisik satu per satu. Lanjutkan?`, 
+                    icon: 'warning', showCancelButton: true, confirmButtonColor: '#D50000', confirmButtonText: 'Ya, Saya Paham' 
+                }).then((res) => {
                     if (res.isConfirmed) {
                         for (let i = 1; i <= batchData.copies; i++) { if (batchData.in_warehouse.includes(i) && !batchData.already_shipped.includes(i)) { batchData.selected.add(i); const el = document.getElementById(`seat-${pid}-${i}`); if (el) el.classList.add('selected'); } }
                         updateTotal(); updateSelectAllButtonUI(pid); document.getElementById(`count-${pid}`).innerText = batchData.selected.size;
@@ -719,7 +826,7 @@ if ($append_id > 0) {
                     <?php if($append_id > 0): ?>
                     Swal.fire({ title: 'Berhasil Susulan', text: "Kembali ke data histori?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Ya' }).then((r) => { if (r.isConfirmed) window.location.href = 'data_distributor.php'; else clearCart(); });
                     <?php else: ?>
-                    Swal.fire({ title: 'Berhasil', text: "Cetak nota?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Ya' }).then((r) => { if (r.isConfirmed) window.open(`print_invoice.php?id=${d.shipment_id}`, '_blank'); });
+                    Swal.fire({ title: 'Pengiriman Berhasil', text: "Apakah Anda ingin mencetak Surat Jalan sekarang?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Cetak Surat Jalan' }).then((r) => { if (r.isConfirmed) window.open(`print_invoice.php?id=${d.shipment_id}`, '_blank'); });
                     <?php endif; ?>
                     if (Object.keys(carts).length > 1) { delete carts[activeCartId]; activeCartId = Object.keys(carts)[0]; switchCart(activeCartId); } else clearCart();
                     window.loadHistory();

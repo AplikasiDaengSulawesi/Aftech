@@ -73,23 +73,16 @@ $periode_label = $show_all ? "SEMUA WAKTU" : date('d/m/Y', strtotime($start_date
         .bg-light { background: #f9f9f9; }
         
         @media print {
-            .btn-print { display: none; }
-        }
-        .btn-print { 
-            position: fixed; top: 20px; right: 20px; 
-            padding: 10px 20px; background: #1A237E; color: #fff; 
-            border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
+            .bg-light { background: #f9f9f9; }
         }
     </style>
 </head>
 <body>
-    <button class="btn-print" onclick="window.print()">CETAK SEKARANG</button>
-
     <table class="header-table">
         <tr>
             <td style="width: 60%;">
                 <h1 style="margin:0; font-size: 24px;">PT AFTECH MAKASSAR INDONESIA</h1>
-                <p style="margin:2px 0;">Sistem Manajemen Produksi & Inventaris Gudang</p>
+                <p style="margin:2px 0;">JL.KIMA 15 KAVLING KODE R-4 A1</p>
             </td>
             <td style="text-align: right;">
                 <p style="margin:0;">Tanggal Cetak: <?php echo date('d F Y H:i'); ?></p>

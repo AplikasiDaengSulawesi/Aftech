@@ -204,7 +204,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                                 <th class="text-center col-prod"><strong>PRODUKSI (UNIT)</strong></th>
                                                 <th class="text-center col-ver"><strong>VERIFIED (UNIT)</strong></th>
                                                 <th class="text-center col-ship"><strong>TERKIRIM (UNIT)</strong></th>
-                                                <th class="text-end pe-4 col-stock"><strong>STOK GUDANG</strong></th>
+                                                <th class="text-center col-stock"><strong>STOK GUDANG</strong></th>
                                             </tr>
                                         </thead>
                                         <tbody id="reportTableBody">
@@ -224,6 +224,22 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
     <?php include '../includes/footer.php' ?>
     <script>
         window.columnStates = { 'col-no': true, 'col-date': true, 'col-item': true, 'col-prod': true, 'col-ver': true, 'col-ship': true, 'col-stock': true };
+
+        function formatCompactNumber(number) {
+            number = parseInt(number) || 0;
+            if (number < 1000) {
+                return number.toLocaleString('id-ID');
+            } else if (number >= 1000 && number < 1000000) {
+                return (number / 1000).toFixed(1).replace(/\.0$/, '') + ' Ribu';
+            } else if (number >= 1000000 && number < 1000000000) {
+                return (number / 1000000).toFixed(1).replace(/\.0$/, '') + ' Juta';
+            } else if (number >= 1000000000 && number < 1000000000000) {
+                return (number / 1000000000).toFixed(1).replace(/\.0$/, '') + ' Milyar';
+            } else if (number >= 1000000000000) {
+                return (number / 1000000000000).toFixed(1).replace(/\.0$/, '') + ' Triliun';
+            }
+            return number.toLocaleString('id-ID');
+        }
 
         // Setup DateRangePicker
         $('#report_daterange').daterangepicker({
@@ -255,11 +271,20 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                 const result = await res.json();
                 
                 if (result.status === 'success') {
-                    // Update Summary
-                    document.getElementById('stat-produced').innerText = formatNumber(result.summary.produced);
-                    document.getElementById('stat-verified').innerText = formatNumber(result.summary.verified);
-                    document.getElementById('stat-shipped').innerText = formatNumber(result.summary.shipped);
-                    document.getElementById('stat-stock').innerText = formatNumber(result.summary.stock);
+                    // Update Summary (Identic with Data Produksi Standard)
+                    const stats = result.summary || { produced: 0, verified: 0, shipped: 0, stock: 0 };
+                    
+                    const elProduced = document.getElementById('stat-produced');
+                    if(elProduced) { elProduced.innerText = formatCompactNumber(stats.produced); elProduced.title = parseInt(stats.produced || 0).toLocaleString('id-ID'); }
+
+                    const elVerified = document.getElementById('stat-verified');
+                    if(elVerified) { elVerified.innerText = formatCompactNumber(stats.verified); elVerified.title = parseInt(stats.verified || 0).toLocaleString('id-ID'); }
+
+                    const elShipped = document.getElementById('stat-shipped');
+                    if(elShipped) { elShipped.innerText = formatCompactNumber(stats.shipped); elShipped.title = parseInt(stats.shipped || 0).toLocaleString('id-ID'); }
+
+                    const elStock = document.getElementById('stat-stock');
+                    if(elStock) { elStock.innerText = formatCompactNumber(stats.stock); elStock.title = parseInt(stats.stock || 0).toLocaleString('id-ID'); }
 
                     if(result.summary.bulan) {
                         const label = result.summary.bulan.includes('Filter') || result.summary.bulan.includes('Semua') ? result.summary.bulan : `(${result.summary.bulan})`;
@@ -281,11 +306,11 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
 
                         const shippedDisplay = (parseInt(row.shipped_qty) > 0) 
                             ? `<strong>${formatNumber(row.shipped_qty)}</strong>` 
-                            : `<small class="text-muted italic" style="font-size:10px;">Belum Terkirim</small>`;
+                            : `<small class="text-primary italic" style="font-size:10px; font-weight:600;">Belum ada unit yang terkirim</small>`;
                         
                         const stockDisplay = (parseInt(row.stock_qty) > 0)
                             ? `<span class="badge badge-primary light font-w800" style="font-size:13px;">${formatNumber(row.stock_qty)}</span>`
-                            : `<span class="badge badge-light text-danger font-w800" style="font-size:11px;">Kosong</span>`;
+                            : `<small class="text-danger italic" style="font-size:10px; font-weight:600;">Habis</small>`;
 
                         tbody.insertAdjacentHTML('beforeend', `
                             <tr>
@@ -301,7 +326,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                 <td class="text-center col-prod ${window.columnStates['col-prod'] ? '' : 'col-hidden'}"><strong>${formatNumber(row.produced_qty)}</strong></td>
                                 <td class="text-center col-ver ${window.columnStates['col-ver'] ? '' : 'col-hidden'}"><span class="text-primary font-w700">${formatNumber(row.verified_qty)}</span></td>
                                 <td class="text-center col-ship ${window.columnStates['col-ship'] ? '' : 'col-hidden'}"><span class="text-success">${shippedDisplay}</span></td>
-                                <td class="text-end pe-4 col-stock ${window.columnStates['col-stock'] ? '' : 'col-hidden'}">${stockDisplay}</td>
+                                <td class="text-center col-stock ${window.columnStates['col-stock'] ? '' : 'col-hidden'}">${stockDisplay}</td>
                             </tr>
                         `);
                     });

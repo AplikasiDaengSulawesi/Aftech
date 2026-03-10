@@ -49,8 +49,8 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
   final _sizeValueController = TextEditingController(text: "600");
   final _qtyController = TextEditingController(text: "1200");
   final _labelCountController = TextEditingController(text: "1");
-  final _opController = TextEditingController(text: "ahmad");
-  final _qcController = TextEditingController(text: "siti");
+  final _opController = TextEditingController();
+  final _qcController = TextEditingController();
   final _batchController = TextEditingController();
   final _ipPrinterController = TextEditingController(text: "192.168.1.100");
 
@@ -156,15 +156,19 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
     final shifts = await _dbService.getMasterData('shifts');
     final units = await _dbService.getMasterData('units');
     setState(() {
+      // CLEAR DULU AGAR FRESH
+      _items.clear(); _machines.clear(); _shifts.clear(); _units.clear();
+      _itemDetails.clear(); _machineDetails.clear();
+
       _itemDetails = items; 
       _items = items.map((e) => e['name'] as String).toSet().toList();
       _machineDetails = machines; 
       _machines = machines.map((e) => e['name'] as String).toSet().toList();
       _shifts = (shifts.isNotEmpty ? shifts : ["SHIFT A", "SHIFT B"]).toSet().toList();
       _units = (units.isNotEmpty ? units : ["ML", "GR", "PCS"]).toSet().toList();
-      if (_selectedItem.isEmpty && _items.isNotEmpty) _selectedItem = _items.first;
-      if (_selectedMachine.isEmpty && _machines.isNotEmpty) _selectedMachine = _machines.first;
-      if (_selectedShift.isEmpty && _shifts.isNotEmpty) _selectedShift = _shifts.first;
+      if (_items.isNotEmpty) _selectedItem = _items.contains(_selectedItem) ? _selectedItem : _items.first;
+      if (_machines.isNotEmpty) _selectedMachine = _machines.contains(_selectedMachine) ? _selectedMachine : _machines.first;
+      if (_shifts.isNotEmpty) _selectedShift = _shifts.contains(_selectedShift) ? _selectedShift : _shifts.first;
       _updateAutoUnit(); _updateRelatedData();
     });
   }
@@ -222,10 +226,35 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
     );
   }
 
-  Future<void> _refreshDatabase() async { setState(() => _isSyncing = true); if (await _dbService.syncMasterData()) { await _loadMasterData(); await _loadReports(); await _loadTemplates(); _showOverlayIcon(Icons.sync, Colors.greenAccent); } setState(() => _isSyncing = false); }
+  Future<void> _refreshDatabase() async {
+    if (_isSyncing) return; 
+    setState(() => _isSyncing = true);
+    try {
+      if (await _dbService.syncMasterData()) { 
+        await _loadMasterData(); 
+        await _loadReports(); 
+        await _loadTemplates(); 
+        _showOverlayIcon(Icons.sync, Colors.greenAccent); 
+      }
+    } catch (e) {
+      debugPrint("Sync Error: $e");
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
 
   // --- ACTIONS ---
   Future<void> _addToQueue() async {
+    // VALIDASI INPUT: OPERATOR & QC WAJIB DIISI
+    if (_opController.text.trim().isEmpty || _qcController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        content: Text("LENGKAPI DATA: Nama Operator dan QC wajib diisi!"),
+      ));
+      return;
+    }
+
     final newBatch = _batchController.text;
     final printedIdx = _printQueue.indexWhere((e) => e.batch == newBatch && e.isPrinted);
     if (printedIdx != -1) {
@@ -327,7 +356,33 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
         bottomNavigationBar: _buildModernNav(), 
       ),
       if (_isProcessing) _buildElegantPrintOverlay(), 
+      if (_isSyncing) _buildElegantSyncOverlay(), 
     ]);
+  }
+
+  // --- ELEGANT SYNC OVERLAY ---
+  Widget _buildElegantSyncOverlay() {
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+      child: Container(
+        color: Colors.black.withOpacity(0.7),
+        child: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Stack(alignment: Alignment.center, children: [
+              const SizedBox(width: 120, height: 120, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white24)),
+              ScaleTransition(
+                scale: Tween(begin: 0.8, end: 1.2).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut)), // EFEK DENYUT
+                child: const Icon(Icons.cloud_sync_rounded, color: Colors.white, size: 50)
+              ),
+            ]),
+            const SizedBox(height: 30),
+            const Text("SYNCHRONIZING DATABASE", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w300, letterSpacing: 4)),
+            const SizedBox(height: 10),
+            const Text("Please wait, fetching latest master data...", style: TextStyle(color: Colors.white54, fontSize: 10)),
+          ]),
+        ),
+      ),
+    );
   }
 
   // --- ELEGANT PRINT OVERLAY (SIMPLE & ELEGANT) ---
@@ -400,7 +455,7 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
     switch (_currentTabIndex) {
       case 0: return TemplateTab(templates: _templates, isLoading: _isLoadingTemplates, onSelect: _applyTemplate, onRefresh: _loadTemplates);
       case 1: return QueueTab(filteredQueue: _filteredQueue, subTab: _currentQueueSubTab, selectedIds: _selectedIds, onTabChange: (i)=>setState(()=>_currentQueueSubTab=i), onSearch: (v)=>setState(()=>_searchQuery=v), onShowDetail: (l)=>showDialog(context: context, builder: (ctx)=>DetailDialog(data: l, isReport: false, onEdit: () async { setState(() { _selectedItem = l.item; _selectedMachine = l.machine; _selectedShift = l.shift; _sizeValueController.text = l.size; _qtyController.text = l.quantity; _opController.text = l.operator; _qcController.text = l.qc; _selectedUnit = l.unit; _labelCountController.text = l.deltaCount.toString(); }); await _dbService.deleteFromLocalQueue(l.id!); await _loadLocalQueue(); Navigator.pop(ctx); setState(() { _currentTabIndex = 2; }); _updateRelatedData(); })), onPrint: (l) { if(_currentQueueSubTab == 0) _executePrint(l, 1, l.deltaCount, false); else showDialog(context: context, builder: (ctx)=>ReprintModal(label: l, onPrint: (s,e,isL)=>_executePrint(l,s,e,isL), onSyncOnly: (s,e) => _syncLabel(l, addCopies: (e - l.copies), isOnlySync: true))); }, onSync: (l) => _syncLabel(l), onDelete: (l) async { bool? res = await showDialog<bool>(context: context, builder: (ctx) => const ConfirmDialog(title: "HAPUS?", message: "Hapus batch ini?", icon: Icons.delete_rounded, color: Colors.red)); if(res == true) { await _dbService.deleteFromLocalQueue(l.id!); _loadLocalQueue(); } }, onDeleteMassal: (ids) async { bool? res = await showDialog<bool>(context: context, builder: (ctx) => const ConfirmDialog(title: "HAPUS MASAL?", message: "Hapus data terpilih?", icon: Icons.delete_forever_rounded, color: Colors.red)); if(res == true) { for(var id in ids) await _dbService.deleteFromLocalQueue(id); setState(()=>_selectedIds.clear()); _loadLocalQueue(); } }, onCancelSelect: ()=>setState(()=>_selectedIds.clear()));
-      case 2: return InputTab(isWide: false, selectedItem: _selectedItem, selectedUnit: _selectedUnit, selectedMachine: _selectedMachine, selectedShift: _selectedShift, items: _items, units: _units, machines: _machines, shifts: _shifts, availableSizes: _availableSizes, availableQuantities: _availableQuantities, machineDetails: _machineDetails, sizeController: _sizeValueController, qtyController: _qtyController, labelCountController: _labelCountController, opController: _opController, qcController: _qcController, batchController: _batchController, currentTime: _currentTime, selectedDate: _selectedDate, onItemChanged: (v){ setState(()=>_selectedItem=v!); _updateAutoUnit(); _updateRelatedData(); }, onUnitChanged: (v)=>setState(()=>_selectedUnit=v!), onMachineChanged: (v){ setState(()=>_selectedMachine=v!); _updateRelatedData(); }, onShiftChanged: (v)=>setState(()=>_selectedShift=v!), onSave: _addToQueue, onGenerateBatch: _generateBatch);
+      case 2: return InputTab(isWide: false, selectedItem: _selectedItem, selectedUnit: _selectedUnit, selectedMachine: _selectedMachine, selectedShift: _selectedShift, items: _items, units: _units, machines: _machines, shifts: _shifts, availableSizes: _availableSizes, availableQuantities: _availableQuantities, machineDetails: _machineDetails, sizeController: _sizeValueController, qtyController: _qtyController, labelCountController: _labelCountController, opController: _opController, qcController: _qcController, batchController: _batchController, currentTime: _currentTime, selectedDate: _selectedDate, onItemChanged: (v){ setState(()=>_selectedItem=v!); _updateAutoUnit(); _updateRelatedData(); }, onUnitChanged: (v)=>setState(()=>_selectedUnit=v!), onMachineChanged: (v){ setState(()=>_selectedMachine=v!); _updateRelatedData(); }, onShiftChanged: (v)=>setState(()=>_selectedShift=v!), onSave: _addToQueue, onGenerateBatch: _generateBatch, onRefresh: _refreshDatabase, isLoading: _isSyncing);
       case 3: return ReportTab(reports: _filteredReports, isLoading: _isLoadingReports, onRefresh: _loadReports, onShowDetail: (r)=>showDialog(context: context, builder: (ctx)=>DetailDialog(data: r, isReport: true)));
       case 4: return LogTab(logs: _filteredLogs, onRefresh: _loadLocalLogs);
       default: return Container();
@@ -412,7 +467,7 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
     if (_connected) { status = "READY (BT)"; sCol = Colors.greenAccent; }
     else if (_isIpConnected) { status = "READY (IP)"; sCol = Colors.cyanAccent; }
     
-    return AppBar(elevation: 0, backgroundColor: Colors.indigo[900], titleSpacing: 0, leading: const Icon(Icons.precision_manufacturing, color: Colors.white, size: 22), title: InkWell(onTap: () async { final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime(2030)); if (picked != null) { setState(() { _selectedDate = picked; }); _initAppData(); } }, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text("PT Aftech Makassar", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)), Row(children: [const Icon(Icons.calendar_month, size: 10, color: Colors.white70), const SizedBox(width: 4), Text(DateFormat('dd-MM-yyyy').format(_selectedDate), style: const TextStyle(fontSize: 10, color: Colors.white70)), const Text(" | ", style: TextStyle(fontSize: 10, color: Colors.white70)), const Icon(Icons.access_time, size: 10, color: Colors.white70), const SizedBox(width: 4), Text(_currentTime, style: const TextStyle(fontSize: 10, color: Colors.white70))])])), actions: [InkWell(onTap: _showConnectionPicker, child: Container(margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 8), padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(20), border: Border.all(color: sCol)), child: Row(children: [Icon(_connected || _isIpConnected ? Icons.link : Icons.link_off, size: 14, color: sCol), const SizedBox(width: 6), Text(status, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: sCol))]))), const SizedBox(width: 8)]);
+    return AppBar(elevation: 0, backgroundColor: Colors.indigo[900], titleSpacing: 0, leading: const Icon(Icons.precision_manufacturing, color: Colors.white, size: 22), title: InkWell(onTap: () async { final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime(2030)); if (picked != null) { setState(() { _selectedDate = picked; }); _initAppData(); } }, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text("PT AFTECH MAKASSAR INDONESIA", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)), Row(children: [const Icon(Icons.calendar_month, size: 10, color: Colors.white70), const SizedBox(width: 4), Text(DateFormat('dd-MM-yyyy').format(_selectedDate), style: const TextStyle(fontSize: 10, color: Colors.white70)), const Text(" | ", style: TextStyle(fontSize: 10, color: Colors.white70)), const Icon(Icons.access_time, size: 10, color: Colors.white70), const SizedBox(width: 4), Text(_currentTime, style: const TextStyle(fontSize: 10, color: Colors.white70))])])), actions: [InkWell(onTap: _showConnectionPicker, child: Container(margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 8), padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(20), border: Border.all(color: sCol)), child: Row(children: [Icon(_connected || _isIpConnected ? Icons.link : Icons.link_off, size: 14, color: sCol), const SizedBox(width: 6), Text(status, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: sCol))]))), const SizedBox(width: 8)]);
   }
 
   void _showConnectionPicker() => showModalBottomSheet(
@@ -456,13 +511,13 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
           const Text("DATABASE SYNCHRONIZATION", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1)),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: _isTestingConn ? null : () async {
-              setM(() => _isTestingConn = true);
-              bool ok = await _dbService.syncMasterData();
-              setM(() => _isTestingConn = false);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: ok ? Colors.green : Colors.red, behavior: SnackBarBehavior.floating, content: Text(ok ? "SINGKRON DATABASE BERHASIL!" : "SINGKRON GAGAL: Periksa Internet / Link")));
+            onPressed: _isSyncing ? null : () {
+              Navigator.pop(context); // Tutup modal dulu
+              _refreshDatabase(); // Jalankan sync
             },
-            icon: _isTestingConn ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.indigo)) : const Icon(Icons.cloud_sync_rounded, size: 18),
+            icon: _isSyncing 
+              ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.indigo)) 
+              : const Icon(Icons.cloud_sync_rounded, size: 18),
             label: const Text("SINGKRON DATABASE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[100], foregroundColor: Colors.indigo[900], minimumSize: const Size(double.infinity, 50), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15), side: BorderSide(color: Colors.indigo.withOpacity(0.1)))),
           ),
@@ -471,9 +526,25 @@ class _PrinterScreenState extends State<PrinterScreen> with TickerProviderStateM
           const Divider(),
           if(_connected) ListTile(leading: const Icon(Icons.bluetooth_connected, color: Colors.green), title: Text(_selectedDevice?.name ?? "Unknown", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)), subtitle: const Text("Connected via Bluetooth", style: TextStyle(fontSize: 10, color: Colors.green)), trailing: TextButton(onPressed: () { _bluetoothService.disconnect().then((_) => setState(() => _connected = false)); Navigator.pop(ctx); }, child: const Text("DISCONNECT", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10))))
           else if(_devices.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Text("Mencari Bluetooth...", style: TextStyle(fontSize: 11, color: Colors.grey)))
-          else ..._devices.map((d) => ListTile(leading: const Icon(Icons.bluetooth), title: Text(d.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)), onTap: () { setState(()=>_selectedDevice=d); _connect(); Navigator.pop(ctx); })),
+          else SizedBox(
+            height: 150, // Tinggi tetap agar bisa di-scroll
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: _devices.length,
+              itemBuilder: (context, index) {
+                final d = _devices[index];
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.bluetooth, size: 20),
+                  title: Text(d.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  subtitle: Text(d.address ?? "", style: const TextStyle(fontSize: 9)),
+                  onTap: () { setState(()=>_selectedDevice=d); _connect(); Navigator.pop(ctx); }
+                );
+              },
+            ),
+          ),
           const Divider(),
-          ListTile(leading: const Icon(Icons.delete_forever, color: Colors.red), title: const Text("Reset Lokal", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red)), onTap: () { Navigator.pop(ctx); _handleResetLocalData(); }),
+          ListTile(leading: const Icon(Icons.delete_forever, color: Colors.red), title: const Text("Reset Database Lokal", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red)), onTap: () { Navigator.pop(ctx); _handleResetLocalData(); }),
           const SizedBox(height: 20),
         ]),
       ),

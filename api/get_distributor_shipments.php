@@ -32,6 +32,12 @@ $totalData = $totalRow['total'];
 $totalPages = ceil($totalData / $limit);
 $total_customer = $totalRow['total_customer'];
 
+// Hitung Repeat Order: Customer yang melakukan pengiriman > 1 kali
+$sqlRepeat = "SELECT COUNT(*) as repeat_count FROM (SELECT customer_name FROM outbound_shipments s $where GROUP BY customer_name HAVING COUNT(s.id) > 1) as repeat_table";
+$resRepeat = $conn->query($sqlRepeat);
+$repeatRow = $resRepeat->fetch_assoc();
+$total_repeat = $repeatRow['repeat_count'];
+
 // Hitung khusus Total Unit secara presisi berdasarkan filter
 $unit_join = "JOIN outbound_shipment_batches b_unit ON b_unit.shipment_id = s.id 
               JOIN production_labels p_unit ON b_unit.production_id = p_unit.id";
@@ -126,6 +132,7 @@ echo json_encode([
         'total_pengiriman' => $totalData,
         'total_unit' => $total_unit,
         'total_customer' => $total_customer,
+        'total_repeat' => $total_repeat,
         'bulan' => $current_label
     ]
 ]);

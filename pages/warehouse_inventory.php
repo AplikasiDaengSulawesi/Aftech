@@ -131,7 +131,7 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                     <div class="media-body text-white text-end">
                                         <p class="mb-1 text-white font-w600">Belum di Scan</p>
                                         <h3 class="text-white mb-0" id="kpi-waiting">0</h3>
-                                        <small class="d-block mb-1">Produksi Menunggu QC</small>
+                                        <small class="d-block mb-1">Belum Diverifikasi</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>

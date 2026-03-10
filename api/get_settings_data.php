@@ -18,6 +18,8 @@ if ($type == 'item') {
     $res = $conn->query("SELECT q.*, m.name as machine_name FROM master_quantities q JOIN master_machines m ON q.machine_id = m.id ORDER BY m.name ASC");
 } elseif ($type == 'user') {
     $res = $conn->query("SELECT id, username, full_name, role FROM users ORDER BY username ASC");
+} elseif ($type == 'customer') {
+    $res = $conn->query("SELECT * FROM master_customers ORDER BY name ASC");
 } elseif ($type == 'unit') {
     $res = $conn->query("SELECT * FROM master_units ORDER BY name ASC");
 } elseif ($type == 'shift') {

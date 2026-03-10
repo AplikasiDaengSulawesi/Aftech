@@ -258,7 +258,7 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
                 }
 
                 if (isAlreadyScannedLocally) {
-                    new Audio('../public/sounds/alert.wav').play().catch(e => console.log(e));
+                    new Audio('../assets/sounds/alert.wav').play().catch(e => console.log(e));
                     updateStatus('warning', 'SUDAH DI-SCAN', `Label #${labelNo} untuk Batch ${batchStr} sudah diverifikasi.`);
                     setTimeout(() => resumeScanner(), 2000);
                     return;
@@ -272,7 +272,7 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
                 const data = await res.json();
 
                 if(data.status === 'success') {
-                    new Audio('../public/sounds/success.wav').play().catch(e => {});
+                    new Audio('../assets/sounds/success.wav').play().catch(e => {});
                     updateStatus('success', '✓ TERVERIFIKASI', data.message);
 
                     const prodId = data.data.production_id;
@@ -289,7 +289,7 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
                     updateOrRenderGrid(data.data);
                     setTimeout(() => resumeScanner(), 800);
                 } else {
-                    new Audio('../public/sounds/reject.wav').play().catch(e => {});
+                    new Audio('../assets/sounds/reject.wav').play().catch(e => {});
                     updateStatus('error', '⚠ PERHATIAN', data.message);
                     setTimeout(() => resumeScanner(), 2000);
                 }

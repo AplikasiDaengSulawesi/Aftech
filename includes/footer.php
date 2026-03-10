@@ -20,5 +20,5 @@
 <script src="../assets/vendor/toastr/js/toastr.min.js"></script>
 <!-- Daterangepicker -->
 <script src="../assets/vendor/moment/moment.min.js"></script>
-<script src="../assets/vendor/bootstrap-daterangepicker/daterangepicker.js"></script>
-<script src="../public/js/spa_nav.js"></script>
+<script 
+src="../assets/vendor/bootstrap-daterangepicker/daterangepicker.js"></script>

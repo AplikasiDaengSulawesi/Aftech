@@ -101,7 +101,8 @@ class CardGroup extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
-  const CardGroup({super.key, required this.title, required this.icon, required this.child});
+  final Widget? trailing;
+  const CardGroup({super.key, required this.title, required this.icon, required this.child, this.trailing});
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -117,6 +118,8 @@ class CardGroup extends StatelessWidget {
           Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.indigo.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, size: 18, color: Colors.indigo)),
           const SizedBox(width: 12),
           Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 0.5)),
+          const Spacer(),
+          if (trailing != null) trailing!,
         ]),
         const SizedBox(height: 20),
         child

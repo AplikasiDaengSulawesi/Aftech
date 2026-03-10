@@ -20,7 +20,7 @@ class TemplateTab extends StatelessWidget {
         Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.indigo.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.dashboard_customize_rounded, color: Colors.indigo, size: 20)),
         const SizedBox(width: 12),
         const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text("MASTER TEMPLATES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5, color: Colors.indigo)),
+          Text("TEMPLATE PRODUKSI", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5, color: Colors.indigo)),
           Text("Format produksi cepat (Sekali Klik)", style: TextStyle(fontSize: 10, color: Colors.grey))
         ]),
         const Spacer(),

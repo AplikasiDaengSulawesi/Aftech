@@ -102,11 +102,12 @@ class DatabaseService {
   Future<bool> syncMasterData() async {
     try {
       debugPrint("🚀 [SYNC] Menghubungi Server...");
+      final String ts = DateTime.now().millisecondsSinceEpoch.toString();
       // 1. Ambil Master Data (Items, Machines, etc)
-      final resMaster = await http.get(Uri.parse("$baseUrl/get_master_data.php")).timeout(const Duration(seconds: 15));
+      final resMaster = await http.get(Uri.parse("$baseUrl/get_master_data.php?_nocache=$ts")).timeout(const Duration(seconds: 15));
       
       // 2. Ambil Master Templates
-      final resTemp = await http.get(Uri.parse("$baseUrl/get_templates.php")).timeout(const Duration(seconds: 15));
+      final resTemp = await http.get(Uri.parse("$baseUrl/get_templates.php?_nocache=$ts")).timeout(const Duration(seconds: 15));
       
       if (resMaster.statusCode == 200 && resTemp.statusCode == 200) {
         final db = await instance.database;
@@ -141,7 +142,7 @@ class DatabaseService {
   // --- DATA FETCH HELPERS ---
   Future<List<Map<String, dynamic>>> getItemsWithUnits() async {
     try {
-      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php"));
+      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php?_nocache=${DateTime.now().millisecondsSinceEpoch}"));
       if(res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body)['items']);
     } catch(e) {}
     return [];
@@ -149,7 +150,7 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getMachinesWithStatus() async {
     try {
-      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php"));
+      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php?_nocache=${DateTime.now().millisecondsSinceEpoch}"));
       if(res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body)['machines']);
     } catch(e) {}
     return [];
@@ -157,7 +158,7 @@ class DatabaseService {
 
   Future<List<String>> getMasterData(String type) async {
     try {
-      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php"));
+      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php?_nocache=${DateTime.now().millisecondsSinceEpoch}"));
       if(res.statusCode == 200) return List<String>.from(jsonDecode(res.body)[type]);
     } catch(e) {}
     return [];
@@ -165,7 +166,7 @@ class DatabaseService {
 
   Future<List<String>> getRelatedSizes(String itemName) async {
     try {
-      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php"));
+      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php?_nocache=${DateTime.now().millisecondsSinceEpoch}"));
       if(res.statusCode == 200) {
         final List sizes = jsonDecode(res.body)['sizes'];
         return sizes.where((s) => s['parent_item'] == itemName).map((s) => s['size_value'].toString()).toList();
@@ -176,7 +177,7 @@ class DatabaseService {
 
   Future<List<String>> getRelatedQuantities(String machineName) async {
     try {
-      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php"));
+      final res = await http.get(Uri.parse("$baseUrl/get_master_data.php?_nocache=${DateTime.now().millisecondsSinceEpoch}"));
       if(res.statusCode == 200) {
         final List qtys = jsonDecode(res.body)['quantities'];
         return qtys.where((q) => q['parent_machine'] == machineName).map((q) => q['qty_value'].toString()).toList();
@@ -197,7 +198,7 @@ class DatabaseService {
 
   Future<List<dynamic>> fetchRemoteReports() async {
     try {
-      final response = await http.get(Uri.parse("$baseUrl/get_reports.php")).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse("$baseUrl/get_reports_mobile.php?_nocache=${DateTime.now().millisecondsSinceEpoch}")).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) return jsonDecode(response.body);
     } catch (e) {}
     return [];

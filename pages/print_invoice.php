@@ -47,8 +47,14 @@ if (count($name_parts) >= 2) {
 $total_paket = $header['total_qty'];
 $no_trx = $seq . '-' . $datetime_str . '-' . $total_paket . '-' . $initials;
 
-$tanggal_cetak = date('d F Y H:i:s');
-$tanggal_kirim = date('d F Y', strtotime($header['shipment_date']));
+function tgl_indo($tanggal) {
+    $bulan = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    $pecahkan = explode('-', date('Y-m-d', strtotime($tanggal)));
+    return $pecahkan[2] . ' ' . $bulan[(int)$pecahkan[1]] . ' ' . $pecahkan[0];
+}
+
+$tanggal_kirim = tgl_indo($header['shipment_date']);
+$tanggal_cetak = tgl_indo(date('Y-m-d')) . ' ' . date('H:i:s');
 
 // PAGINATION LOGIC
 $items_per_first_page = 15;
@@ -140,7 +146,7 @@ $total_pages = count($pages);
             <tr>
                 <td>
                     <div class="title">PT AFTECH MAKASSAR INDONESIA</div>
-                    <div>Sistem Manajemen Gudang & Logistik</div>
+                    <div>JL.KIMA 15 KAVLING KODE R-4 A1</div>
                 </td>
                 <td style="text-align: right;">
                     <h2 style="margin: 0; color: #D50000;">SURAT JALAN</h2>

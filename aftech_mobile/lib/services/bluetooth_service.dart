@@ -101,8 +101,9 @@ class BluetoothService {
     // Header Tanggal
     tspl += "TEXT 30,25,\"2\",0,1,1,\"$fullDateTime\"\r\n";
     
-    // PT AFTECH MAKASSAR INDONESIA Vertikal
-    tspl += "TEXT 560,160,\"3\",90,3,3,\"PT AFTECH\"\r\n";
+    // PT & Alamat Vertikal (Sisi Kanan)
+    tspl += "TEXT 550,80,\"3\",90,1,1,\"PT. AFTECH MAKASSAR INDONESIA\"\r\n";
+    tspl += "TEXT 520,80,\"2\",90,1,1,\"JL.KIMA 15 KAVLING KODE R-4 A1\"\r\n";
 
     // 2. MANUAL QR RENDERING (OPTION 2: NO PADDING, CUSTOM SIZE)
     String qrData = "$labelIndex-$batch";
@@ -134,7 +135,7 @@ class BluetoothService {
     int yStart = 535; 
     tspl += "TEXT 30,$yStart,\"3\",0,2,2,\"$item $size\"\r\n";
     tspl += "TEXT 30,${yStart + 50},\"3\",0,2,2,\"${machine.toUpperCase()}\"\r\n";
-    tspl += "TEXT 30,${yStart + 100},\"3\",0,2,2,\"$shift\"\r\n";
+    tspl += "TEXT 30,${yStart + 100},\"3\",0,2,2,\"$shift  / QTY: $quantity\"\r\n";
     tspl += "TEXT 30,${yStart + 150},\"3\",0,2,2,\"${operator.toUpperCase()} / ${qc.toUpperCase()}\"\r\n";
     tspl += "TEXT 30,${yStart + 200},\"2\",0,1,1,\"Batch: $batch\"\r\n";
 

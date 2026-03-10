@@ -70,6 +70,12 @@ if ($action == 'save') {
             $sql = "INSERT INTO users (username, full_name, role, password) VALUES ('$username', '$full_name', '$role_user', '$h')";
         }
         $log_detail = "Admin Update User: $username";
+    } elseif ($type == 'customer') {
+        $name = $conn->real_escape_string($_POST['name']);
+        $contact = $conn->real_escape_string($_POST['contact']);
+        $address = $conn->real_escape_string($_POST['address']);
+        $sql = (!empty($id)) ? "UPDATE master_customers SET name='$name', contact='$contact', address='$address' WHERE id=$id" : "INSERT INTO master_customers (name, contact, address) VALUES ('$name', '$contact', '$address')";
+        $log_detail = "Admin Update Customer: $name";
     } elseif ($type == 'pin') {
         $pin = $conn->real_escape_string($_POST['pin_code']);
         $note = $conn->real_escape_string($_POST['note']);
@@ -98,7 +104,8 @@ if ($action == 'save') {
     }
 
     if ($sql && $conn->query($sql)) {
-        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TAMBAH', '$log_detail')");
+        $log_action = (!empty($id)) ? 'EDIT' : 'TAMBAH';
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('$log_action', '$log_detail')");
         $response = ['status' => 'success'];
     } else {
         $response = ['status' => 'error', 'message' => $conn->error ?: 'Query error'];
@@ -148,6 +155,7 @@ if ($action == 'save') {
     
     if ($type == 'item') $table = "master_items";
     elseif ($type == 'machine') $table = "master_machines";
+    elseif ($type == 'customer') $table = "master_customers";
     elseif ($type == 'unit') $table = "master_units";
     elseif ($type == 'shift') $table = "master_shifts";
     elseif ($type == 'template') $table = "master_templates";
@@ -189,6 +197,9 @@ if ($action == 'save') {
             if (!$conn->query("DELETE FROM outbound_shipments WHERE id=$id")) {
                 throw new Exception($conn->error);
             }
+
+            // Kurangi total_orders di master_customers
+            $conn->query("UPDATE master_customers SET total_orders = GREATEST(0, total_orders - 1) WHERE name = '" . $conn->real_escape_string($headerData['customer_name']) . "'");
 
             $conn->query("INSERT INTO activity_logs (action, details) VALUES ('HAPUS', '$log_msg')");
             $conn->commit();
