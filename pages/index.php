@@ -62,32 +62,9 @@
         color: #ffffff !important; 
     }
 
-    /* OWL CAROUSEL DOTS POSITIONING - CLEAN & PRECISE */
-    #log-carousel.owl-carousel .owl-dots {
-        position: absolute;
-        top: -45px;
-        right: 0;
-        display: flex !important;
-        align-items: center;
-    }
-    #log-carousel.owl-carousel .owl-dot {
-        background: none !important;
-        border: none !important;
-        padding: 0 !important;
-    }
-    #log-carousel.owl-carousel .owl-dot span {
-        width: 8px !important;
-        height: 8px !important;
-        margin: 0 4px !important;
-        background: #e0e0e0 !important;
-        display: block;
-        border-radius: 50%;
-        transition: all 0.3s ease;
-    }
-    #log-carousel.owl-carousel .owl-dot.active span {
-        background: #1A237E !important;
-        width: 12px !important;
-        border-radius: 10px !important;
+    /* OWL CAROUSEL STYLE - CLEAN & NO NAV */
+    .card-header .card-title {
+        width: 100%;
     }
 </style>
 <body>
@@ -379,7 +356,9 @@
                 // 5. LOG CAROUSEL
                 const carousel = $('#log-carousel');
                 let html = '';
-                data.recent_logs.forEach(l => {
+                // Batasi hanya 6 log terbaru agar dots tidak terlalu banyak
+                const logsToShow = data.recent_logs.slice(0, 6);
+                logsToShow.forEach(l => {
                     html += `
                         <div class="items">
                             <div class="p-4 bg-white" style="border-radius: 20px; border: 1px solid #f0f0f0; min-height: 160px; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
@@ -397,7 +376,7 @@
                 }
                 carousel.html(html);
                 carousel.owlCarousel({
-                    loop:true, margin:20, nav:false, dots:true,
+                    loop:true, margin:20, nav:false, dots:false,
                     responsive:{ 0:{ items:1 }, 768:{ items:2 }, 1200:{ items:3 } }
                 });
 

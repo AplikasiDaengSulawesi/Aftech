@@ -27,6 +27,8 @@ if ($data) {
             VALUES ('$item', '$size', '$unit', '$batch', '$machine', '$shift', '$quantity', '$operator', '$qc', '$formattedDate', '$time', $copies, '$device')
             ON DUPLICATE KEY UPDATE 
             copies = copies + VALUES(copies), 
+            shift = VALUES(shift),
+            qc = VALUES(qc),
             production_time = '$time',
             device_model = '$device'";
 

@@ -1,7 +1,6 @@
 <?php
 header("Content-Type: application/json");
 include 'config.php';
-// File ini khusus untuk Aplikasi Mobile agar tidak bentrok dengan format Web
 
 $start_date = isset($_GET['start_date']) ? $conn->real_escape_string($_GET['start_date']) : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $conn->real_escape_string($_GET['end_date']) : date('Y-m-d');
@@ -20,7 +19,9 @@ $sql = "
         p.size,
         p.unit,
         p.operator,
+        p.qc,
         p.machine,
+        p.shift,
         p.production_time,
         (p.quantity * p.copies) as produced_qty,
         p.copies as copies
