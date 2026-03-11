@@ -2,11 +2,27 @@
 <html lang="en">
 <?php 
 include '../includes/header.php';
-$role = $_SESSION['role'] ?? 'qc';
-if($role !== 'admin' && $role !== 'gudang') { header("Location: index.php"); exit; }
+require_once '../includes/auth_check.php';
+protect_page('shipment_reports');
 require_once '../includes/db.php';
 
-$m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$items_query = $pdo->query("
+    SELECT i.id, i.name, u.name as unit_name 
+    FROM master_items i 
+    LEFT JOIN master_units u ON i.unit_id = u.id 
+    ORDER BY i.name ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$hierarchy_data = [];
+foreach($items_query as $it) {
+    $sizes = $pdo->prepare("SELECT size_value FROM master_sizes WHERE item_id = ? ORDER BY CAST(size_value AS UNSIGNED) ASC");
+    $sizes->execute([$it['id']]);
+    
+    $hierarchy_data[$it['name']] = [
+        'unit' => $it['unit_name'],
+        'sizes' => $sizes->fetchAll(PDO::FETCH_COLUMN)
+    ];
+}
 ?>
 <style>
     .pagination-xs .page-link { padding: 5px 10px; font-size: 12px; }
@@ -88,9 +104,9 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                 <div class="media">
                                     <span class="me-3"><i class="fa fa-box-open"></i></span>
                                     <div class="media-body text-white text-end">
-                                        <p class="mb-1 text-white font-w600">Total Unit Terkirim</p>
+                                        <p class="mb-1 text-white font-w600">Total Dus Terkirim</p>
                                         <h3 class="text-white mb-0" id="kpi-unit">0</h3>
-                                        <small class="d-block mt-1">Pcs Produk</small>
+                                        <small class="d-block mt-1">Dus Produk</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>
@@ -149,7 +165,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-time" id="chk-time" checked disabled><label class="form-check-label small font-w600" for="chk-time">Waktu Pengiriman</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-customer" id="chk-customer" checked><label class="form-check-label small font-w600" for="chk-customer">Customer</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-items" id="chk-items" checked><label class="form-check-label small font-w600" for="chk-items">Item & Ukuran</label></div>
-                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-total" id="chk-total" checked><label class="form-check-label small font-w600" for="chk-total">Total Keluar</label></div>
+                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-total" id="chk-total" checked><label class="form-check-label small font-w600" for="chk-total">Total Dus</label></div>
                                                 <div class="form-check"><input class="form-check-input col-checkbox" type="checkbox" value="col-officer" id="chk-officer" checked><label class="form-check-label small font-w600" for="chk-officer">Dikirim Oleh</label></div>
                                             </div>
                                         </div>
@@ -160,11 +176,39 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                     <div class="col-12 col-md-4">
                                         <input type="text" id="f_search" name="search" class="form-control form-control-sm" placeholder="Cari data...">
                                     </div>
+                                    <!-- NATIVE BOOTSTRAP SUPER FILTER ITEM -->
                                     <div class="col-12 col-md-3">
-                                        <select name="item" id="f_item" class="form-control form-control-sm default-select auto-filter">
-                                            <option value="">Semua Item</option>
-                                            <?php foreach($m_items as $i) echo "<option value='".htmlspecialchars($i['name'])."'>".htmlspecialchars($i['name'])."</option>"; ?>
-                                        </select>
+                                        <div class="dropdown w-100">
+                                            <button class="form-control form-control-sm d-flex justify-content-between align-items-center text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+                                                <span id="sf-label" class="text-truncate text-muted">Semua Item</span>
+                                                <i class="fa fa-caret-down opacity-50 ms-2 text-muted"></i>
+                                            </button>
+                                            <ul class="dropdown-menu shadow-lg border-0 mt-1" style="max-height: 350px; overflow-y: auto; border-radius: 12px; font-family: 'Poppins', sans-serif; font-size: 13px; min-width: 100%;">
+                                                <li><a class="dropdown-item font-w600 text-black" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectSuperFilter('', '')">Semua Item</a></li>
+                                                <li><hr class="dropdown-divider m-0"></li>
+                                                <?php foreach($hierarchy_data as $item => $data): ?>
+                                                    <li>
+                                                        <div class="d-flex justify-content-between align-items-center dropdown-item" style="cursor: default; padding: 5px 15px;">
+                                                            <a class="text-black font-w600 text-decoration-none flex-grow-1" style="opacity: 0.7;" href="javascript:void(0)" onclick="selectSuperFilter('<?= $item ?>', '', '')"><?= $item ?></a>
+                                                            <?php if(!empty($data['sizes'])): ?>
+                                                            <a class="text-primary" style="font-size: 16px; margin-left: 10px;" data-bs-toggle="collapse" href="#collapse-<?= md5($item) ?>" onclick="event.stopPropagation();"><i class="fa fa-plus-circle" style="color: #1A237E;"></i></a>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </li>
+                                                    <?php if(!empty($data['sizes'])): ?>
+                                                    <div class="collapse bg-white" id="collapse-<?= md5($item) ?>">
+                                                        <?php foreach($data['sizes'] as $sz): ?>
+                                                        <?php $displayLabel = $sz . ' ' . $data['unit']; ?>
+                                                        <li><a class="dropdown-item text-muted" style="padding: 8px 15px 8px 25px;" href="javascript:void(0)" onclick="selectSuperFilter('<?= $item ?>', '<?= $sz ?>', '<?= $displayLabel ?>')"><?= $displayLabel ?></a></li>
+                                                        <?php endforeach; ?>
+                                                        <li><a class="dropdown-item text-primary font-w600" style="padding: 8px 15px 8px 25px;" href="javascript:void(0)" onclick="selectSuperFilter('<?= $item ?>', 'Custom', 'Ukuran Lainnya')"><i class="fa fa-plus me-2"></i>Ukuran Lainnya</a></li>
+                                                    </div>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                            <input type="hidden" name="item" id="f_item_val">
+                                            <input type="hidden" name="size" id="f_size_val">
+                                        </div>
                                     </div>
                                     <div class="col-12 col-md-5">
                                         <input type="text" id="f_daterange" class="form-control form-control-sm daterange-picker" placeholder="Pilih Tanggal Pengiriman" readonly>
@@ -189,7 +233,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                                 <th class="ps-4 col-time"><strong>WAKTU PENGIRIMAN</strong></th>
                                                 <th class="col-customer"><strong>CUSTOMER</strong></th>
                                                 <th class="col-items"><strong>ITEM & UKURAN</strong></th>
-                                                <th class="col-total"><strong>TOTAL KELUAR</strong></th>
+                                                <th class="col-total"><strong>TOTAL DUS</strong></th>
                                                 <th class="col-officer"><strong>DIKIRIM OLEH</strong></th>
                                             </tr>
                                         </thead>
@@ -260,7 +304,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
             params.set('page', page); params.set('limit', 10);
 
             try {
-                const res = await fetch(`../api/get_distributor_shipments.php?${params.toString()}&_nocache=${Date.now()}`, {
+                const res = await fetch(`../api/get_shipments.php?${params.toString()}&_nocache=${Date.now()}`, {
                     cache: 'no-store',
                     headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
                 });
@@ -281,8 +325,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                     document.getElementById('kpi-repeat').title = result.stats.total_repeat.toLocaleString('id-ID');
 
                     if(result.stats.bulan) {
-                        const label = result.stats.bulan.includes('Filter') ? result.stats.bulan : `(${result.stats.bulan})`;
-                        document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = label);
+                        document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = result.stats.bulan);
                     }
                 }
 
@@ -314,8 +357,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                         const parts = it.split('|');
                         const nameSize = parts[0];
                         const labelCount = parts[1] || '0';
-                        const unitCount = parts[2] || '0';
-                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${labelCount} Paket (${unitCount} Unit)</small></div>`;
+                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${labelCount} Dus</small></div>`;
                     }).join('');
                 }
 
@@ -331,8 +373,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                         </td>
                         <td class="col-items ${window.columnStates['col-items'] ? '' : 'col-hidden'}">${itemsHTML || '-'}</td>
                         <td class="col-total ${window.columnStates['col-total'] ? '' : 'col-hidden'}">
-                            <div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.filtered_actual_qty || 0} Unit</div>
-                            <div class="mt-1 small text-muted font-w600" style="font-size:10px; padding-left: 5px;">${row.filtered_label_qty || 0} Paket</div>
+                            ${parseInt(row.total_qty || 0) > 0 ? `<div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty} Dus</div>` : `<span class="badge badge-danger light font-w800" style="font-size:10px;">BELUM ADA</span>`}
                         </td>
                         <td class="col-officer ${window.columnStates['col-officer'] ? '' : 'col-hidden'}"><small class="font-w600 text-black">${row.shipped_by}</small></td>
                     </tr>
@@ -350,8 +391,8 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                         <strong class="text-black" style="word-break:break-all;">${row.customer_name}</strong>
                     </div>
                     <div class="action-list">
-                        <button onclick="Swal.close(); viewShipmentDetail(${index})" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Unit</button>
-                        <button onclick="Swal.close(); window.location.href='distributor_scan.php?append_id=${row.id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Unit Susulan</button>
+                        <button onclick="Swal.close(); viewShipmentDetail(${index})" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Dus</button>
+                        <button onclick="Swal.close(); window.location.href='shipment_scan.php?append_id=${row.id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Dus Susulan</button>
                         <button onclick="Swal.close(); window.open('print_invoice.php?id=${row.id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan</button>
                         <button onclick="Swal.close(); deleteShipment(${row.id}, '${row.customer_name}')" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
@@ -378,7 +419,6 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
 
                     result.data.forEach((item, i) => {
                         totalLabel += parseInt(item.label_qty);
-                        totalUnit += parseInt(item.unit_qty);
                         tableRows += `
                             <tr>
                                 <td class="text-muted align-middle" style="font-size: 12px;">${i + 1}</td>
@@ -387,10 +427,9 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                     <div class="text-muted" style="font-size: 11px;">${item.size} ${item.unit} &bull; <span class="text-primary font-w600">#${item.batch}</span></div>
                                 </td>
                                 <td class="text-center align-middle font-w600 text-black" style="font-size: 13px;">
-                                    ${item.label_qty} Paket<br>
-                                    <small class="text-muted font-w500" style="font-size: 10px;">(@ ${item.per_paket} Unit)</small>
+                                    ${item.label_qty} Dus
                                 </td>
-                                <td class="text-end align-middle font-w800 text-black" style="font-size: 14px;">${item.unit_qty} Unit</td>
+                                <td class="text-end align-middle font-w800 text-black" style="font-size: 14px;">${item.label_qty} Dus</td>
                             </tr>
                         `;
                     });
@@ -424,7 +463,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                         </div>
 
                         <div class="mb-3">
-                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Unit</h6>
+                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Dus</h6>
                         </div>
 
                         <div class="table-responsive border rounded">
@@ -433,18 +472,18 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
                                     <tr>
                                         <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 10%;">NO</th>
                                         <th class="text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 45%;">ITEM & BATCH</th>
-                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 20%;">JML PAKET</th>
-                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">TOTAL FISIK</th>
+                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 20%;">JUMLAH</th>
+                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">TOTAL</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian unit.</td></tr>'}
+                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian label.</td></tr>'}
                                 </tbody>
                                 <tfoot class="bg-light">
                                     <tr>
                                         <td colspan="2" class="text-end py-3 text-black font-w800" style="font-size: 12px; border-bottom: 0;">TOTAL KESELURUHAN</td>
                                         <td class="text-center py-3 text-black font-w800" style="font-size: 14px; border-bottom: 0;">${totalLabel}</td>
-                                        <td class="text-end py-3 text-danger font-w800" style="font-size: 16px; border-bottom: 0;">${totalUnit} Unit</td>
+                                        <td class="text-end py-3 text-danger font-w800" style="font-size: 16px; border-bottom: 0;">${totalLabel} Dus</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -466,7 +505,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     const f = new FormData(); f.append('id', id);
-                    const res = await fetch(`../api/admin_manage.php?action=delete&type=shipment`, { method: 'POST', body: f });
+                    const res = await fetch(`../api/manage_settings.php?action=delete&type=shipment`, { method: 'POST', body: f });
                     const data = await res.json();
                     if(data.status === 'success') { 
                         toastr.success('Data Berhasil Dibatalkan'); 
@@ -492,7 +531,25 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
             controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == totalP ? 'disabled' : ''}"><a class="page-link" onclick="fetchShipments(${current+1})"><i class="fas fa-chevron-right"></i></a></li>`);
         }
 
-        window.resetFilter = () => { document.getElementById('formFilter').reset(); $('#f_daterange').val(''); $('#f_start').val(''); $('#f_end').val(''); fetchShipments(1); }
+        window.selectSuperFilter = (item, size, displayLabel) => {
+            document.getElementById('f_item_val').value = item;
+            document.getElementById('f_size_val').value = size;
+            
+            let label = item || 'Semua Item';
+            if(size) label = `${item} (${displayLabel})`;
+            const labelEl = document.getElementById('sf-label');
+            labelEl.innerText = label;
+            if (item) labelEl.classList.remove('text-muted');
+            else labelEl.classList.add('text-muted');
+            
+            const dropdownEl = labelEl.closest('.dropdown');
+            if(dropdownEl && dropdownEl.classList.contains('show')) {
+                dropdownEl.querySelector('[data-bs-toggle="dropdown"]').click();
+            }
+            fetchShipments(1);
+        };
+
+        window.resetFilter = () => { document.getElementById('formFilter').reset(); $('#f_daterange').val(''); $('#f_start').val(''); $('#f_end').val(''); selectSuperFilter('', '', ''); }
         document.getElementById('f_search').oninput = () => { clearTimeout(window.sT); window.sT = setTimeout(() => { fetchShipments(1); }, 500); }
         $(document).on('change', '.auto-filter', () => { fetchShipments(1); });
 
@@ -514,7 +571,7 @@ $m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetch
         }
 
         fetchShipments();
-        document.querySelector('a[href="data_distributor.php"]')?.closest('li')?.classList.add('mm-active');
+        document.querySelector('a[href="shipment_data.php"]')?.closest('li')?.classList.add('mm-active');
     </script>
 </body>
 </html>

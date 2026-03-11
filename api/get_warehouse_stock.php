@@ -1,5 +1,6 @@
 <?php
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $sql = "SELECT w.*, p.batch, p.item, p.copies, p.quantity, p.unit, p.size, IFNULL(q.total_scanned, 0) as scanned 

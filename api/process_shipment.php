@@ -1,6 +1,7 @@
 <?php
 session_start();
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Cache-Control: post-check=0, pre-check=0', false);
@@ -27,11 +28,11 @@ if ($action === 'get_batch_data') {
 
     // Cek apakah barang yang di-scan ada di gudang
     $wh_check = $conn->query("SELECT id FROM warehouse_items WHERE production_id = $prod_id AND label_no = $scanned_label");
-    if ($wh_check->num_rows === 0) die(json_encode(['status' => 'error', 'message' => "Label #$scanned_label belum masuk ke Gudang!"]));
+    if ($wh_check->num_rows === 0) die(json_encode(['status' => 'error', 'message' => "Dus #$scanned_label belum masuk ke Gudang!"]));
 
     // Cek apakah barang yang di-scan sudah terkirim
     $dist_check = $conn->query("SELECT id FROM distributor_shipments WHERE production_id = $prod_id AND label_no = $scanned_label");
-    if ($dist_check->num_rows > 0) die(json_encode(['status' => 'error', 'message' => "Label #$scanned_label sudah pernah dikirim!"]));
+    if ($dist_check->num_rows > 0) die(json_encode(['status' => 'error', 'message' => "Dus #$scanned_label sudah pernah dikirim!"]));
 
     // Ambil data stok gudang untuk batch ini
     $in_warehouse = [];
@@ -77,7 +78,7 @@ elseif ($action === 'submit_bulk') {
         $total_qty += count($labels);
     }
 
-    if ($total_qty === 0) die(json_encode(['status' => 'error', 'message' => 'Tidak ada paket yang dipilih!']));
+    if ($total_qty === 0) die(json_encode(['status' => 'error', 'message' => 'Tidak ada dus yang dipilih!']));
 
     $conn->begin_transaction();
     try {
@@ -148,7 +149,7 @@ elseif ($action === 'submit_bulk') {
                 // Pastikan tidak dobel
                 $check = $conn->query("SELECT id FROM distributor_shipments WHERE production_id = $prod_id AND label_no = $label_no FOR UPDATE");
                 if ($check->num_rows > 0) {
-                    throw new Exception("Paket #$label_no pada Batch terkait sudah dikirim oleh proses lain.");
+                    throw new Exception("Dus #$label_no pada Batch terkait sudah dikirim oleh proses lain.");
                 }
 
                 $stmt->bind_param("iii", $shipment_id, $prod_id, $label_no);
@@ -171,21 +172,21 @@ elseif ($action === 'submit_bulk') {
             $no_resi = $seq . '-' . $datetime_str . '-' . $total_paket_all . '-' . $initials;
             
             if ($append_to > 0) {
-                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Tambah susulan $total_qty paket ke No. Resi #$no_resi')");
+                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Tambah susulan $total_qty dus ke No. Resi #$no_resi')");
             } else {
-                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Kirim $total_qty paket ke {$headerData['customer_name']} (No. Resi #$no_resi)')");
+                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Kirim $total_qty dus ke {$headerData['customer_name']} (No. Resi #$no_resi)')");
             }
         } else {
             if ($append_to > 0) {
-                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Tambah susulan $total_qty paket ke Nota #$shipment_id')");
+                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Tambah susulan $total_qty dus ke Nota #$shipment_id')");
             } else {
-                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Kirim $total_qty paket ke $customer_name (Nota #$shipment_id)')");
+                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Kirim $total_qty dus ke $customer_name (Nota #$shipment_id)')");
             }
         }
 
         $conn->commit();
         session_write_close(); // Lepas lock session segera
-        echo json_encode(['status' => 'success', 'message' => "Berhasil mengirim $total_qty barang ke $customer_name", 'shipment_id' => $shipment_id]);
+        echo json_encode(['status' => 'success', 'message' => "Berhasil mengirim $total_qty dus ke $customer_name", 'shipment_id' => $shipment_id]);
     } catch (Exception $e) {
         $conn->rollback();
         echo json_encode(['status' => 'error', 'message' => 'Gagal simpan: ' . $e->getMessage()]);

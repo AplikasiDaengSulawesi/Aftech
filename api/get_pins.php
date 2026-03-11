@@ -1,5 +1,6 @@
 <?php
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $res = $conn->query("SELECT id, pin_code, note FROM app_config ORDER BY id ASC");

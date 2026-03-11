@@ -1,5 +1,6 @@
 <?php
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $limit  = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
@@ -7,6 +8,7 @@ $page   = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 $search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
 $item_filter = isset($_GET['item']) ? $conn->real_escape_string($_GET['item']) : '';
+$size_filter = isset($_GET['size']) ? $conn->real_escape_string($_GET['size']) : '';
 $start_date = isset($_GET['start_date']) ? $conn->real_escape_string($_GET['start_date']) : '';
 $end_date   = isset($_GET['end_date']) ? $conn->real_escape_string($_GET['end_date']) : '';
 
@@ -18,6 +20,10 @@ if (!empty($search)) {
 
 if (!empty($item_filter)) {
     $where .= " AND s.id IN (SELECT ds.shipment_id FROM distributor_shipments ds JOIN production_labels p ON ds.production_id = p.id WHERE p.item = '$item_filter')";
+}
+
+if (!empty($size_filter) && $size_filter !== 'Custom') {
+    $where .= " AND s.id IN (SELECT ds.shipment_id FROM distributor_shipments ds JOIN production_labels p ON ds.production_id = p.id WHERE p.size = '$size_filter')";
 }
 
 if (!empty($start_date) && !empty($end_date)) {
@@ -38,17 +44,20 @@ $resRepeat = $conn->query($sqlRepeat);
 $repeatRow = $resRepeat->fetch_assoc();
 $total_repeat = $repeatRow['repeat_count'];
 
-// Hitung khusus Total Unit secara presisi berdasarkan filter
+// Hitung khusus Total Label secara presisi berdasarkan filter
 $unit_join = "JOIN outbound_shipment_batches b_unit ON b_unit.shipment_id = s.id 
               JOIN production_labels p_unit ON b_unit.production_id = p_unit.id";
 $unit_where = $where; 
 if (!empty($item_filter)) {
     $unit_where .= " AND p_unit.item = '$item_filter'";
 }
-$sqlUnitTotal = "SELECT COALESCE(SUM(b_unit.unit_qty), 0) as total_unit FROM outbound_shipments s $unit_join $unit_where";
+if (!empty($size_filter) && $size_filter !== 'Custom') {
+    $unit_where .= " AND p_unit.size = '$size_filter'";
+}
+$sqlUnitTotal = "SELECT COALESCE(SUM(b_unit.label_qty), 0) as total_label FROM outbound_shipments s $unit_join $unit_where";
 $resUnitTotal = $conn->query($sqlUnitTotal);
 $unitTotalRow = $resUnitTotal->fetch_assoc();
-$total_unit = $unitTotalRow['total_unit'];
+$total_label = $unitTotalRow['total_label'];
 
 // Tentukan label bulan/filter
 $bulan_indonesia = [
@@ -56,17 +65,25 @@ $bulan_indonesia = [
     '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus', 
     '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
 ];
-$current_label = $bulan_indonesia[date('m')] . ' ' . date('Y');
+$current_label = '(' . $bulan_indonesia[date('m')] . ' ' . date('Y') . ')';
 
-if (!empty($search) || !empty($item_filter) || !empty($start_date)) {
+if (!empty($search) || !empty($item_filter) || !empty($size_filter) || !empty($start_date)) {
     $current_label = "Hasil Filter";
 }
 
 // Ambil data header dengan limit
 $select_qty = "";
+$extra_cond = "";
 if (!empty($item_filter)) {
-    $select_qty = ", (SELECT SUM(b3.label_qty) FROM outbound_shipment_batches b3 JOIN production_labels p3 ON b3.production_id = p3.id WHERE b3.shipment_id = s.id AND p3.item = '$item_filter') as filtered_label_qty,
-                    (SELECT SUM(b4.unit_qty) FROM outbound_shipment_batches b4 JOIN production_labels p4 ON b4.production_id = p4.id WHERE b4.shipment_id = s.id AND p4.item = '$item_filter') as filtered_actual_qty";
+    $extra_cond .= " AND p3.item = '$item_filter'";
+}
+if (!empty($size_filter) && $size_filter !== 'Custom') {
+    $extra_cond .= " AND p3.size = '$size_filter'";
+}
+
+if (!empty($item_filter) || !empty($size_filter)) {
+    $select_qty = ", (SELECT SUM(b3.label_qty) FROM outbound_shipment_batches b3 JOIN production_labels p3 ON b3.production_id = p3.id WHERE b3.shipment_id = s.id $extra_cond) as filtered_label_qty,
+                    (SELECT SUM(b3.unit_qty) FROM outbound_shipment_batches b3 JOIN production_labels p3 ON b3.production_id = p3.id WHERE b3.shipment_id = s.id $extra_cond) as filtered_actual_qty";
 } else {
     $select_qty = ", s.total_qty as filtered_label_qty, s.total_actual_qty as filtered_actual_qty";
 }
@@ -75,7 +92,7 @@ $sql = "SELECT s.* $select_qty,
                (SELECT GROUP_CONCAT(CONCAT(p.item, ' (', p.size, ' ', p.unit, ')|', b.label_qty, '|', b.unit_qty) SEPARATOR ';') 
                 FROM outbound_shipment_batches b
                 JOIN production_labels p ON b.production_id = p.id 
-                WHERE b.shipment_id = s.id" . (!empty($item_filter) ? " AND p.item = '$item_filter'" : "") . "
+                WHERE b.shipment_id = s.id" . (!empty($item_filter) ? " AND p.item = '$item_filter'" : "") . (!empty($size_filter) && $size_filter !== 'Custom' ? " AND p.size = '$size_filter'" : "") . "
                 GROUP BY b.shipment_id) as item_summary
         FROM outbound_shipments s 
         $where 
@@ -130,7 +147,8 @@ echo json_encode([
     'current_page' => $page,
     'stats' => [
         'total_pengiriman' => $totalData,
-        'total_unit' => $total_unit,
+        'total_unit' => $total_label,
+        'total_label' => $total_label,
         'total_customer' => $total_customer,
         'total_repeat' => $total_repeat,
         'bulan' => $current_label

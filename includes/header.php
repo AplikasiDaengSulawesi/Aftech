@@ -13,13 +13,14 @@ if (!isset($_SESSION['user_id'])) {
 $current_page = basename($_SERVER['PHP_SELF']);
 $page_titles = [
     'index.php' => 'Dashboard Utama',
-    'data_produksi.php' => 'Manajemen Produksi',
+    'production_data.php' => 'Manajemen Produksi',
     'warehouse_inventory.php' => 'Inventori Gudang',
-    'log_aktivitas.php' => 'Log Aktivitas Sistem',
-    'data_distributor.php' => 'Riwayat Pengiriman',
-    'pengaturan.php' => 'Pengaturan Master Data',
+    'activity_logs.php' => 'Log Aktivitas Sistem',
+    'shipment_data.php' => 'Riwayat Pengiriman',
+    'settings.php' => 'Pengaturan Master Data',
     'qc_checker.php' => 'Pengecekan QC',
-    'distributor_scan.php' => 'Quick Scan Pengiriman'
+    'shipment_scan.php' => 'Quick Scan Pengiriman',
+	'access_control.php' => 'Hak Akses'
 ];
 $display_title = $page_titles[$current_page] ?? 'AFTECH System';
 ?>
@@ -161,10 +162,13 @@ $display_title = $page_titles[$current_page] ?? 'AFTECH System';
 			border-radius: 12px !important;
 			box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
 			opacity: 1 !important;
-			padding: 15px 15px 15px 50px !important;
+			padding: 15px 20px 15px 55px !important;
 			font-family: 'Poppins', sans-serif !important;
 			font-weight: 600 !important;
 			font-size: 13px !important;
+			width: auto !important;
+			min-width: 300px !important;
+			max-width: 450px !important;
 		}
 		.toast-success { background-color: #00C853 !important; }
 		.toast-error { background-color: #D50000 !important; }
@@ -254,7 +258,7 @@ $display_title = $page_titles[$current_page] ?? 'AFTECH System';
 									<li class="text-center py-4 small text-muted">Memuat log...</li>
 								</ul>
 							</div>
-							<a class="all-notification d-flex justify-content-center align-items-center py-3" href="log_aktivitas.php" style="background: #f8f9ff; color: var(--af-primary); font-weight: 800; font-size: 13px; transition: 0.3s; border-top: 1px solid #f1f5f9;">
+							<a class="all-notification d-flex justify-content-center align-items-center py-3" href="activity_logs.php" style="background: #f8f9ff; color: var(--af-primary); font-weight: 800; font-size: 13px; transition: 0.3s; border-top: 1px solid #f1f5f9;">
 								<span>Lihat Semua Log</span>
 								<i class="fas fa-chevron-right ms-2" style="font-size: 10px;"></i>
 							</a>

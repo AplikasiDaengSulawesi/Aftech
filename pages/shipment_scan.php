@@ -2,8 +2,8 @@
 <html lang="en">
 <?php 
 include '../includes/header.php';
-$role = $_SESSION['role'] ?? 'qc';
-if($role !== 'admin' && $role !== 'gudang') { header("Location: index.php"); exit; }
+require_once '../includes/auth_check.php';
+protect_page('shipment_reports');
 require_once '../includes/db.php';
 
 $append_id = isset($_GET['append_id']) ? (int)$_GET['append_id'] : 0;
@@ -202,7 +202,7 @@ if ($append_id > 0) {
                                     </div>
                                     
                                     <hr class="mt-1 mb-3">
-                                    <h5 class="text-black mb-3"><i class="fa fa-boxes me-2 text-primary"></i>Daftar Unit Keluar</h5>
+                                    <h5 class="text-black mb-3"><i class="fa fa-boxes me-2 text-primary"></i>Daftar Dus Keluar</h5>
                                     
                                     <div id="empty-cart" class="text-center py-4">
                                         <i class="fa fa-box-open fa-3x text-light mb-3"></i>
@@ -213,21 +213,21 @@ if ($append_id > 0) {
                                         <!-- Grid visual per batch akan dirender di sini -->
                                     </div>
 
-                                    <div class="mt-4">
+                                    <div class="mt-4 pt-3 border-top">
                                         <div class="row g-2">
-                                            <div class="col-8">
-                                                <button type="submit" class="btn btn-primary btn-sm shadow-sm w-100" id="btn-submit" disabled style="height: 40px;">
-                                                    <i class="fa fa-paper-plane me-2"></i> Proses Pengiriman
+                                            <div class="col-12 col-sm-8">
+                                                <button type="submit" class="btn btn-primary shadow-sm w-100" id="btn-submit" disabled style="height: 42px; font-weight: 600; font-size: 12px; border-radius: 8px;">
+                                                    Proses Pengiriman
                                                 </button>
                                             </div>
-                                            <div class="col-4">
+                                            <div class="col-12 col-sm-4">
                                                 <?php if($append_id > 0): ?>
-                                                <button type="button" class="btn btn-danger btn-sm w-100 shadow-sm" onclick="window.location.href='data_distributor.php'" style="height: 40px;">
-                                                    <i class="fa fa-times me-1"></i> Batal
+                                                <button type="button" class="btn btn-danger w-100 shadow-sm" onclick="window.location.href='shipment_data.php'" style="height: 42px; font-weight: 600; font-size: 12px; border-radius: 8px;">
+                                                    Batalkan
                                                 </button>
                                                 <?php else: ?>
-                                                <button type="button" class="btn btn-light btn-sm w-100" onclick="clearCart()" style="height: 40px;">
-                                                    <i class="fa fa-trash-alt me-1 text-danger"></i> Kosongkan
+                                                <button type="button" class="btn btn-light w-100 border" onclick="clearCart()" style="height: 42px; font-weight: 600; font-size: 12px; border-radius: 8px; background: #fdfdfd; color: #d32f2f;">
+                                                    Kosongkan
                                                 </button>
                                                 <?php endif; ?>
                                             </div>
@@ -251,7 +251,7 @@ if ($append_id > 0) {
                                                 <th class="ps-4"><strong>WAKTU PENGIRIMAN</strong></th>
                                                 <th><strong>CUSTOMER</strong></th>
                                                 <th><strong>ITEM & UKURAN</strong></th>
-                                                <th><strong>TOTAL KELUAR</strong></th>
+                                                <th><strong>TOTAL DUS</strong></th>
                                                 <th><strong>DIKIRIM OLEH</strong></th>
                                             </tr>
                                         </thead>
@@ -327,7 +327,7 @@ if ($append_id > 0) {
             if (!tbody) return;
 
             try {
-                const uniqueUrl = `../api/process_distributor.php?action=history&_nocache=${Date.now()}`;
+                const uniqueUrl = `../api/process_shipment.php?action=history&_nocache=${Date.now()}`;
                 const res = await fetch(uniqueUrl, { 
                     method: 'GET', 
                     cache: 'no-store',
@@ -376,8 +376,7 @@ if ($append_id > 0) {
                         const parts = it.split('|');
                         const nameSize = parts[0];
                         const labelCount = parts[1] || '0';
-                        const unitCount = parts[2] || '0';
-                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${labelCount} Paket (${unitCount} Unit)</small></div>`;
+                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${labelCount} Dus</small></div>`;
                     }).join('');
                 }
 
@@ -393,8 +392,7 @@ if ($append_id > 0) {
                         </td>
                         <td>${itemsHTML || '-'}</td>
                         <td>
-                            <div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_actual_qty || 0} Unit</div>
-                            <div class="mt-1 small text-muted font-w600" style="font-size:10px; padding-left: 5px;">${row.total_qty || 0} Paket</div>
+                            <div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty || 0} Dus</div>
                         </td>
                         <td><small class="font-w600 text-black">${row.shipped_by}</small></td>
                     </tr>
@@ -412,8 +410,8 @@ if ($append_id > 0) {
                         <strong class="text-black" style="word-break:break-all;">${name}</strong>
                     </div>
                     <div class="action-list">
-                        <button onclick="Swal.close(); viewShipmentDetail(${id}, '${name.replace(/'/g, "\\'")}')" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Unit</button>
-                        <button onclick="Swal.close(); window.location.href='distributor_scan.php?append_id=${id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Unit Susulan</button>
+                        <button onclick="Swal.close(); viewShipmentDetail(${id}, '${name.replace(/'/g, "\\'")}')" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Dus</button>
+                        <button onclick="Swal.close(); window.location.href='shipment_scan.php?append_id=${id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Dus Susulan</button>
                         <button onclick="Swal.close(); window.open('print_invoice.php?id=${id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan</button>
                         <button onclick="Swal.close(); deleteShipment(${id})" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
@@ -435,11 +433,9 @@ if ($append_id > 0) {
                 if (result.status === 'success') {
                     let tableRows = '';
                     let totalLabel = 0;
-                    let totalUnit = 0;
 
                     result.data.forEach((item, i) => {
                         totalLabel += parseInt(item.label_qty);
-                        totalUnit += parseInt(item.unit_qty);
                         tableRows += `
                             <tr>
                                 <td class="text-muted align-middle" style="font-size: 12px;">${i + 1}</td>
@@ -448,10 +444,9 @@ if ($append_id > 0) {
                                     <div class="text-muted" style="font-size: 11px;">${item.size} ${item.unit} &bull; <span class="text-primary font-w600">#${item.batch}</span></div>
                                 </td>
                                 <td class="text-center align-middle font-w600 text-black" style="font-size: 13px;">
-                                    ${item.label_qty} Paket<br>
-                                    <small class="text-muted font-w500" style="font-size: 10px;">(@ ${item.per_paket} Unit)</small>
+                                    ${item.label_qty} Dus
                                 </td>
-                                <td class="text-end align-middle font-w800 text-black" style="font-size: 14px;">${item.unit_qty} Unit</td>
+                                <td class="text-end align-middle font-w800 text-black" style="font-size: 14px;">${item.label_qty} Dus</td>
                             </tr>
                         `;
                     });
@@ -467,7 +462,7 @@ if ($append_id > 0) {
                         </div>
 
                         <div class="mb-3">
-                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Unit</h6>
+                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Dus</h6>
                         </div>
 
                         <div class="table-responsive border rounded">
@@ -476,18 +471,18 @@ if ($append_id > 0) {
                                     <tr>
                                         <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 10%;">NO</th>
                                         <th class="text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 45%;">ITEM & BATCH</th>
-                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 20%;">JML PAKET</th>
-                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">TOTAL FISIK</th>
+                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 20%;">JUMLAH</th>
+                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">TOTAL</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian unit.</td></tr>'}
+                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian label.</td></tr>'}
                                 </tbody>
                                 <tfoot class="bg-light">
                                     <tr>
                                         <td colspan="2" class="text-end py-3 text-black font-w800" style="font-size: 12px; border-bottom: 0;">TOTAL KESELURUHAN</td>
                                         <td class="text-center py-3 text-black font-w800" style="font-size: 14px; border-bottom: 0;">${totalLabel}</td>
-                                        <td class="text-end py-3 text-danger font-w800" style="font-size: 16px; border-bottom: 0;">${totalUnit} Unit</td>
+                                        <td class="text-end py-3 text-danger font-w800" style="font-size: 16px; border-bottom: 0;">${totalLabel} Dus</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -512,7 +507,7 @@ if ($append_id > 0) {
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     const f = new FormData(); f.append('id', id);
-                    const res = await fetch(`../api/admin_manage.php?action=delete&type=shipment`, { method: 'POST', body: f });
+                    const res = await fetch(`../api/manage_settings.php?action=delete&type=shipment`, { method: 'POST', body: f });
                     const data = await res.json();
                     if(data.status === 'success') {
                         toastr.success('Data Berhasil Dibatalkan');
@@ -697,7 +692,7 @@ if ($append_id > 0) {
             isProcessing = true;
             updateStatus('info', 'Memeriksa...', 'Mencari data unit...');
             try {
-                const res = await fetch(`../api/process_distributor.php?action=get_batch_data&qr=${encodeURIComponent(decodedText)}`);
+                const res = await fetch(`../api/process_shipment.php?action=get_batch_data&qr=${encodeURIComponent(decodedText)}`);
                 const result = await res.json();
                 if(result.status === 'success') {
                     new Audio('../assets/sounds/success.wav').play().catch(e => {});
@@ -819,12 +814,12 @@ if ($append_id > 0) {
                 f.append('cart', JSON.stringify(finalCart));
                 f.append('append_to', <?php echo $append_id; ?>);
                 
-                const res = await fetch('../api/process_distributor.php?action=submit_bulk', { method: 'POST', body: f });
+                const res = await fetch('../api/process_shipment.php?action=submit_bulk', { method: 'POST', body: f });
                 const d = await res.json();
                 if (d.status === 'success') {
                     toastr.success(d.message);
                     <?php if($append_id > 0): ?>
-                    Swal.fire({ title: 'Berhasil Susulan', text: "Kembali ke data histori?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Ya' }).then((r) => { if (r.isConfirmed) window.location.href = 'data_distributor.php'; else clearCart(); });
+                    Swal.fire({ title: 'Berhasil Susulan', text: "Kembali ke data histori?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Ya' }).then((r) => { if (r.isConfirmed) window.location.href = 'shipment_data.php'; else clearCart(); });
                     <?php else: ?>
                     Swal.fire({ title: 'Pengiriman Berhasil', text: "Apakah Anda ingin mencetak Surat Jalan sekarang?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Cetak Surat Jalan' }).then((r) => { if (r.isConfirmed) window.open(`print_invoice.php?id=${d.shipment_id}`, '_blank'); });
                     <?php endif; ?>
@@ -836,7 +831,7 @@ if ($append_id > 0) {
 
         switchCart(1);
         window.loadHistory();
-        document.querySelector('a[href="distributor_scan.php"]')?.closest('li')?.classList.add('mm-active');
+        document.querySelector('a[href="shipment_scan.php"]')?.closest('li')?.classList.add('mm-active');
     </script>
 </body>
 </html>

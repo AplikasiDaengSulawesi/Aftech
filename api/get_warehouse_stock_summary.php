@@ -1,5 +1,6 @@
 <?php
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $limit  = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
@@ -18,9 +19,19 @@ if (!empty($_GET['item'])) {
     $where_clauses[] = "p.item = '$item_filter'";
 }
 
+if (!empty($_GET['size']) && $_GET['size'] !== 'Custom') {
+    $size_filter = $conn->real_escape_string($_GET['size']);
+    $where_clauses[] = "p.size = '$size_filter'";
+}
+
 if (!empty($_GET['machine'])) {
     $machine_filter = $conn->real_escape_string($_GET['machine']);
     $where_clauses[] = "p.machine = '$machine_filter'";
+}
+
+if (!empty($_GET['shift'])) {
+    $shift_filter = $conn->real_escape_string($_GET['shift']);
+    $where_clauses[] = "p.shift = '$shift_filter'";
 }
 
 if (!empty($_GET['start_date']) && !empty($_GET['end_date'])) {
@@ -36,9 +47,9 @@ $bulan_indonesia = [
     '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
     '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
 ];
-$bulan_ini = $bulan_indonesia[date('m')] . ' ' . date('Y');
+$bulan_ini = '(' . $bulan_indonesia[date('m')] . ' ' . date('Y') . ')';
 
-if (!empty($_GET['start_date']) || !empty($_GET['end_date']) || !empty($_GET['search']) || !empty($_GET['item']) || !empty($_GET['machine'])) {
+if (!empty($_GET['start_date']) || !empty($_GET['end_date']) || !empty($_GET['search']) || !empty($_GET['item']) || !empty($_GET['size']) || !empty($_GET['machine']) || !empty($_GET['shift'])) {
     $bulan_ini = 'Hasil Filter';
 }
 
@@ -51,7 +62,8 @@ if ($bulan_ini !== 'Hasil Filter') {
 
 $statsSql = "
     SELECT p.id, p.copies, p.quantity,
-           COUNT(w.id) as total_in_warehouse
+           COUNT(w.id) as total_in_warehouse,
+           (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as total_shipped
     FROM warehouse_items w
     JOIN production_labels p ON w.production_id = p.id
     $statsWhere
@@ -60,16 +72,20 @@ $statsSql = "
 
 $statsRes = $conn->query($statsSql);
 $total_batch = 0;
-$total_stok = 0;
+$total_stok = 0; // Net Stock (Verified - Shipped)
+$total_verified = 0; // Total labels that entered
 $total_kapasitas = 0;
-$total_qty = 0;
+$total_shipped = 0;
 
 if ($statsRes) {
     while($row = $statsRes->fetch_assoc()) {
         $total_batch++;
-        $total_stok += (int)$row['total_in_warehouse'];
+        $verified = (int)$row['total_in_warehouse'];
+        $shipped = (int)$row['total_shipped'];
+        $total_verified += $verified;
+        $total_stok += ($verified - $shipped);
         $total_kapasitas += (int)$row['copies'];
-        $total_qty += (int)$row['quantity'] * (int)$row['total_in_warehouse'];
+        $total_shipped += $shipped;
     }
 }
 
@@ -85,6 +101,7 @@ $totalPages = ceil($totalData / $limit);
 // Menghitung jumlah label per batch di gudang dan mengambil pengirim terakhir
 $sql = "SELECT p.id as production_id, p.batch, p.item, p.copies, p.unit, p.size, p.quantity, p.machine, p.shift,
                COUNT(w.id) as total_in_warehouse,
+               (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as total_shipped_labels,
                MAX(w.transferred_at) as last_entry,
                (SELECT transferred_by FROM warehouse_items WHERE production_id = p.id ORDER BY transferred_at DESC LIMIT 1) as pengirim
         FROM warehouse_items w
@@ -110,9 +127,10 @@ echo json_encode([
     'current_page' => (int)$page,
     'stats' => [
         'total_batch' => $total_batch,
-        'total_stok' => $total_stok,
+        'total_verified' => $total_verified,
+        'total_stok' => $total_stok, // Net stock (Verified - Shipped)
         'total_kapasitas' => $total_kapasitas,
-        'total_qty' => $total_qty,
+        'total_shipped' => $total_shipped,
         'bulan' => $bulan_ini
     ]
 ]);

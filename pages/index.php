@@ -91,7 +91,7 @@
                                             <div class="media-body text-white text-end">
                                                 <p class="mb-1 text-white font-w600">Total Produksi</p>
                                                 <h3 class="text-white mb-0" id="k-prod">0</h3>
-                                                <small class="d-block mt-1">Unit Terdaftar</small>
+                                                <small class="kpi-title-month">Batch produksi bulan ini</small>
                                             </div>
                                         </div>
                                     </div>
@@ -105,7 +105,7 @@
                                             <div class="media-body text-white text-end">
                                                 <p class="mb-1 text-white font-w600">Antrian QC</p>
                                                 <h3 class="text-white mb-0" id="k-pending-2">0</h3>
-                                                <small class="d-block mt-1">Label Belum Masuk</small>
+                                                <small class="kpi-title-month">Belum diverifikasi scan</small>
                                             </div>
                                         </div>
                                     </div>
@@ -119,7 +119,7 @@
                                             <div class="media-body text-white text-end">
                                                 <p class="mb-1 text-white font-w600">Stok Gudang</p>
                                                 <h3 class="text-white mb-0" id="k-stok-2">0</h3>
-                                                <small class="d-block mt-1">Unit Siap Kirim</small>
+                                                <small class="kpi-title-month">Fisik tersedia saat ini</small>
                                             </div>
                                         </div>
                                     </div>
@@ -133,7 +133,7 @@
                                             <div class="media-body text-white text-end">
                                                 <p class="mb-1 text-white font-w600">Pengiriman</p>
                                                 <h3 class="text-white mb-0" id="k-ship">0</h3>
-                                                <small class="d-block mt-1">Unit Terdistribusi</small>
+                                                <small class="kpi-title-month">Fisik keluar dari gudang</small>
                                             </div>
                                         </div>
                                     </div>
@@ -273,11 +273,11 @@
                 document.getElementById('k-prod').innerText = formatCompactNumber(data.total_production);
                 document.getElementById('k-prod').title = data.total_production.toLocaleString('id-ID');
                 
-                // Widget Antrian QC (Labels)
+                // Widget Antrian QC (Dus)
                 document.getElementById('k-pending-2').innerText = formatCompactNumber(waitLabel);
                 document.getElementById('k-pending-2').title = waitLabel.toLocaleString('id-ID');
-                
-                // Stock & Pending (Units)
+
+                // Stock & Pending (Dus)
                 document.getElementById('k-pending').innerText = formatCompactNumber(waitUnit);
                 document.getElementById('k-pending').title = waitUnit.toLocaleString('id-ID');
                 
@@ -295,7 +295,7 @@
                 document.getElementById('k-shipped-legend').innerText = formatCompactNumber(data.total_shipped);
                 document.getElementById('k-shipped-legend').title = data.total_shipped.toLocaleString('id-ID');
 
-                // 2. DONUT (Using Units)
+                // 2. DONUT (Using Dus)
                 if(!donutChart) {
                     donutChart = new ApexCharts(document.querySelector("#donutChart"), {
                         series: [ready, waitUnit, data.total_shipped],
@@ -348,7 +348,7 @@
                     list.insertAdjacentHTML('beforeend', `
                         <div class="batch-item">
                             <div><p class="font-w700 text-black mb-0" style="font-size:13px;">${b.item}</p><span class="text-primary" style="font-size:11px;">#${b.batch}</span></div>
-                            <span class="badge badge-sm light badge-primary">${parseInt(b.total_qty).toLocaleString('id-ID')} Unit</span>
+                            <span class="badge badge-sm light badge-primary">${parseInt(b.total_qty).toLocaleString('id-ID')} Dus</span>
                         </div>
                     `);
                 });

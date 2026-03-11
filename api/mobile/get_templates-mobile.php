@@ -1,7 +1,8 @@
 <?php
 // backend_files/api/get_templates.php
 header("Content-Type: application/json");
-include 'config.php';
+include '../config.php';
+verify_api_access();
 
 try {
     $result = $conn->query("SELECT * FROM master_templates ORDER BY template_name ASC");

@@ -2,8 +2,8 @@
 <html lang="en">
 <?php 
 include '../includes/header.php';
-$role = $_SESSION['role'] ?? 'gudang';
-if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
+require_once '../includes/auth_check.php';
+protect_page('qc_checker');
 ?>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
@@ -92,7 +92,7 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
                                         <div id="status-icon"><i class="fa fa-qrcode fa-2x text-muted"></i></div>
                                         <div id="status-text">
                                             <div class="font-w600 text-black">Siap Scan</div>
-                                            <small class="text-muted">Arahkan kamera ke QR Label</small>
+                                            <small class="text-muted">Arahkan kamera ke QR Dus</small>
                                         </div>
                                     </div>
                                     <button class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="resumeScanner()">Resume Scanner</button>
@@ -108,13 +108,13 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
                             <div class="card-header border-bottom flex-column align-items-start">
                                 <div class="d-flex justify-content-between w-100 mb-3">
                                     <h4 class="card-title text-black">Pantauan Real-Time QC</h4>
-                                    <span class="badge border border-primary text-primary bg-light shadow-sm" style="font-size: 14px;" id="global-total-verified">Total Verifikasi: 0</span>
+                                    <span class="badge border border-primary text-primary bg-light shadow-sm" style="font-size: 14px;" id="global-total-verified">Total Scan Dus: 0</span>
                                 </div>
                             </div>
                             <div class="card-body" id="tracking-maps-container">
                                 <div id="empty-state" class="text-center py-5">
                                     <i class="fa fa-th fa-4x text-light mb-3"></i>
-                                    <h5 class="text-muted">Belum ada batch yang dipantau.<br>Scan label untuk memulai tracking.</h5>
+                                    <h5 class="text-muted">Belum ada batch yang dipantau.<br>Scan dus untuk memulai tracking.</h5>
                                 </div>
                                 <!-- Grid Cards will be appended here -->
                             </div>
@@ -141,7 +141,7 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
             for (const pid in globalScannedCounts) {
                 total += globalScannedCounts[pid];
             }
-            document.getElementById('global-total-verified').innerText = `Total Verifikasi: ${total}`;
+            document.getElementById('global-total-verified').innerText = `Total Scan Dus: ${total}`;
         }
 
         // Fungsi Global untuk Muat Progress QC (Full AJAX Multi-Batch)
@@ -162,9 +162,9 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
                             production_id: prodId,
                             item: row.item,
                             batch: row.batch,
-                            copies: parseInt(row.quantity || row.copies), // prefer quantity if available
+                            copies: parseInt(row.copies), 
                             scanned_list: scannedList,
-                            progress: `${scannedList.length}/${parseInt(row.quantity || row.copies)}`,
+                            progress: `${scannedList.length}/${parseInt(row.copies)}`,
                             last_no: scannedList[scannedList.length - 1]
                         };
 
@@ -234,13 +234,13 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
             if (isProcessing) return;
             if (html5QrCode && html5QrCode.isScanning) html5QrCode.pause(true);
 
-            // 1. LOKAL PRE-CHECK: Cegah scan label ganda sebelum hit API
+            // 1. LOKAL PRE-CHECK: Cegah scan dus ganda sebelum hit API
             const dashIndex = decodedText.indexOf('-');
             if (dashIndex > 0) {
                 const labelNo = parseInt(decodedText.substring(0, dashIndex));
                 const batchStr = decodedText.substring(dashIndex + 1);
                 
-                // Cek apakah label ini sudah ada di dalam DOM Grid (sudah hijau)
+                // Cek apakah dus ini sudah ada di dalam DOM Grid (sudah hijau)
                 let isAlreadyScannedLocally = false;
                 for (const pid of trackedBatchIds) {
                     const batchHeader = document.querySelector(`#batch-card-${pid} h5`);
@@ -259,7 +259,7 @@ if($role !== 'admin' && $role !== 'qc') { header("Location: index.php"); exit; }
 
                 if (isAlreadyScannedLocally) {
                     new Audio('../assets/sounds/alert.wav').play().catch(e => console.log(e));
-                    updateStatus('warning', 'SUDAH DI-SCAN', `Label #${labelNo} untuk Batch ${batchStr} sudah diverifikasi.`);
+                    updateStatus('warning', 'SUDAH DI-SCAN', `Dus #${labelNo} untuk Batch ${batchStr} sudah diverifikasi.`);
                     setTimeout(() => resumeScanner(), 2000);
                     return;
                 }

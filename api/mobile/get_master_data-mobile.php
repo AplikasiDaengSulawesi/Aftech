@@ -1,5 +1,6 @@
 <?php
-include 'config.php';
+include '../config.php';
+verify_api_access();
 
 // Fetch Items with their associated Units using JOIN
 $items = $conn->query("

@@ -1,6 +1,7 @@
 <?php
 header("Content-Type: application/json");
-include 'config.php';
+include '../config.php';
+verify_api_access();
 
 $start_date = isset($_GET['start_date']) ? $conn->real_escape_string($_GET['start_date']) : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $conn->real_escape_string($_GET['end_date']) : date('Y-m-d');

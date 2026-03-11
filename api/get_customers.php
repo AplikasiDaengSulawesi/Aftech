@@ -1,5 +1,6 @@
 <?php
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $q = isset($_GET['q']) ? $conn->real_escape_string($_GET['q']) : '';

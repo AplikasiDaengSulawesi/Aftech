@@ -1,12 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <?php 
-include '../includes/header.php'; 
-require_once '../includes/db.php'; 
+include '../includes/header.php';
+require_once '../includes/auth_check.php';
+protect_page('warehouse');
+require_once '../includes/db.php';
 
 // Fetch master data for filters
-$m_items = $pdo->query("SELECT name FROM master_items ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$m_shifts = $pdo->query("SELECT name FROM master_shifts ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+$items_query = $pdo->query("
+    SELECT i.id, i.name, u.name as unit_name 
+    FROM master_items i 
+    LEFT JOIN master_units u ON i.unit_id = u.id 
+    ORDER BY i.name ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$hierarchy_data = [];
+foreach($items_query as $it) {
+    $sizes = $pdo->prepare("SELECT size_value FROM master_sizes WHERE item_id = ? ORDER BY CAST(size_value AS UNSIGNED) ASC");
+    $sizes->execute([$it['id']]);
+    
+    $hierarchy_data[$it['name']] = [
+        'unit' => $it['unit_name'],
+        'sizes' => $sizes->fetchAll(PDO::FETCH_COLUMN)
+    ];
+}
 ?>
 <style>
     .cinema-grid-warehouse { 
@@ -114,9 +134,9 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                 <div class="media">
                                     <span class="me-3"><i class="fa fa-layer-group"></i></span>
                                     <div class="media-body text-white text-end">
-                                        <p class="mb-1 text-white font-w600">Total Qty</p>
+                                        <p class="mb-1 text-white font-w600">Total Dus Masuk</p>
                                         <h3 class="text-white mb-0" id="kpi-qty">0</h3>
-                                        <small class="d-block mb-1">Unit Produk</small>
+                                        <small class="d-block mb-1">Diterima di Gudang</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>
@@ -129,9 +149,9 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                 <div class="media">
                                     <span class="me-3"><i class="fa fa-clock"></i></span>
                                     <div class="media-body text-white text-end">
-                                        <p class="mb-1 text-white font-w600">Belum di Scan</p>
-                                        <h3 class="text-white mb-0" id="kpi-waiting">0</h3>
-                                        <small class="d-block mb-1">Belum Diverifikasi</small>
+                                        <p class="mb-1 text-white font-w600">Telah Terkirim</p>
+                                        <h3 class="text-white mb-0" id="kpi-shipped">0</h3>
+                                        <small class="d-block mb-1">Dus Keluar</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>
@@ -144,9 +164,9 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                 <div class="media">
                                     <span class="me-3"><i class="fa fa-check-circle"></i></span>
                                     <div class="media-body text-white text-end">
-                                        <p class="mb-1 text-white font-w600">Telah di Verifikasi</p>
+                                        <p class="mb-1 text-white font-w600">Sisa di Gudang</p>
                                         <h3 class="text-white mb-0" id="kpi-verified">0</h3>
-                                        <small class="d-block mb-1">Total Fisik di Gudang</small>
+                                        <small class="d-block mb-1">Total Dus Tersedia</small>
                                         <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
                                     </div>
                                 </div>
@@ -162,7 +182,7 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                 <div class="filter-card-header">
                                     <div>
                                         <h4 class="text-black mb-0 font-w800">Persediaan Gudang (Warehouse Inventory)</h4>
-                                        <p class="mb-0 small text-muted">Klik baris untuk melihat peta unit atau mengosongkan batch</p>
+                                        <p class="mb-0 small text-muted">Klik baris untuk melihat peta dus atau mengosongkan batch</p>
                                     </div>
                                     <div class="header-btn-group">
                                         <div class="dropdown">
@@ -173,10 +193,11 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                                 <h6 class="dropdown-header ps-0 mb-2 font-w700 text-black">Tampilkan:</h6>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-batch" id="chk-batch" checked disabled><label class="form-check-label small font-w600" for="chk-batch">Batch / Terima</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-item" id="chk-item" checked><label class="form-check-label small font-w600" for="chk-item">Item / Size</label></div>
-                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-qty" id="chk-qty" checked><label class="form-check-label small font-w600" for="chk-qty">Qty Unit</label></div>
+                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-qty" id="chk-qty" checked><label class="form-check-label small font-w600" for="chk-qty">Total Dus</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-mesin" id="chk-mesin" checked><label class="form-check-label small font-w600" for="chk-mesin">Mesin / Shift</label></div>
-                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-progres" id="chk-progres" checked><label class="form-check-label small font-w600" for="chk-progres">Stok di Gudang</label></div>
-                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-pending" id="chk-pending"><label class="form-check-label small font-w600" for="chk-pending">Belum Check</label></div>
+                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-progres" id="chk-progres" checked><label class="form-check-label small font-w600" for="chk-progres">Verified</label></div>
+                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-shipped" id="chk-shipped" checked><label class="form-check-label small font-w600" for="chk-shipped">Terkirim</label></div>
+                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-pending" id="chk-pending"><label class="form-check-label small font-w600" for="chk-pending">Sisa Stok</label></div>
                                                 <div class="form-check"><input class="form-check-input col-checkbox" type="checkbox" value="col-qc" id="chk-qc" checked><label class="form-check-label small font-w600" for="chk-qc">Pengirim (QC)</label></div>
                                             </div>
                                         </div>
@@ -187,8 +208,74 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                 </div>
                                 <form id="formFilter" class="row g-2">
                                     <div class="col-12 col-md-3"><input type="text" id="f_search" name="search" class="form-control form-control-sm" placeholder="Cari data..."></div>
-                                    <div class="col-6 col-md-2"><select name="item" id="f_item" class="form-control form-control-sm default-select auto-filter"><option value="">Semua Item</option><?php foreach($m_items as $i) echo "<option value='{$i['name']}'>{$i['name']}</option>"; ?></select></div>
-                                    <div class="col-6 col-md-2"><select name="machine" id="f_machine" class="form-control form-control-sm default-select auto-filter"><option value="">Semua Mesin</option><?php foreach($m_machines as $m) echo "<option value='{$m['name']}'>{$m['name']}</option>"; ?></select></div>
+                                    <!-- NATIVE BOOTSTRAP SUPER FILTER ITEM -->
+                                    <div class="col-6 col-md-2">
+                                        <div class="dropdown w-100">
+                                            <button class="form-control form-control-sm d-flex justify-content-between align-items-center text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+                                                <span id="sf-label" class="text-truncate text-muted">Semua Item</span>
+                                                <i class="fa fa-caret-down opacity-50 ms-2 text-muted"></i>
+                                            </button>
+                                            <ul class="dropdown-menu shadow-lg border-0 mt-1" style="max-height: 350px; overflow-y: auto; border-radius: 12px; font-family: 'Poppins', sans-serif; font-size: 13px; min-width: 100%;">
+                                                <li><a class="dropdown-item font-w600 text-black" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectSuperFilter('', '')">Semua Item</a></li>
+                                                <li><hr class="dropdown-divider m-0"></li>
+                                                <?php foreach($hierarchy_data as $item => $data): ?>
+                                                    <li>
+                                                        <div class="d-flex justify-content-between align-items-center dropdown-item" style="cursor: default; padding: 5px 15px;">
+                                                            <a class="text-black font-w600 text-decoration-none flex-grow-1" style="opacity: 0.7;" href="javascript:void(0)" onclick="selectSuperFilter('<?= $item ?>', '', '')"><?= $item ?></a>
+                                                            <?php if(!empty($data['sizes'])): ?>
+                                                            <a class="text-primary" style="font-size: 16px; margin-left: 10px;" data-bs-toggle="collapse" href="#collapse-<?= md5($item) ?>" onclick="event.stopPropagation();"><i class="fa fa-plus-circle" style="color: #1A237E;"></i></a>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </li>
+                                                    <?php if(!empty($data['sizes'])): ?>
+                                                    <div class="collapse bg-white" id="collapse-<?= md5($item) ?>">
+                                                        <?php foreach($data['sizes'] as $sz): ?>
+                                                        <?php $displayLabel = $sz . ' ' . $data['unit']; ?>
+                                                        <li><a class="dropdown-item text-muted" style="padding: 8px 15px 8px 25px;" href="javascript:void(0)" onclick="selectSuperFilter('<?= $item ?>', '<?= $sz ?>', '<?= $displayLabel ?>')"><?= $displayLabel ?></a></li>
+                                                        <?php endforeach; ?>
+                                                        <li><a class="dropdown-item text-primary font-w600" style="padding: 8px 15px 8px 25px;" href="javascript:void(0)" onclick="selectSuperFilter('<?= $item ?>', 'Custom', 'Ukuran Lainnya')"><i class="fa fa-plus me-2"></i>Ukuran Lainnya</a></li>
+                                                    </div>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                            <input type="hidden" name="item" id="f_item_val">
+                                            <input type="hidden" name="size" id="f_size_val">
+                                        </div>
+                                    </div>
+
+                                    <!-- NATIVE BOOTSTRAP SUPER FILTER MESIN -->
+                                    <div class="col-6 col-md-2">
+                                        <div class="dropdown w-100">
+                                            <button class="form-control form-control-sm d-flex justify-content-between align-items-center text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+                                                <span id="sf-mesin-label" class="text-truncate text-muted">Semua Mesin</span>
+                                                <i class="fa fa-caret-down opacity-50 ms-2 text-muted"></i>
+                                            </button>
+                                            <ul class="dropdown-menu shadow-lg border-0 mt-1" style="max-height: 350px; overflow-y: auto; border-radius: 12px; font-family: 'Poppins', sans-serif; font-size: 13px; min-width: 100%;">
+                                                <li><a class="dropdown-item font-w600 text-black" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectMesinFilter('', '', '')">Semua Mesin</a></li>
+                                                <li><hr class="dropdown-divider m-0"></li>
+                                                <?php foreach($m_machines as $m): ?>
+                                                    <li>
+                                                        <div class="d-flex justify-content-between align-items-center dropdown-item" style="cursor: default; padding: 5px 15px;">
+                                                            <a class="text-black font-w600 text-decoration-none flex-grow-1" style="opacity: 0.7;" href="javascript:void(0)" onclick="selectMesinFilter('<?= $m['name'] ?>', '', '')"><?= $m['name'] ?></a>
+                                                            <?php if(!empty($m_shifts)): ?>
+                                                            <a class="text-primary" style="font-size: 16px; margin-left: 10px;" data-bs-toggle="collapse" href="#collapse-mesin-<?= md5($m['name']) ?>" onclick="event.stopPropagation();"><i class="fa fa-plus-circle" style="color: #1A237E;"></i></a>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </li>
+                                                    <?php if(!empty($m_shifts)): ?>
+                                                    <div class="collapse bg-white" id="collapse-mesin-<?= md5($m['name']) ?>">
+                                                        <?php foreach($m_shifts as $sh): ?>
+                                                        <?php $displayLabel = $sh['name']; ?>
+                                                        <li><a class="dropdown-item text-muted" style="padding: 8px 15px 8px 25px;" href="javascript:void(0)" onclick="selectMesinFilter('<?= $m['name'] ?>', '<?= $sh['name'] ?>', '<?= $displayLabel ?>')"><?= $displayLabel ?></a></li>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                            <input type="hidden" name="machine" id="f_machine_val">
+                                            <input type="hidden" name="shift" id="f_shift_val">
+                                        </div>
+                                    </div>
                                     <div class="col-12 col-md-5"><input type="text" id="f_daterange" class="form-control form-control-sm daterange-picker" placeholder="Pilih Tanggal Masuk Gudang" readonly><input type="hidden" name="start_date" id="f_start"><input type="hidden" name="end_date" id="f_end"></div>
                                 </form>
                             </div>
@@ -206,10 +293,11 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                                             <tr>
                                                 <th class="ps-4 text-center col-batch"><strong>BATCH / TERIMA</strong></th>
                                                 <th class="col-item"><strong>ITEM / SIZE</strong></th>
-                                                <th class="col-qty text-center"><strong>QTY</strong></th>
+                                                <th class="col-qty text-center"><strong>TOTAL DUS</strong></th>
                                                 <th class="col-mesin"><strong>MESIN</strong></th>
-                                                <th class="col-progres text-center"><strong>STOK GUDANG</strong></th>
-                                                <th class="col-pending text-center col-hidden"><strong>BELUM CHECK</strong></th>
+                                                <th class="col-progres text-center"><strong>VERIFIED</strong></th>
+                                                <th class="col-shipped text-center"><strong>TERKIRIM</strong></th>
+                                                <th class="col-pending text-center"><strong>SISA STOK</strong></th>
                                                 <th class="col-qc"><strong>QC CHECK</strong></th>
                                             </tr>
                                         </thead>
@@ -234,14 +322,14 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
                     <div class="modal-header bg-primary text-white border-0" style="border-radius: 20px 20px 0 0;">
-                        <h5 class="modal-title text-white font-w700"><i class="fa fa-th-large me-2"></i>Peta Unit Gudang</h5>
+                        <h5 class="modal-title text-white font-w700"><i class="fa fa-th-large me-2"></i>Peta Dus Gudang</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body p-4">
                         <div class="d-flex justify-content-between mb-2">
                             <div><h5 class="text-black mb-0" id="v-item"></h5><p class="small text-primary mb-0" id="v-batch"></p></div>
                         </div>
-                        <p class="text-muted small mb-3">Peta visual unit label yang sudah masuk ke gudang (Warna Indigo).</p>
+                        <p class="text-muted small mb-3">Peta visual unit dus yang sudah masuk ke gudang (Warna Indigo).</p>
                         <div class="cinema-grid-warehouse" id="v-grid"></div>
                     </div>
                 </div>
@@ -253,7 +341,7 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
     <script>
         window.currentPage = 1;
         window.latestData = [];
-        window.columnStates = { 'col-batch': true, 'col-item': true, 'col-qty': true, 'col-mesin': true, 'col-progres': true, 'col-pending': false, 'col-qc': true };
+        window.columnStates = { 'col-batch': true, 'col-item': true, 'col-qty': true, 'col-mesin': true, 'col-progres': true, 'col-shipped': true, 'col-pending': true, 'col-qc': true };
 
         function renderSkeleton() {
             const tbody = document.getElementById('warehouseTableBody');
@@ -298,24 +386,23 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                 const response = await res.json();
 
                 // Update KPI Stats if available
-                if (response.stats) {
-                    document.getElementById('kpi-batch').innerText = formatCompactNumber(response.stats.total_batch);
-                    document.getElementById('kpi-batch').title = response.stats.total_batch.toLocaleString('id-ID');
+                                                if (response.stats) {
+                                                    document.getElementById('kpi-batch').innerText = formatCompactNumber(response.stats.total_batch);
+                                                    document.getElementById('kpi-batch').title = response.stats.total_batch.toLocaleString('id-ID');
 
-                    document.getElementById('kpi-qty').innerText = formatCompactNumber(response.stats.total_qty);
-                    document.getElementById('kpi-qty').title = response.stats.total_qty.toLocaleString('id-ID');
+                                                    document.getElementById('kpi-qty').innerText = formatCompactNumber(response.stats.total_verified);
+                                                    document.getElementById('kpi-qty').title = response.stats.total_verified.toLocaleString('id-ID');
 
-                    const waitingQC = (parseInt(response.stats.total_kapasitas) || 0) - (parseInt(response.stats.total_stok) || 0);
-                    document.getElementById('kpi-waiting').innerText = formatCompactNumber(waitingQC);
-                    document.getElementById('kpi-waiting').title = waitingQC.toLocaleString('id-ID');
+                                                    document.getElementById('kpi-shipped').innerText = formatCompactNumber(response.stats.total_shipped);
+                                                    document.getElementById('kpi-shipped').title = response.stats.total_shipped.toLocaleString('id-ID');
 
-                    document.getElementById('kpi-verified').innerText = formatCompactNumber(response.stats.total_stok);
-                    document.getElementById('kpi-verified').title = response.stats.total_stok.toLocaleString('id-ID');
+                                                    document.getElementById('kpi-verified').innerText = formatCompactNumber(response.stats.total_stok);
+                                                    document.getElementById('kpi-verified').title = response.stats.total_stok.toLocaleString('id-ID');
 
-                    if(response.stats.bulan) {
-                        document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = `(${response.stats.bulan})`);
-                    }
-                }
+                                                    if(response.stats.bulan) {
+                                                        document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = response.stats.bulan);
+                                                    }
+                                                }
 
                 if (response.data) {
                     window.latestData = response.data;
@@ -326,7 +413,37 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                 }
             } catch (e) { console.error("WH AJAX Error:", e); }
         }
-        window.resetFilter = () => { document.getElementById('formFilter').reset(); $('#f_daterange').val(''); $('#f_start').val(''); $('#f_end').val(''); fetchWarehouseStock(1); }
+        window.selectSuperFilter = (item, size, displayLabel) => {
+            document.getElementById('f_item_val').value = item;
+            document.getElementById('f_size_val').value = size;
+            let label = item || 'Semua Item';
+            if(size) label = `${item} (${displayLabel})`;
+            const labelEl = document.getElementById('sf-label');
+            labelEl.innerText = label;
+            if (item) labelEl.classList.remove('text-muted');
+            else labelEl.classList.add('text-muted');
+            
+            const dropdownEl = labelEl.closest('.dropdown');
+            if(dropdownEl && dropdownEl.classList.contains('show')) dropdownEl.querySelector('[data-bs-toggle="dropdown"]').click();
+            fetchWarehouseStock(1);
+        };
+
+        window.selectMesinFilter = (machine, shift, displayLabel) => {
+            document.getElementById('f_machine_val').value = machine;
+            document.getElementById('f_shift_val').value = shift || '';
+            let label = machine || 'Semua Mesin';
+            if(shift) label = `${machine} (${displayLabel})`;
+            const labelEl = document.getElementById('sf-mesin-label');
+            labelEl.innerText = label;
+            if (machine) labelEl.classList.remove('text-muted');
+            else labelEl.classList.add('text-muted');
+            
+            const dropdownEl = labelEl.closest('.dropdown');
+            if(dropdownEl && dropdownEl.classList.contains('show')) dropdownEl.querySelector('[data-bs-toggle="dropdown"]').click();
+            fetchWarehouseStock(1);
+        };
+
+        window.resetFilter = () => { document.getElementById('formFilter').reset(); $('#f_daterange').val(''); $('#f_start').val(''); $('#f_end').val(''); selectSuperFilter('', '', ''); selectMesinFilter('', '', ''); }
         document.getElementById('f_search').oninput = () => { clearTimeout(window.sT); window.sT = setTimeout(() => { fetchWarehouseStock(1); }, 500); }
         $(document).on('change', '.auto-filter', () => { fetchWarehouseStock(1); });
 
@@ -367,9 +484,10 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
             const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
             
             data.forEach((row, index) => {
-                const scanned = parseInt(row.total_in_warehouse || 0);
+                const verified = parseInt(row.total_in_warehouse || 0);
+                const shipped = parseInt(row.total_shipped_labels || 0);
+                const stock = verified - shipped;
                 const limit = parseInt(row.copies || 0);
-                const pending = limit - scanned;
                 
                 let dateFormatted = '-- ---';
                 if(row.last_entry) { 
@@ -384,13 +502,18 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
                             <div class="text-black small" style="font-weight:400;">${dateFormatted} | ${row.last_entry_time} WITA</div>
                         </td>
                         <td class="col-item ${window.columnStates['col-item'] ? '' : 'col-hidden'}"><div class="text-black font-w700">${row.item}</div><small class="text-black">${row.size} ${row.unit}</small></td>
-                        <td class="col-qty text-center ${window.columnStates['col-qty'] ? '' : 'col-hidden'}"><span class="badge badge-light border text-black shadow-sm font-w700" style="font-size:12px;">${row.quantity} Unit</span></td>
+                        <td class="col-qty text-center ${window.columnStates['col-qty'] ? '' : 'col-hidden'}">
+                            ${parseInt(row.copies) > 0 ? `<span class="badge badge-light border text-black shadow-sm font-w700" style="font-size:12px;">${row.copies} Dus</span>` : `<span class="badge badge-danger light font-w800" style="font-size:10px;">BELUM ADA</span>`}
+                        </td>
                         <td class="col-mesin ${window.columnStates['col-mesin'] ? '' : 'col-hidden'}"><span class="text-black font-w600">${row.machine || '-'}</span><br><small>${row.shift || '-'}</small></td>
                         <td class="col-progres text-center ${window.columnStates['col-progres'] ? '' : 'col-hidden'}">
-                            <span class="text-black font-w800">${scanned}</span>
+                            <span class="text-black font-w800">${verified}</span>
+                        </td>
+                        <td class="col-shipped text-center ${window.columnStates['col-shipped'] ? '' : 'col-hidden'}">
+                            <span class="text-success font-w800">${shipped}</span>
                         </td>
                         <td class="col-pending text-center ${window.columnStates['col-pending'] ? '' : 'col-hidden'}">
-                            ${pending > 0 ? `<span class="text-danger font-w800">${pending}</span> <small class="text-muted">Unit</small>` : `<span class="badge badge-success text-white" style="font-size:11px; font-weight:800; padding: 6px 12px; border-radius: 6px;">COMPLETE</span>`}
+                            ${stock > 0 ? `<span class="text-primary font-w800">${stock}</span> <small class="text-muted">Dus</small>` : `<span class="badge badge-danger text-white" style="font-size:11px; font-weight:800; padding: 6px 12px; border-radius: 6px;">KOSONG</span>`}
                         </td>
                         <td class="col-qc ${window.columnStates['col-qc'] ? '' : 'col-hidden'}"><div class="small text-black font-w600">${row.pengirim || '-'}</div></td>
                     </tr>
@@ -442,7 +565,7 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
             Swal.fire({ title: 'Hapus dari Gudang?', text: `Kosongkan seluruh unit batch #${batch} dari gudang?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#D50000', confirmButtonText: 'Ya, Hapus' }).then(async (res) => {
                 if(res.isConfirmed) {
                     const f = new FormData(); f.append('id', id);
-                    const r = await fetch(`../api/admin_manage.php?action=delete&type=warehouse_batch`, { method: 'POST', body: f });
+                    const r = await fetch(`../api/manage_settings.php?action=delete&type=warehouse_batch`, { method: 'POST', body: f });
                     if((await r.json()).status === 'success') { toastr.success('Dihapus'); fetchWarehouseStock(window.currentPage); }
                 }
             });

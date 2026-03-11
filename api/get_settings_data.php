@@ -1,5 +1,6 @@
 <?php
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $type = $_GET['type'] ?? '';
@@ -26,9 +27,10 @@ if ($type == 'item') {
     $res = $conn->query("SELECT * FROM master_shifts ORDER BY name ASC");
 } elseif ($type == 'template') {
     $res = $conn->query("SELECT * FROM master_templates ORDER BY template_name ASC");
-} elseif ($type == 'pin') {
-    // Ambil daftar PIN Otoritas Mobile
-    $res = $conn->query("SELECT * FROM app_config ORDER BY id ASC");
+} elseif ($type == 'api_key') {
+    $res = $conn->query("SELECT * FROM api_keys ORDER BY created_at DESC");
+} elseif ($type == 'role_permissions') {
+    $res = $conn->query("SELECT * FROM role_permissions");
 }
 
 if (isset($res) && $res) {

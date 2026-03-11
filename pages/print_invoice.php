@@ -12,16 +12,14 @@ $header = $stmt->fetch();
 
 if (!$header) die("Data pengiriman tidak ditemukan.");
 
-// Fetch Details Grouped by Item & Size
+// Fetch Details Grouped by Item & Size (Focus on Dus)
 $stmtDet = $pdo->prepare("
     SELECT CONCAT(p.item, ' (', p.size, ' ', p.unit, ')') as item_size, 
-           p.quantity as per_paket,
-           SUM(b.label_qty) as label_qty, 
-           SUM(b.unit_qty) as qty
+           SUM(b.label_qty) as dus_qty
     FROM outbound_shipment_batches b
     JOIN production_labels p ON b.production_id = p.id
     WHERE b.shipment_id = ?
-    GROUP BY p.item, p.size, p.unit, p.quantity
+    GROUP BY p.item, p.size, p.unit
 ");
 $stmtDet->execute([$id]);
 $details = $stmtDet->fetchAll();
@@ -43,9 +41,9 @@ if (count($name_parts) >= 2) {
     $initials = strtoupper(substr(trim($header['customer_name']), 0, 2));
 }
 
-// 4. Generate No Resi (Urutan-TanggalWaktu-TotalPaket-Inisial)
-$total_paket = $header['total_qty'];
-$no_trx = $seq . '-' . $datetime_str . '-' . $total_paket . '-' . $initials;
+// 4. Generate No Resi (Urutan-TanggalWaktu-TotalDus-Inisial)
+$total_dus = $header['total_qty'];
+$no_trx = $seq . '-' . $datetime_str . '-' . $total_dus . '-' . $initials;
 
 function tgl_indo($tanggal) {
     $bulan = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -189,8 +187,8 @@ $total_pages = count($pages);
                 <tr>
                     <th style="width: 50px;">NO</th>
                     <th>NAMA ITEM & UKURAN</th>
-                    <th style="text-align: center; width: 120px;">PAKET</th>
-                    <th style="text-align: center; width: 120px;">TOTAL UNIT</th>
+                    <th style="text-align: center; width: 120px;">JUMLAH DUS</th>
+                    <th style="text-align: center; width: 120px;">KETERANGAN</th>
                 </tr>
             </thead>
             <tbody>
@@ -198,19 +196,18 @@ $total_pages = count($pages);
                 <tr class="item">
                     <td><?php echo $global_no++; ?></td>
                     <td><strong style="font-size: 15px;"><?php echo $row['item_size']; ?></strong></td>
-                    <td style="text-align: center; font-weight: bold;">
-                        <?php echo $row['label_qty']; ?> Paket<br>
-                        <small style="font-size: 10px; color: #666; font-weight: normal;">(@ <?php echo $row['per_paket']; ?> Unit)</small>
+                    <td style="text-align: center; font-weight: bold; font-size: 15px; color: #1A237E;">
+                        <?php echo $row['dus_qty']; ?> Dus
                     </td>
-                    <td style="text-align: center; font-weight: bold; font-size: 15px; color: #1A237E;"><?php echo $row['qty']; ?> Unit</td>
+                    <td style="text-align: center; font-size: 12px; color: #666;">-</td>
                 </tr>
                 <?php endforeach; ?>
                 
                 <?php if ($current_page == $total_pages): ?>
                 <tr class="total-row">
                     <td colspan="2" style="text-align: right;">TOTAL KESELURUHAN DIKIRIM :</td>
-                    <td style="text-align: center;"><?php echo $header['total_qty']; ?> Paket</td>
-                    <td style="text-align: center; color: #D50000; font-size: 18px;"><?php echo $header['total_actual_qty']; ?> Unit</td>
+                    <td style="text-align: center; color: #D50000; font-size: 18px;"><?php echo $header['total_qty']; ?> Dus</td>
+                    <td></td>
                 </tr>
                 <?php endif; ?>
             </tbody>

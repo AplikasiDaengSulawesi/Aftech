@@ -1,5 +1,6 @@
 <?php
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $prod_id = isset($_GET['prod_id']) ? (int)$_GET['prod_id'] : 0;

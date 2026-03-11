@@ -1,6 +1,7 @@
 <?php
 session_start();
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 $qr_input = isset($_GET['batch']) ? $conn->real_escape_string($_GET['batch']) : '';
@@ -36,14 +37,14 @@ $limit = (int)$prod['copies'];
 
 // 3. Validasi Rentang Nomor
 if ($label_no < 1 || $label_no > $limit) {
-    echo json_encode(['status' => 'error', 'message' => "Label #$label_no di luar kuota ($limit)"]);
+    echo json_encode(['status' => 'error', 'message' => "Dus #$label_no di luar kuota ($limit)"]);
     exit;
 }
 
-// 4. Cek Duplikasi Label di Gudang (Bukan lagi di QC)
+// 4. Cek Duplikasi Dus di Gudang (Bukan lagi di QC)
 $check = $conn->query("SELECT id FROM warehouse_items WHERE production_id = $prod_pk AND label_no = $label_no");
 if ($check->num_rows > 0) {
-    echo json_encode(['status' => 'error', 'message' => "Label #$label_no sudah ada di Gudang!"]);
+    echo json_encode(['status' => 'error', 'message' => "Dus #$label_no sudah ada di Gudang!"]);
     exit;
 }
 
@@ -51,14 +52,14 @@ if ($check->num_rows > 0) {
 try {
     $conn->query("INSERT INTO warehouse_items (production_id, label_no, transferred_by) VALUES ($prod_pk, $label_no, '$scanned_by')");
 
-    // Ambil list semua label yang sudah di Gudang untuk dirender ulang di Grid UI Scanner
+    // Ambil list semua dus yang sudah di Gudang untuk dirender ulang di Grid UI Scanner
     $scanned_list = [];
     $res_list = $conn->query("SELECT label_no FROM warehouse_items WHERE production_id = $prod_pk");
     while($r = $res_list->fetch_assoc()) $scanned_list[] = (int)$r['label_no'];
 
     echo json_encode([
         'status' => 'success',
-        'message' => "Masuk Gudang (#$label_no)",
+        'message' => "Dus Masuk (#$label_no)",
         'data' => [
             'production_id' => $prod_pk,
             'item' => $prod['item'],

@@ -1,6 +1,7 @@
 <?php
 session_start();
 include 'config.php';
+verify_api_access();
 header('Content-Type: application/json');
 
 error_reporting(E_ALL);
@@ -57,6 +58,12 @@ if ($action == 'save') {
             ? "UPDATE master_templates SET template_name='$name', item='$item', size='$size', unit='$unit', machine='$machine', shift='$shift', quantity='$quantity' WHERE id=$id" 
             : "INSERT INTO master_templates (template_name, item, size, unit, machine, shift, quantity) VALUES ('$name', '$item', '$size', '$unit', '$machine', '$shift', '$quantity')";
         $log_detail = "Admin Update Template: $name";
+    } elseif ($type == 'api_key') {
+        $device_name = $conn->real_escape_string($_POST['device_name']);
+        // Generate a random 4-block key
+        $new_key = 'AFTECH-' . strtoupper(substr(md5(uniqid()), 0, 4)) . '-' . strtoupper(substr(md5(uniqid()), 4, 4)) . '-' . date('Y');
+        $sql = "INSERT INTO api_keys (device_name, api_key) VALUES ('$device_name', '$new_key')";
+        $log_detail = "Admin Generate API Key untuk: $device_name";
     } elseif ($type == 'user') {
         $username = $conn->real_escape_string($_POST['username']);
         $full_name = $conn->real_escape_string($_POST['full_name']);
@@ -76,11 +83,6 @@ if ($action == 'save') {
         $address = $conn->real_escape_string($_POST['address']);
         $sql = (!empty($id)) ? "UPDATE master_customers SET name='$name', contact='$contact', address='$address' WHERE id=$id" : "INSERT INTO master_customers (name, contact, address) VALUES ('$name', '$contact', '$address')";
         $log_detail = "Admin Update Customer: $name";
-    } elseif ($type == 'pin') {
-        $pin = $conn->real_escape_string($_POST['pin_code']);
-        $note = $conn->real_escape_string($_POST['note']);
-        $sql = (!empty($id)) ? "UPDATE app_config SET pin_code='$pin', note='$note' WHERE id=$id" : "INSERT INTO app_config (pin_code, note) VALUES ('$pin', '$note')";
-        $log_detail = "Admin Update Master PIN: $note";
     } elseif ($type == 'production') {
         $item = $conn->real_escape_string($_POST['item']);
         $size = $conn->real_escape_string($_POST['size']);
@@ -93,6 +95,9 @@ if ($action == 'save') {
         $qc = $conn->real_escape_string($_POST['qc']);
         $p_date = $conn->real_escape_string($_POST['production_date']);
         $p_time = $conn->real_escape_string($_POST['production_time']);
+        
+        // --- FIX FORMAT WAKTU (Pastikan ada detik HH:MM:SS) ---
+        if (strlen($p_time) == 5) { $p_time .= ":00"; }
         
         $batch = $conn->real_escape_string($_POST['batch'] ?? '');
         $sql = "UPDATE production_labels SET 
@@ -142,6 +147,49 @@ if ($action == 'save') {
             $response = ['status' => 'success'];
         }
     }
+} elseif ($action == 'approve_api_key') {
+    $id = (int)$_POST['id'];
+    $pin = $conn->real_escape_string($_POST['reset_pin'] ?? '0503');
+    $new_key = 'AFTECH-' . strtoupper(substr(md5(uniqid()), 0, 4)) . '-' . strtoupper(substr(md5(uniqid()), 4, 4)) . '-' . date('Y');
+    $sql = "UPDATE api_keys SET api_key='$new_key', reset_pin='$pin', status='approved', is_active=1 WHERE id=$id";
+    
+    if ($conn->query($sql)) {
+        $res = $conn->query("SELECT device_name FROM api_keys WHERE id=$id");
+        $d_name = ($res && $r = $res->fetch_assoc()) ? $r['device_name'] : $id;
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('SETUJU', 'Admin Menyetujui Akses Perangkat: $d_name (PIN Reset: $pin)')");
+        $response = ['status' => 'success'];
+    } else {
+        $response = ['status' => 'error', 'message' => $conn->error];
+    }
+} elseif ($action == 'update_reset_pin') {
+    $id = (int)$_POST['id'];
+    $pin = $conn->real_escape_string($_POST['reset_pin']);
+    $sql = "UPDATE api_keys SET reset_pin='$pin' WHERE id=$id";
+    
+    if ($conn->query($sql)) {
+        $res = $conn->query("SELECT device_name FROM api_keys WHERE id=$id");
+        $d_name = ($res && $r = $res->fetch_assoc()) ? $r['device_name'] : $id;
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('EDIT', 'Admin Update PIN Reset Perangkat: $d_name menjadi $pin')");
+        $response = ['status' => 'success'];
+    } else {
+        $response = ['status' => 'error', 'message' => $conn->error];
+    }
+} elseif ($action == 'save_role_permissions') {
+    $perms = json_decode($_POST['permissions'], true);
+    if (!empty($perms)) {
+        $conn->begin_transaction();
+        try {
+            $conn->query("DELETE FROM role_permissions");
+            foreach ($perms as $p) {
+                $role = $conn->real_escape_string($p['role']);
+                $page = $conn->real_escape_string($p['page']);
+                $conn->query("INSERT INTO role_permissions (role, page_slug) VALUES ('$role', '$page')");
+            }
+            $conn->query("INSERT INTO activity_logs (action, details) VALUES ('EDIT', 'Admin Memperbarui Hak Akses Role (Permissions)')");
+            $conn->commit();
+            $response = ['status' => 'success'];
+        } catch (Exception $e) { $conn->rollback(); $response = ['status' => 'error', 'message' => $e->getMessage()]; }
+    }
 } elseif ($action == 'clear_logs') {
     if ($conn->query("TRUNCATE TABLE activity_logs")) {
         $response = ['status' => 'success'];
@@ -163,6 +211,7 @@ if ($action == 'save') {
     elseif ($type == 'quantity') $table = "master_quantities";
     elseif ($type == 'user') $table = "users";
     elseif ($type == 'production') $table = "production_labels";
+    elseif ($type == 'api_key') $table = "api_keys";
     elseif ($type == 'warehouse_batch') { $table = "warehouse_items"; $where = "production_id=$id"; }
     if ($type == 'shipment' || $type == 'distributor_shipment') {
     $conn->begin_transaction();
@@ -219,6 +268,7 @@ if ($action == 'save') {
         elseif ($type == 'user') $name_field = 'username';
         elseif ($type == 'production') $name_field = 'batch';
         elseif ($type == 'template') $name_field = 'template_name';
+        elseif ($type == 'api_key') $name_field = 'device_name';
         
         $log_delete_detail = "Hapus $type ID $id";
         if ($type == 'warehouse_batch') {
