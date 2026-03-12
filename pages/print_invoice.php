@@ -198,8 +198,7 @@ $total_pages = count($pages);
                 <tr class="item">
                     <td><?php echo $global_no++; ?></td>
                     <td>
-                        <strong style="font-size: 15px;"><?php echo $row['item']; ?> (<?php echo $row['size']; ?> <?php echo $row['unit']; ?>)</strong><br>
-                        <small style="color: #666; font-weight: 600;"><?php echo strtoupper($row['machines']); ?> | <?php echo strtoupper($row['shifts']); ?></small>
+                        <strong style="font-size: 15px;"><?php echo $row['item']; ?> (<?php echo $row['size']; ?> <?php echo $row['unit']; ?>) |<small style="color: #666; font-weight: 600;"><?php echo strtoupper($row['machines']); ?></small></strong><br>
                     </td>
                     <td style="text-align: center; font-weight: bold; font-size: 15px; color: #1A237E;">
                         <?php echo $row['dus_qty']; ?> Dus
