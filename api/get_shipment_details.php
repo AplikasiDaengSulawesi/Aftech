@@ -9,7 +9,7 @@ if (!$id) {
 }
 
 // Tarik data detail per-batch
-$sql = "SELECT p.batch, p.item, p.size, p.unit, p.quantity as per_paket, COUNT(d.id) as label_qty, (COUNT(d.id) * p.quantity) as unit_qty
+$sql = "SELECT p.id as production_id, d.shipment_id, p.batch, p.item, p.size, p.unit, p.quantity as per_paket, COUNT(d.id) as label_qty, (COUNT(d.id) * p.quantity) as unit_qty
         FROM distributor_shipments d
         JOIN production_labels p ON d.production_id = p.id
         WHERE d.shipment_id = $id

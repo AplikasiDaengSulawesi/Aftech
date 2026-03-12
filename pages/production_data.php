@@ -413,11 +413,48 @@ foreach($items_query as $it) {
         };
 
         window.deleteProduction = (id) => {
-            Swal.fire({ title: 'Hapus?', text: "Data dihapus permanen!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#D50000', confirmButtonText: 'Ya, Hapus' }).then(async (result) => {
+            const row = window.latestData.find(r => r.id == id);
+            const hasShipped = row && parseInt(row.shipped) > 0;
+            
+            const config = {
+                title: hasShipped ? '⚠️ Perhatian: Data Terkirim!' : 'Hapus Data Produksi?',
+                text: hasShipped 
+                    ? `Batch ini memiliki ${row.shipped} dus yang SUDAH TERKIRIM ke customer. Jika dihapus, riwayat stok dan pengiriman terkait batch ini akan ikut terhapus secara permanen. Tetap hapus?` 
+                    : "Data akan dihapus permanen dari sistem dan gudang!",
+                icon: hasShipped ? 'error' : 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#D50000',
+                confirmButtonText: hasShipped ? 'Ya, Tetap Hapus Semuanya' : 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            };
+
+            Swal.fire(config).then(async (result) => {
                 if (result.isConfirmed) {
+                    // Double check if shipped to prevent accidental deletion of critical data
+                    if (hasShipped) {
+                        const { value: confirm } = await Swal.fire({
+                            title: 'Konfirmasi Akhir',
+                            text: 'Ketik "HAPUS" untuk mengkonfirmasi penghapusan batch yang sudah terkirim ini:',
+                            input: 'text',
+                            inputPlaceholder: 'Ketik HAPUS di sini...',
+                            showCancelButton: true,
+                            confirmButtonColor: '#D50000',
+                            inputValidator: (value) => {
+                                if (!value || value.toUpperCase() !== 'HAPUS') return 'Anda harus mengetik HAPUS untuk melanjutkan!';
+                            }
+                        });
+                        if (!confirm) return;
+                    }
+
                     const f = new FormData(); f.append('id', id);
                     const res = await fetch(`../api/manage_settings.php?action=delete&type=production`, { method: 'POST', body: f });
-                    if((await res.json()).status === 'success') { toastr.success('Terhapus.'); fetchProduction(window.currentPage); }
+                    const response = await res.json();
+                    if(response.status === 'success') { 
+                        toastr.success('Data Berhasil Dihapus'); 
+                        fetchProduction(window.currentPage); 
+                    } else {
+                        toastr.error(response.message || 'Gagal menghapus data');
+                    }
                 }
             });
         };

@@ -562,11 +562,48 @@ foreach($items_query as $it) {
         }
 
         window.clearBatch = function(id, batch) {
-            Swal.fire({ title: 'Hapus dari Gudang?', text: `Kosongkan seluruh unit batch #${batch} dari gudang?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#D50000', confirmButtonText: 'Ya, Hapus' }).then(async (res) => {
+            const row = window.latestData.find(r => r.production_id == id);
+            const shippedCount = row ? parseInt(row.total_shipped_labels || 0) : 0;
+            const hasShipped = shippedCount > 0;
+
+            const config = {
+                title: hasShipped ? '⚠️ Perhatian: Stok Terkirim!' : 'Kosongkan Batch?',
+                text: hasShipped 
+                    ? `Batch #${batch} memiliki ${shippedCount} dus yang SUDAH TERKIRIM. Mengosongkan batch ini akan menghapus riwayat stok di gudang namun TETAP meninggalkan data pengiriman yang mungkin menjadi tidak sinkron. Lanjutkan?` 
+                    : `Hapus seluruh unit batch #${batch} dari stok gudang?`,
+                icon: hasShipped ? 'error' : 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#D50000',
+                confirmButtonText: hasShipped ? 'Ya, Tetap Kosongkan' : 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            };
+
+            Swal.fire(config).then(async (res) => {
                 if(res.isConfirmed) {
+                    if (hasShipped) {
+                        const { value: confirm } = await Swal.fire({
+                            title: 'Konfirmasi Keamanan',
+                            text: 'Ketik "HAPUS" untuk mengosongkan stok batch yang sudah ada pengirimannya:',
+                            input: 'text',
+                            inputPlaceholder: 'Ketik HAPUS...',
+                            showCancelButton: true,
+                            confirmButtonColor: '#D50000',
+                            inputValidator: (value) => {
+                                if (!value || value.toUpperCase() !== 'HAPUS') return 'Anda harus mengetik HAPUS untuk melanjutkan!';
+                            }
+                        });
+                        if (!confirm) return;
+                    }
+
                     const f = new FormData(); f.append('id', id);
                     const r = await fetch(`../api/manage_settings.php?action=delete&type=warehouse_batch`, { method: 'POST', body: f });
-                    if((await r.json()).status === 'success') { toastr.success('Dihapus'); fetchWarehouseStock(window.currentPage); }
+                    const response = await r.json();
+                    if(response.status === 'success') { 
+                        toastr.success('Stok Batch Berhasil Dikosongkan'); 
+                        fetchWarehouseStock(window.currentPage); 
+                    } else {
+                        toastr.error(response.message || 'Gagal menghapus data');
+                    }
                 }
             });
         }

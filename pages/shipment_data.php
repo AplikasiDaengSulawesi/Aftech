@@ -349,15 +349,26 @@ foreach($items_query as $it) {
             tbody.innerHTML = data.length ? '' : '<tr><td colspan="5" class="text-center py-5 text-muted">Data Kosong.</td></tr>';
             
             data.forEach((row, index) => {
-                // Item Summary Logic
+                // Item Aggregation Logic: Menggabungkan item yang sama namanya & ukurannya
                 let itemsHTML = '';
                 if (row.item_summary) {
                     const items = row.item_summary.split(';');
-                    itemsHTML = items.map(it => {
+                    const aggregated = {};
+
+                    items.forEach(it => {
                         const parts = it.split('|');
                         const nameSize = parts[0];
-                        const labelCount = parts[1] || '0';
-                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${labelCount} Dus</small></div>`;
+                        const count = parseInt(parts[1] || '0');
+                        
+                        if (aggregated[nameSize]) {
+                            aggregated[nameSize] += count;
+                        } else {
+                            aggregated[nameSize] = count;
+                        }
+                    });
+
+                    itemsHTML = Object.entries(aggregated).map(([nameSize, totalCount]) => {
+                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${totalCount} Dus</small></div>`;
                     }).join('');
                 }
 
@@ -373,7 +384,7 @@ foreach($items_query as $it) {
                         </td>
                         <td class="col-items ${window.columnStates['col-items'] ? '' : 'col-hidden'}">${itemsHTML || '-'}</td>
                         <td class="col-total ${window.columnStates['col-total'] ? '' : 'col-hidden'}">
-                            ${parseInt(row.total_qty || 0) > 0 ? `<div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty} Dus</div>` : `<span class="badge badge-danger light font-w800" style="font-size:10px;">BELUM ADA</span>`}
+                            ${parseInt(row.total_qty || 0) > 0 ? `<div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty} Dus</div>` : `<span class="badge badge-danger text-white font-w800" style="font-size:11px; padding: 5px 10px; border-radius:6px;">RETURNED</span>`}
                         </td>
                         <td class="col-officer ${window.columnStates['col-officer'] ? '' : 'col-hidden'}"><small class="font-w600 text-black">${row.shipped_by}</small></td>
                     </tr>
@@ -421,7 +432,7 @@ foreach($items_query as $it) {
                         totalLabel += parseInt(item.label_qty);
                         tableRows += `
                             <tr>
-                                <td class="text-muted align-middle" style="font-size: 12px;">${i + 1}</td>
+                                <td class="text-muted align-middle text-center" style="font-size: 12px;">${i + 1}</td>
                                 <td class="align-middle">
                                     <div class="text-black font-w700" style="font-size: 13px;">${item.item}</div>
                                     <div class="text-muted" style="font-size: 11px;">${item.size} ${item.unit} &bull; <span class="text-primary font-w600">#${item.batch}</span></div>
@@ -429,7 +440,11 @@ foreach($items_query as $it) {
                                 <td class="text-center align-middle font-w600 text-black" style="font-size: 13px;">
                                     ${item.label_qty} Dus
                                 </td>
-                                <td class="text-end align-middle font-w800 text-black" style="font-size: 14px;">${item.label_qty} Dus</td>
+                                <td class="text-end align-middle">
+                                    <button onclick="returnShipmentItem(${item.shipment_id}, ${item.production_id}, '${item.batch}', ${item.label_qty})" class="btn btn-danger btn-xxs shadow-sm text-white font-w600 px-2" style="font-size:10px; border-radius:4px;">
+                                        <i class="fa fa-undo me-1"></i> Return
+                                    </button>
+                                </td>
                             </tr>
                         `;
                     });
@@ -454,7 +469,7 @@ foreach($items_query as $it) {
                                     <small class="text-muted text-uppercase d-block mb-2" style="font-size:10px; font-weight:700; letter-spacing:1px;">Detail Dokumen</small>
                                     <table class="w-100" style="font-size: 12px;">
                                         <tr><td class="text-muted pb-1" style="width: 80px;">No. Resi</td><td class="pb-1 text-black font-w700">#${row.no_resi}</td></tr>
-                                        <tr><td class="text-muted pb-1">Status</td><td class="pb-1"><span class="badge badge-success light" style="font-size: 10px;">TERKIRIM</span></td></tr>
+                                        <tr><td class="text-muted pb-1">Status</td><td class="pb-1"><span class="badge ${parseInt(row.total_qty) === 0 ? 'badge-danger' : 'badge-success'} light" style="font-size: 10px;">${parseInt(row.total_qty) === 0 ? 'DI-RETURN' : 'TERKIRIM'}</span></td></tr>
                                         <tr><td class="text-muted pb-1">Waktu</td><td class="text-black font-w600 pb-1">${row.shipped_at_formatted} | <span class="text-primary">${row.shipped_time_formatted}</span></td></tr>
                                         <tr><td class="text-muted">Petugas</td><td class="text-black font-w600">${row.shipped_by}</td></tr>
                                     </table>
@@ -463,7 +478,7 @@ foreach($items_query as $it) {
                         </div>
 
                         <div class="mb-3">
-                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Dus</h6>
+                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Barang & Kendali Return</h6>
                         </div>
 
                         <div class="table-responsive border rounded">
@@ -473,17 +488,17 @@ foreach($items_query as $it) {
                                         <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 10%;">NO</th>
                                         <th class="text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 45%;">ITEM & BATCH</th>
                                         <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 20%;">JUMLAH</th>
-                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">TOTAL</th>
+                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">AKSI</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada data rincian label.</td></tr>'}
+                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Seluruh item telah di-return.</td></tr>'}
                                 </tbody>
                                 <tfoot class="bg-light">
                                     <tr>
-                                        <td colspan="2" class="text-end py-3 text-black font-w800" style="font-size: 12px; border-bottom: 0;">TOTAL KESELURUHAN</td>
+                                        <td colspan="2" class="text-end py-3 text-black font-w800" style="font-size: 12px; border-bottom: 0;">TOTAL BERSIH</td>
                                         <td class="text-center py-3 text-black font-w800" style="font-size: 14px; border-bottom: 0;">${totalLabel}</td>
-                                        <td class="text-end py-3 text-danger font-w800" style="font-size: 16px; border-bottom: 0;">${totalLabel} Dus</td>
+                                        <td class="text-end py-3 ${totalLabel === 0 ? 'text-danger' : 'text-primary'} font-w800" style="font-size: 16px; border-bottom: 0;">${totalLabel} Dus</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -495,6 +510,38 @@ foreach($items_query as $it) {
             } catch (e) {
                 contentEl.innerHTML = '<div class="text-center text-danger py-4"><i class="fa fa-wifi fa-2x mb-2"></i><br>Gagal terhubung ke server.</div>';
             }
+        };
+
+        window.returnShipmentItem = function(shipmentId, prodId, batchCode, qty) {
+            Swal.fire({
+                title: 'Return ke Gudang?',
+                text: `Anda akan mengembalikan ${qty} dus dari batch #${batchCode} kembali ke stok gudang. Lanjutkan?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#FFA000',
+                confirmButtonText: 'Ya, Return Barang',
+                cancelButtonText: 'Batal'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const f = new FormData();
+                    f.append('shipment_id', shipmentId);
+                    f.append('production_id', prodId);
+                    const res = await fetch(`../api/manage_settings.php?action=delete&type=shipment_item`, { method: 'POST', body: f });
+                    const data = await res.json();
+                    if(data.status === 'success') {
+                        toastr.success(`Batch #${batchCode} berhasil di-return ke gudang`);
+                        // Refresh modal rincian tanpa menutupnya
+                        const modalEl = document.getElementById('modalViewShipment');
+                        const resiIndex = window.latestData.findIndex(r => r.id == shipmentId);
+                        if (resiIndex !== -1) {
+                            viewShipmentDetail(resiIndex);
+                        }
+                        fetchShipments(window.currentPage);
+                    } else {
+                        toastr.error(data.message);
+                    }
+                }
+            });
         };
 
         window.deleteShipment = function(id, name) {

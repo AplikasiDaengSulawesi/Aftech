@@ -213,6 +213,42 @@ if ($action == 'save') {
     elseif ($type == 'production') $table = "production_labels";
     elseif ($type == 'api_key') $table = "api_keys";
     elseif ($type == 'warehouse_batch') { $table = "warehouse_items"; $where = "production_id=$id"; }
+    elseif ($type == 'shipment_item') {
+        $shipment_id = (int)$_POST['shipment_id'];
+        $prod_id = (int)$_POST['production_id'];
+
+        $conn->begin_transaction();
+        try {
+            // 1. Ambil info Batch String untuk log
+            $resB = $conn->query("SELECT batch FROM production_labels WHERE id=$prod_id");
+            $batchStr = ($resB && $rowB = $resB->fetch_assoc()) ? $rowB['batch'] : $prod_id;
+
+            // 2. Hitung jumlah yang akan di-return (untuk log)
+            $resCount = $conn->query("SELECT COUNT(*) as total FROM distributor_shipments WHERE shipment_id=$shipment_id AND production_id=$prod_id");
+            $qty = ($resCount && $rowCount = $resCount->fetch_assoc()) ? $rowCount['total'] : 0;
+
+            if ($qty == 0) throw new Exception("Data rincian tidak ditemukan.");
+
+            // 3. Hapus data label individual agar kembali ke stok
+            $conn->query("DELETE FROM distributor_shipments WHERE shipment_id=$shipment_id AND production_id=$prod_id");
+
+            // 4. Hapus rincian batch dari tabel bantu
+            $conn->query("DELETE FROM outbound_shipment_batches WHERE shipment_id=$shipment_id AND production_id=$prod_id");
+
+            // 5. Update total_qty di header nota
+            $conn->query("UPDATE outbound_shipments SET total_qty = (SELECT COALESCE(SUM(label_qty), 0) FROM outbound_shipment_batches WHERE shipment_id=$shipment_id) WHERE id=$shipment_id");
+
+            $conn->query("INSERT INTO activity_logs (action, details) VALUES ('RETUR', 'Return $qty dus Batch #$batchStr dari Nota ID #$shipment_id ke Gudang')");
+            
+            $conn->commit();
+            echo json_encode(['status' => 'success', 'parent_id' => $shipment_id]);
+            exit;
+        } catch (Exception $e) {
+            $conn->rollback();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
     if ($type == 'shipment' || $type == 'distributor_shipment') {
     $conn->begin_transaction();
     try {

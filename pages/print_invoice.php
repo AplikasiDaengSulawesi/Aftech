@@ -14,7 +14,9 @@ if (!$header) die("Data pengiriman tidak ditemukan.");
 
 // Fetch Details Grouped by Item & Size (Focus on Dus)
 $stmtDet = $pdo->prepare("
-    SELECT CONCAT(p.item, ' (', p.size, ' ', p.unit, ')') as item_size, 
+    SELECT p.item, p.size, p.unit, 
+           GROUP_CONCAT(DISTINCT p.machine SEPARATOR ', ') as machines,
+           GROUP_CONCAT(DISTINCT p.shift SEPARATOR ', ') as shifts,
            SUM(b.label_qty) as dus_qty
     FROM outbound_shipment_batches b
     JOIN production_labels p ON b.production_id = p.id
@@ -195,7 +197,10 @@ $total_pages = count($pages);
                 <?php foreach($page_items as $row): ?>
                 <tr class="item">
                     <td><?php echo $global_no++; ?></td>
-                    <td><strong style="font-size: 15px;"><?php echo $row['item_size']; ?></strong></td>
+                    <td>
+                        <strong style="font-size: 15px;"><?php echo $row['item']; ?> (<?php echo $row['size']; ?> <?php echo $row['unit']; ?>)</strong><br>
+                        <small style="color: #666; font-weight: 600;"><?php echo strtoupper($row['machines']); ?> | <?php echo strtoupper($row['shifts']); ?></small>
+                    </td>
                     <td style="text-align: center; font-weight: bold; font-size: 15px; color: #1A237E;">
                         <?php echo $row['dus_qty']; ?> Dus
                     </td>

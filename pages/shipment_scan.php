@@ -16,9 +16,11 @@ if ($append_id > 0) {
 ?>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
-    .scanner-container { position: sticky; top: 20px; }
+    .scanner-container { position: sticky; top: 20px; z-index: 5; }
     #reader { width: 100%; border-radius: 15px; overflow: hidden; border: 3px solid #1A237E !important; background: #000; min-height: 250px; }
     #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; border-radius: 12px; }
+    
+    .form-shipment-card { position: relative; z-index: 10; }
     
     .status-panel { 
         min-height: 80px; padding: 15px; border-radius: 10px; margin-top: 15px; 
@@ -154,7 +156,7 @@ if ($append_id > 0) {
 
                     <!-- FORM PENGIRIMAN BULK -->
                     <div class="col-xl-8 col-lg-7">
-                        <div class="card shadow-sm border-0 h-100">
+                        <div class="card shadow-sm border-0 h-100 form-shipment-card">
                             <div class="card-header border-bottom flex-column align-items-start">
                                 <div class="d-flex justify-content-between w-100 mb-3">
                                     <h4 class="card-title text-black">
@@ -296,14 +298,14 @@ if ($append_id > 0) {
         let cartCounter = 1;
         let activeCartId = 1;
         let carts = {
-        1: {
-        name: 'Keranjang 1',
-        customer_name: '<?php echo $append_id > 0 ? addslashes($append_data['customer_name']) : ''; ?>',
-        customer_contact: '<?php echo $append_id > 0 ? addslashes($append_data['customer_contact']) : ''; ?>',
-        customer_address: '<?php echo $append_id > 0 ? addslashes($append_data['customer_address']) : ''; ?>',
-        shipment_date: '<?php echo $append_id > 0 ? addslashes($append_data['shipment_date']) : date("Y-m-d"); ?>',
-        items: {}
-        }
+            1: {
+                name: 'Keranjang 1',
+                customer_name: '<?php echo ($append_id > 0 && $append_data) ? addslashes($append_data['customer_name']) : ''; ?>',
+                customer_contact: '<?php echo ($append_id > 0 && $append_data) ? addslashes($append_data['customer_contact']) : ''; ?>',
+                customer_address: '<?php echo ($append_id > 0 && $append_data) ? addslashes($append_data['customer_address']) : ''; ?>',
+                shipment_date: '<?php echo ($append_id > 0 && $append_data) ? addslashes($append_data['shipment_date']) : date("Y-m-d"); ?>',
+                items: {}
+            }
         };
 
         function formatCompactNumber(number) {
@@ -372,11 +374,22 @@ if ($append_id > 0) {
                 let itemsHTML = '';
                 if (row.item_summary) {
                     const items = row.item_summary.split(';');
-                    itemsHTML = items.map(it => {
+                    const aggregated = {};
+
+                    items.forEach(it => {
                         const parts = it.split('|');
                         const nameSize = parts[0];
-                        const labelCount = parts[1] || '0';
-                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${labelCount} Dus</small></div>`;
+                        const count = parseInt(parts[1] || '0');
+                        
+                        if (aggregated[nameSize]) {
+                            aggregated[nameSize] += count;
+                        } else {
+                            aggregated[nameSize] = count;
+                        }
+                    });
+
+                    itemsHTML = Object.entries(aggregated).map(([nameSize, totalCount]) => {
+                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${totalCount} Dus</small></div>`;
                     }).join('');
                 }
 

@@ -73,7 +73,8 @@ if ($start_date || $end_date || $search || $item || $machine) {
 
 // 2. Ambil Data dengan Limit & Join ke Warehouse (Live Scanned Count)
 $sql = "SELECT p.*,
-               (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) as scanned
+               (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) as scanned,
+               (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as shipped
         FROM production_labels p
         $where
         ORDER BY p.id DESC
