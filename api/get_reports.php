@@ -3,7 +3,7 @@ header('Content-Type: application/json');
 include 'config.php';
 verify_api_access();
 
-$limit  = isset($_GET['limit']) ? (int)$_GET['limit'] : 0; // 0 berarti ambil semua (untuk cetak jika diperlukan API)
+$limit  = isset($_GET['limit']) ? (int)$_GET['limit'] : 0;
 $page   = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
@@ -39,6 +39,8 @@ $total_shipped = (int)($res_ship->fetch_assoc()['total'] ?? 0);
 $count_sql = "";
 if ($report_type == 'pengiriman') {
     $count_sql = "SELECT COUNT(DISTINCT s.id) as total FROM outbound_shipments s JOIN outbound_shipment_batches b ON s.id = b.shipment_id JOIN production_labels p ON b.production_id = p.id " . ($show_all ? "WHERE 1=1" : "WHERE s.shipment_date BETWEEN '$start_date' AND '$end_date'") . ($item_filter ? " AND p.item = '$item_filter'" : "");
+} elseif ($report_type == 'pengiriman_batch') {
+    $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM outbound_shipment_batches b JOIN production_labels p ON b.production_id = p.id JOIN outbound_shipments s ON b.shipment_id = s.id " . ($show_all ? "WHERE 1=1" : "WHERE s.shipment_date BETWEEN '$start_date' AND '$end_date'") . ($item_filter ? " AND p.item = '$item_filter'" : "");
 } else {
     $count_sql = "SELECT COUNT(*) as total FROM production_labels p $where";
 }
@@ -65,6 +67,18 @@ if ($report_type == 'produksi') {
             " . ($show_all ? "WHERE 1=1" : "WHERE s.shipment_date BETWEEN '$start_date' AND '$end_date'") . "
             " . ($item_filter ? " AND p.item = '$item_filter'" : "") . "
             GROUP BY s.id ORDER BY s.shipment_date DESC, s.id DESC";
+} elseif ($report_type == 'pengiriman_batch') {
+    $sql = "SELECT p.batch, p.item, p.size, p.unit, 
+                   SUM(b.label_qty) as total_qty,
+                   GROUP_CONCAT(DISTINCT CONCAT(s.customer_name, ' (', b.label_qty, ' Dus)') SEPARATOR '|||') as distribution_list,
+                   MAX(s.shipment_date) as latest_shipment
+            FROM outbound_shipment_batches b
+            JOIN production_labels p ON b.production_id = p.id
+            JOIN outbound_shipments s ON b.shipment_id = s.id
+            " . ($show_all ? "WHERE 1=1" : "WHERE s.shipment_date BETWEEN '$start_date' AND '$end_date'") . "
+            " . ($item_filter ? " AND p.item = '$item_filter'" : "") . "
+            GROUP BY p.id
+            ORDER BY latest_shipment DESC, p.batch DESC";
 } else { // rekap
     $sql = "SELECT p.production_date, p.batch, p.item, p.size, p.unit, p.copies as produced_qty,
                    (SELECT COUNT(*) FROM warehouse_items WHERE production_id = p.id) as verified_qty,
@@ -80,9 +94,7 @@ $res_details = $conn->query($sql);
 $details = [];
 if ($res_details) {
     while($row = $res_details->fetch_assoc()) {
-        if ($report_type != 'pengiriman') {
-            $row['stock_qty'] = (int)($row['verified_qty'] ?? 0) - (int)($row['shipped_qty'] ?? 0);
-        } else {
+        if ($report_type == 'pengiriman') {
             // Generate No Resi for API response
             $ship_id = $row['shipment_id']; $ship_date = $row['shipment_date'];
             $resSeq = $conn->query("SELECT COUNT(id) as seq FROM outbound_shipments WHERE shipment_date = '$ship_date' AND id <= $ship_id");
@@ -90,6 +102,8 @@ if ($res_details) {
             $name_parts = explode(' ', trim($row['customer_name']));
             $initials = (count($name_parts) >= 2) ? strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[1], 0, 1)) : strtoupper(substr(trim($row['customer_name']), 0, 2));
             $row['no_resi'] = $seq . '-' . date('dmYHi', strtotime($row['shipped_at'])) . '-' . $row['total_shipped_qty'] . '-' . $initials;
+        } elseif ($report_type != 'pengiriman' && $report_type != 'pengiriman_batch') {
+            $row['stock_qty'] = (int)($row['verified_qty'] ?? 0) - (int)($row['shipped_qty'] ?? 0);
         }
         $details[] = $row;
     }

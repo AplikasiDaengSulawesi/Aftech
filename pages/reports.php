@@ -119,7 +119,8 @@ foreach($items_query as $it) {
                                             <option value="rekap">Laporan Rekapitulasi</option>
                                             <option value="produksi">Laporan Bagian Produksi</option>
                                             <option value="gudang">Laporan Inventori Gudang</option>
-                                            <option value="pengiriman">Laporan Bagian Pengiriman</option>
+                                            <option value="pengiriman">Laporan Pengiriman (Customer)</option>
+                                            <option value="pengiriman_batch">Laporan Pengiriman (Batch)</option>
                                         </select>
                                     </div>
                                     <div class="col-12 col-md-2">
@@ -223,6 +224,8 @@ foreach($items_query as $it) {
                 headerHtml += '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL TERIMA</strong></th><th><strong>ITEM / SIZE</strong></th><th class="text-center"><strong>DUS MASUK</strong></th><th class="text-center"><strong>DUS TERKIRIM</strong></th><th class="text-end pe-4"><strong>SISA STOK</strong></th></tr>';
             } else if (reportType === 'pengiriman') {
                 headerHtml += '<th style="width:150px;"><strong>WAKTU PENGIRIMAN</strong></th><th style="width:250px;"><strong>CUSTOMER | NO. RESI</strong></th><th><strong>RINCIAN ITEM (ITEM | JUMLAH | BATCH)</strong></th><th class="text-center" style="width:100px;"><strong>TOTAL</strong></th><th class="text-end pe-4" style="width:150px;"><strong>PETUGAS</strong></th></tr>';
+            } else if (reportType === 'pengiriman_batch') {
+                headerHtml += '<th class="text-center"><strong>KODE BATCH</strong></th><th><strong>ITEM & UKURAN</strong></th><th class="text-center"><strong>TOTAL TERKIRIM</strong></th><th><strong>DISTRIBUSI CUSTOMER</strong></th></tr>';
             } else { // rekap
                 headerHtml += '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL</strong></th><th><strong>ITEM & UKURAN</strong></th><th class="text-center"><strong>PRODUKSI</strong></th><th class="text-center"><strong>VERIFIED</strong></th><th class="text-center"><strong>TERKIRIM</strong></th><th class="text-end pe-4"><strong>STOK</strong></th></tr>';
             }
@@ -249,12 +252,12 @@ foreach($items_query as $it) {
                     
                     result.data.forEach((row, i) => {
                         let rowHtml = `<tr><td class="text-center ps-4 text-muted">${(page-1)*10 + i + 1}</td>`;
-                        const d = new Date(row.production_date || row.shipment_date);
+                        const d = new Date(row.production_date || row.shipment_date || row.latest_shipment);
                         const formattedDate = `${d.getDate()} ${monthNamesShort[d.getMonth()]} ${d.getFullYear()}`;
 
                         if (reportType === 'produksi') {
                             const pct = Math.round((parseInt(row.scanned)/parseInt(row.produced_qty))*100) || 0;
-                            rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">#${row.batch}</span></td>
+                            rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">${row.batch}</span></td>
                                         <td><small class="text-black font-w600">${formattedDate} <span class="text-muted mx-1">|</span> ${row.production_time}</small></td>
                                         <td><div class="text-black font-w700">${row.item}</div><small class="text-muted font-w600">${row.size} ${row.unit}</small></td>
                                         <td class="text-center"><span class="badge badge-light border text-black font-w700">${row.produced_qty} Dus</span></td>
@@ -268,7 +271,7 @@ foreach($items_query as $it) {
                                         </td>
                                         <td class="text-end pe-4"><div class="small"><strong>OP:</strong> ${row.operator} <span class="text-muted mx-1">|</span> <strong>QC:</strong> ${row.qc}</div></td>`;
                         } else if (reportType === 'gudang') {
-                            rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">#${row.batch}</span></td>
+                            rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">${row.batch}</span></td>
                                         <td><small class="text-black font-w600">${formattedDate}</small></td>
                                         <td><div class="text-black font-w700">${row.item}</div><small class="text-muted font-w600">${row.size} ${row.unit}</small></td>
                                         <td class="text-center text-black font-w800">${row.verified_qty} Dus</td>
@@ -287,7 +290,7 @@ foreach($items_query as $it) {
                                     return `<tr>
                                         <td class="py-1 text-black font-w600">${parts[0]}</td>
                                         <td class="py-1 text-center text-primary font-w800">${parts[1]} Dus</td>
-                                        <td class="py-1 text-center text-muted">#${parts[2]}</td>
+                                        <td class="py-1 text-center text-muted">${parts[2]}</td>
                                     </tr>`;
                                 }).join('');
                                 itemsHTML += `</tbody></table>`;
@@ -297,8 +300,23 @@ foreach($items_query as $it) {
                                         <td class="p-1">${itemsHTML || '-'}</td>
                                         <td class="text-center"><div class="badge badge-success text-white font-w800" style="font-size:13px;">${row.total_shipped_qty} Dus</div></td>
                                         <td class="text-end pe-4"><small class="font-w600 text-black">${row.shipped_by}</small></td>`;
+                        } else if (reportType === 'pengiriman_batch') {
+                            let distHTML = '';
+                            if (row.distribution_list) {
+                                distHTML = row.distribution_list.split('|||').map(entry => {
+                                    const parts = entry.split(' (');
+                                    return `<div class="mb-1 d-flex justify-content-between border-bottom pb-1" style="border-bottom-style: dotted !important;">
+                                                <span class="text-black font-w600" style="font-size:11px;">${parts[0]}</span>
+                                                <span class="text-primary font-w800 ms-2" style="font-size:10px;">(${parts[1] || ''}</span>
+                                            </div>`;
+                                }).join('');
+                            }
+                            rowHtml += `<td class="text-center"><span class="text-primary font-w800" style="font-size:12px;">${row.batch}</span></td>
+                                        <td><div class="text-black font-w700" style="font-size:13px;">${row.item}</div><small class="text-muted font-w600">${row.size} ${row.unit}</small></td>
+                                        <td class="text-center"><div class="badge badge-success text-white font-w800" style="font-size:11px; padding: 4px 8px;">${row.total_qty} Dus</div></td>
+                                        <td style="min-width: 250px; padding-top: 10px; padding-bottom: 10px;">${distHTML}</td>`;
                         } else { // rekap
-                            rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">#${row.batch}</span></td>
+                            rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">${row.batch}</span></td>
                                         <td><small class="text-black font-w600">${formattedDate}</small></td>
                                         <td><div class="text-black font-w700">${row.item}</div><small class="text-muted font-w600">${row.size} ${row.unit}</small></td>
                                         <td class="text-center"><strong>${row.produced_qty}</strong></td>

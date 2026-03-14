@@ -153,7 +153,7 @@ foreach($items_query as $it) {
                                 <div class="filter-card-header">
                                     <div>
                                         <h4 class="text-black mb-0 font-w800">Database Pengiriman Distributor</h4>
-                                        <p class="mb-0 small text-muted">Klik baris untuk opsi cetak nota, tambah unit susulan atau pembatalan</p>
+                                        <p class="mb-0 small text-muted">Klik baris untuk opsi cetak nota atau pembatalan</p>
                                     </div>
                                     <div class="header-btn-group">
                                         <div class="dropdown">
@@ -173,13 +173,26 @@ foreach($items_query as $it) {
                                     </div>
                                 </div>
                                 <form id="formFilter" class="row g-2">
-                                    <div class="col-12 col-md-4">
-                                        <input type="text" id="f_search" name="search" class="form-control form-control-sm" placeholder="Cari data...">
-                                    </div>
-                                    <!-- NATIVE BOOTSTRAP SUPER FILTER ITEM -->
+                                    <!-- 1. VIEW MODE TOGGLE (FIRST) -->
                                     <div class="col-12 col-md-3">
-                                        <div class="dropdown w-100">
-                                            <button class="form-control form-control-sm d-flex justify-content-between align-items-center text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+                                        <div class="btn-group btn-group-sm shadow-sm w-100 h-100" role="group">
+                                            <input type="radio" class="btn-check" name="view_mode" id="mode_customer" value="customer" checked onchange="fetchShipments(1)">
+                                            <label class="btn btn-outline-primary font-w600 d-flex align-items-center justify-content-center" for="mode_customer"><i class="fa fa-user me-2"></i> Customer</label>
+                                            
+                                            <input type="radio" class="btn-check" name="view_mode" id="mode_batch" value="batch" onchange="fetchShipments(1)">
+                                            <label class="btn btn-outline-primary font-w600 d-flex align-items-center justify-content-center" for="mode_batch"><i class="fa fa-boxes me-2"></i> Batch</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- 2. SEARCH BAR -->
+                                    <div class="col-12 col-md-3">
+                                        <input type="text" id="f_search" name="search" class="form-control form-control-sm h-100" placeholder="Cari data...">
+                                    </div>
+
+                                    <!-- 3. NATIVE BOOTSTRAP SUPER FILTER ITEM -->
+                                    <div class="col-12 col-md-3">
+                                        <div class="dropdown w-100 h-100">
+                                            <button class="form-control form-control-sm d-flex justify-content-between align-items-center text-start h-100" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
                                                 <span id="sf-label" class="text-truncate text-muted">Semua Item</span>
                                                 <i class="fa fa-caret-down opacity-50 ms-2 text-muted"></i>
                                             </button>
@@ -210,8 +223,10 @@ foreach($items_query as $it) {
                                             <input type="hidden" name="size" id="f_size_val">
                                         </div>
                                     </div>
-                                    <div class="col-12 col-md-5">
-                                        <input type="text" id="f_daterange" class="form-control form-control-sm daterange-picker" placeholder="Pilih Tanggal Pengiriman" readonly>
+
+                                    <!-- 4. DATE RANGE -->
+                                    <div class="col-12 col-md-3">
+                                        <input type="text" id="f_daterange" class="form-control form-control-sm daterange-picker h-100" placeholder="Pilih Tanggal" readonly>
                                         <input type="hidden" name="start_date" id="f_start">
                                         <input type="hidden" name="end_date" id="f_end">
                                     </div>
@@ -228,14 +243,8 @@ foreach($items_query as $it) {
                             <div class="card-body p-0">
                                 <div class="table-responsive">
                                     <table class="table shadow-hover mb-0">
-                                        <thead class="bg-light">
-                                            <tr>
-                                                <th class="ps-4 col-time"><strong>WAKTU PENGIRIMAN</strong></th>
-                                                <th class="col-customer"><strong>CUSTOMER</strong></th>
-                                                <th class="col-items"><strong>ITEM & UKURAN</strong></th>
-                                                <th class="col-total"><strong>TOTAL DUS</strong></th>
-                                                <th class="col-officer"><strong>DIKIRIM OLEH</strong></th>
-                                            </tr>
+                                        <thead class="bg-light" id="tableShipmentHeader">
+                                            <!-- Dynamic Header -->
                                         </thead>
                                         <tbody id="tableShipmentBody">
                                             <!-- Dynamic via AJAX -->
@@ -276,131 +285,123 @@ foreach($items_query as $it) {
         window.latestData = [];
         window.columnStates = { 'col-time': true, 'col-customer': true, 'col-items': true, 'col-total': true, 'col-officer': true };
 
-        function renderSkeleton() {
-            const tbody = document.getElementById('tableShipmentBody');
-            tbody.innerHTML = '';
-            for(let i=0; i<5; i++) {
-                tbody.insertAdjacentHTML('beforeend', `<tr><td class="ps-4"><div class="skeleton" style="height:20px; width:100px;"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text"></div></td></tr>`);
-            }
-        }
-
         function formatCompactNumber(number) {
-            if (number < 1000) {
-                return number.toLocaleString('id-ID');
-            } else if (number >= 1000 && number < 1000000) {
-                return (number / 1000).toFixed(1).replace(/\.0$/, '') + ' Ribu';
-            } else if (number >= 1000000 && number < 1000000000) {
-                return (number / 1000000).toFixed(1).replace(/\.0$/, '') + ' Juta';
-            } else if (number >= 1000000000 && number < 1000000000000) {
-                return (number / 1000000000).toFixed(1).replace(/\.0$/, '') + ' Milyar';
-            } else if (number >= 1000000000000) {
-                return (number / 1000000000000).toFixed(1).replace(/\.0$/, '') + ' Triliun';
-            }
-            return number.toLocaleString('id-ID');
+            number = parseInt(number || 0);
+            if (number < 1000) return number.toLocaleString('id-ID');
+            if (number < 1000000) return (number / 1000).toFixed(1).replace(/\.0$/, '') + ' Rb';
+            return (number / 1000000).toFixed(1).replace(/\.0$/, '') + ' Jt';
         }
 
         window.fetchShipments = async function(page = 1) {
-            const params = new URLSearchParams(new FormData(document.getElementById('formFilter')));
-            params.set('page', page); params.set('limit', 10);
+            const formData = new FormData(document.getElementById('formFilter'));
+            const viewMode = document.querySelector('input[name="view_mode"]:checked').value;
+            const params = new URLSearchParams(formData);
+            params.set('page', page); 
+            params.set('limit', 10);
+            params.set('view_mode', viewMode);
 
             try {
-                const res = await fetch(`../api/get_shipments.php?${params.toString()}&_nocache=${Date.now()}`, {
-                    cache: 'no-store',
-                    headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
-                });
+                const res = await fetch(`../api/get_shipments.php?${params.toString()}&_nocache=${Date.now()}`);
                 const result = await res.json();
                 
-                // Update KPI Stats
                 if (result.stats) {
-                    document.getElementById('kpi-pengiriman').innerText = formatCompactNumber(result.stats.total_pengiriman);
-                    document.getElementById('kpi-pengiriman').title = result.stats.total_pengiriman.toLocaleString('id-ID');
-                    
-                    document.getElementById('kpi-unit').innerText = formatCompactNumber(result.stats.total_unit);
-                    document.getElementById('kpi-unit').title = result.stats.total_unit.toLocaleString('id-ID');
-                    
-                    document.getElementById('kpi-customer').innerText = formatCompactNumber(result.stats.total_customer);
-                    document.getElementById('kpi-customer').title = result.stats.total_customer.toLocaleString('id-ID');
-
-                    document.getElementById('kpi-repeat').innerText = formatCompactNumber(result.stats.total_repeat);
-                    document.getElementById('kpi-repeat').title = result.stats.total_repeat.toLocaleString('id-ID');
-
-                    if(result.stats.bulan) {
-                        document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = result.stats.bulan);
-                    }
+                    document.getElementById('kpi-pengiriman').innerText = result.stats.total_pengiriman;
+                    document.getElementById('kpi-unit').innerText = result.stats.total_unit;
+                    document.getElementById('kpi-customer').innerText = result.stats.total_customer;
+                    if(result.stats.bulan) document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = result.stats.bulan);
                 }
 
                 if(result.data) {
                     window.latestData = result.data;
-                    displayData(result.data);
+                    updateTableHeader(viewMode);
+                    displayData(result.data, viewMode);
                     setupPagination(result.pages, result.total, page);
                     window.currentPage = page;
-                    applyColumnVisibility();
                 }
-            } catch (e) { console.error("Shipment AJAX Error:", e); }
+            } catch (e) { console.error(e); }
         }
 
-        // Auto-Polling
-        setInterval(() => {
-            if (!document.hidden) fetchShipments(window.currentPage);
-        }, 3000);
+        function updateTableHeader(mode) {
+            const header = document.getElementById('tableShipmentHeader');
+            if (mode === 'batch') {
+                header.innerHTML = `<tr><th class="ps-4"><strong>KODE BATCH</strong></th><th><strong>ITEM & UKURAN</strong></th><th><strong>TOTAL DISTRIBUSI</strong></th><th><strong>TUJUAN PENGIRIMAN (CUSTOMER)</strong></th></tr>`;
+            } else {
+                header.innerHTML = `<tr><th class="ps-4 col-time"><strong>WAKTU</strong></th><th class="col-customer"><strong>CUSTOMER</strong></th><th class="col-items"><strong>ITEM & UKURAN</strong></th><th class="col-total"><strong>TOTAL</strong></th><th class="col-officer"><strong>PETUGAS</strong></th></tr>`;
+            }
+        }
 
-        function displayData(data) {
+        function displayData(data, mode) {
             const tbody = document.getElementById('tableShipmentBody');
             tbody.innerHTML = data.length ? '' : '<tr><td colspan="5" class="text-center py-5 text-muted">Data Kosong.</td></tr>';
             
             data.forEach((row, index) => {
-                // Item Aggregation Logic: Menggabungkan item yang sama namanya & ukurannya
-                let itemsHTML = '';
-                if (row.item_summary) {
-                    const items = row.item_summary.split(';');
-                    const aggregated = {};
+                if (mode === 'batch') {
+                    // Split distribution list into clean lines
+                    let distributionHTML = '';
+                    if (row.distribution_list) {
+                        distributionHTML = row.distribution_list.split('|||').map(entry => {
+                            // Mencari nama dan jumlah dus secara bersih
+                            const parts = entry.split(' (');
+                            const name = parts[0];
+                            const qty = parts[1] ? `(${parts[1]}` : '';
 
-                    items.forEach(it => {
-                        const parts = it.split('|');
-                        const nameSize = parts[0];
-                        const count = parseInt(parts[1] || '0');
-                        
-                        if (aggregated[nameSize]) {
-                            aggregated[nameSize] += count;
-                        } else {
-                            aggregated[nameSize] = count;
-                        }
-                    });
+                            return `<div class="mb-1 d-flex justify-content-between border-bottom pb-1" style="border-bottom-style: dotted !important;">
+                                        <span class="text-black font-w600" style="font-size:12px;">${name}</span>
+                                        <span class="text-primary font-w800 ms-2" style="font-size:11px;">${qty}</span>
+                                    </div>`;
+                        }).join('');
+                    }
 
-                    itemsHTML = Object.entries(aggregated).map(([nameSize, totalCount]) => {
-                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${totalCount} Dus</small></div>`;
-                    }).join('');
+                    tbody.insertAdjacentHTML('beforeend', `
+                        <tr>
+                            <td class="ps-4">
+                                <span class="text-primary font-w800" style="font-size:13px; letter-spacing:0.5px;">${row.batch}</span>
+                            </td>
+                            <td>
+                                <div class="text-black font-w700" style="font-size:13px; line-height:1.2;">${row.item}</div>
+                                <small class="text-muted font-w600" style="font-size:11px;">${row.size} ${row.unit}</small>
+                            </td>
+                            <td>
+                                <div class="badge badge-success text-white font-w800" style="font-size:11px; padding: 4px 10px; border-radius:4px;">${row.total_qty} Dus</div>
+                            </td>
+                            <td style="max-width: 400px; padding-top: 12px; padding-bottom: 12px;">
+                                <div class="distribution-list-container">
+                                    ${distributionHTML}
+                                </div>
+                            </td>
+                        </tr>
+                    `);
+                } else {
+                    let itemsHTML = '';
+                    if (row.item_summary) {
+                        const items = row.item_summary.split(';');
+                        const aggregated = {};
+                        items.forEach(it => {
+                            const p = it.split('|');
+                            aggregated[p[0]] = (aggregated[p[0]] || 0) + parseInt(p[1] || 0);
+                        });
+                        itemsHTML = Object.entries(aggregated).map(([n, c]) => `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${n}</div><small class="text-muted font-w600" style="font-size:11px;">${c} Dus</small></div>`).join('');
+                    }
+                    tbody.insertAdjacentHTML('beforeend', `
+                        <tr onclick="showRowActions(${index})">
+                            <td class="ps-4 col-time"><span class="text-black font-w600" style="font-size:13px;">${row.shipped_at_formatted}</span><br><small class="text-muted font-w500">${row.shipped_time_formatted}</small></td>
+                            <td class="col-customer"><div class="text-primary font-w700" style="font-size:14px;">${row.customer_name}</div><small class="text-muted">${row.customer_contact || '-'}</small></td>
+                            <td class="col-items">${itemsHTML || '-'}</td>
+                            <td class="col-total">${parseInt(row.total_qty) > 0 ? `<div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty} Dus</div>` : `<span class="badge badge-danger text-white font-w800" style="font-size:11px;">RETURNED</span>`}</td>
+                            <td class="col-officer"><small class="font-w600 text-black">${row.shipped_by}</small></td>
+                        </tr>
+                    `);
                 }
-
-                tbody.insertAdjacentHTML('beforeend', `
-                    <tr onclick="showRowActions(${index})">
-                        <td class="ps-4 col-time ${window.columnStates['col-time'] ? '' : 'col-hidden'}">
-                            <span class="text-black font-w600" style="font-size:13px;">${row.shipped_at_formatted}</span><br>
-                            <small class="text-muted font-w500">${row.shipped_time_formatted}</small>
-                        </td>
-                        <td class="col-customer ${window.columnStates['col-customer'] ? '' : 'col-hidden'}">
-                            <div class="text-primary font-w700" style="font-size:14px;">${row.customer_name}</div>
-                            <small class="text-muted"><i class="fa fa-phone-alt me-1" style="font-size:10px;"></i>${row.customer_contact || '-'}</small>
-                        </td>
-                        <td class="col-items ${window.columnStates['col-items'] ? '' : 'col-hidden'}">${itemsHTML || '-'}</td>
-                        <td class="col-total ${window.columnStates['col-total'] ? '' : 'col-hidden'}">
-                            ${parseInt(row.total_qty || 0) > 0 ? `<div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty} Dus</div>` : `<span class="badge badge-danger text-white font-w800" style="font-size:11px; padding: 5px 10px; border-radius:6px;">RETURNED</span>`}
-                        </td>
-                        <td class="col-officer ${window.columnStates['col-officer'] ? '' : 'col-hidden'}"><small class="font-w600 text-black">${row.shipped_by}</small></td>
-                    </tr>
-                `);
             });
         }
 
         window.showRowActions = function(index) {
             const row = window.latestData[index];
+            if (!row.id) return; // Disable for batch mode rows
             Swal.fire({
                 html: `
                     <div class="swal2-close-custom" onclick="Swal.close()"><i class="fa fa-times"></i></div>
-                    <div class="text-center mb-3">
-                        <small class="text-muted d-block mb-1">Customer</small>
-                        <strong class="text-black" style="word-break:break-all;">${row.customer_name}</strong>
-                    </div>
+                    <div class="text-center mb-3"><small class="text-muted d-block mb-1">Customer</small><strong class="text-black">${row.customer_name}</strong></div>
                     <div class="action-list">
                         <button onclick="Swal.close(); viewShipmentDetail(${index})" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Dus</button>
                         <button onclick="Swal.close(); window.location.href='shipment_scan.php?append_id=${row.id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Dus Susulan</button>
@@ -408,7 +409,7 @@ foreach($items_query as $it) {
                         <button onclick="Swal.close(); deleteShipment(${row.id}, '${row.customer_name}')" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
                 `,
-                showConfirmButton: false, padding: '1.2rem', width: '320px', borderRadius: '15px'
+                showConfirmButton: false, width: '320px', borderRadius: '15px'
             });
         };
 
@@ -416,209 +417,64 @@ foreach($items_query as $it) {
             const row = window.latestData[index];
             const modalEl = document.getElementById('modalViewShipment');
             const contentEl = document.getElementById('viewDetailContent');
-            contentEl.innerHTML = '<div class="text-center py-5"><i class="fa fa-spinner fa-spin fa-2x text-primary"></i><p class="mt-2 text-muted">Memuat rincian...</p></div>';
+            contentEl.innerHTML = '<div class="text-center py-5"><i class="fa fa-spinner fa-spin fa-2x text-primary"></i></div>';
             new bootstrap.Modal(modalEl).show();
-
             try {
                 const res = await fetch(`../api/get_shipment_details.php?id=${row.id}`);
-                const result = await res.json();
-
-                if (result.status === 'success') {
-                    let tableRows = '';
-                    let totalLabel = 0;
-                    let totalUnit = 0;
-
-                    result.data.forEach((item, i) => {
-                        totalLabel += parseInt(item.label_qty);
-                        tableRows += `
-                            <tr>
-                                <td class="text-muted align-middle text-center" style="font-size: 12px;">${i + 1}</td>
-                                <td class="align-middle">
-                                    <div class="text-black font-w700" style="font-size: 13px;">${item.item}</div>
-                                    <div class="text-muted" style="font-size: 11px;">${item.size} ${item.unit} &bull; <span class="text-primary font-w600">#${item.batch}</span></div>
-                                </td>
-                                <td class="text-center align-middle font-w600 text-black" style="font-size: 13px;">
-                                    ${item.label_qty} Dus
-                                </td>
-                                <td class="text-end align-middle">
-                                    <button onclick="returnShipmentItem(${item.shipment_id}, ${item.production_id}, '${item.batch}', ${item.label_qty})" class="btn btn-danger btn-xxs shadow-sm text-white font-w600 px-2" style="font-size:10px; border-radius:4px;">
-                                        <i class="fa fa-undo me-1"></i> Return
-                                    </button>
-                                </td>
-                            </tr>
-                        `;
-                    });
-
-                    contentEl.innerHTML = `
-                        <div class="row mb-4 g-3">
-                            <div class="col-md-6">
-                                <div class="p-3 bg-light rounded" style="height: 100%;">
-                                    <small class="text-muted text-uppercase d-block mb-2" style="font-size:10px; font-weight:700; letter-spacing:1px;">Dikirim Kepada</small>
-                                    <div class="text-black font-w800 mb-2" style="font-size: 16px;">${row.customer_name}</div>
-                                    <div class="d-flex align-items-center text-muted mb-1" style="font-size: 12px;">
-                                        <i class="fa fa-phone-alt me-2 text-primary" style="width: 14px; text-align: center;"></i> ${row.customer_contact || '-'}
-                                    </div>
-                                    <div class="d-flex align-items-start text-muted" style="font-size: 12px; line-height: 1.4;">
-                                        <i class="fa fa-map-marker-alt me-2 mt-1 text-primary" style="width: 14px; text-align: center;"></i> 
-                                        <span>${row.customer_address || '-'}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="p-3 bg-light rounded" style="height: 100%;">
-                                    <small class="text-muted text-uppercase d-block mb-2" style="font-size:10px; font-weight:700; letter-spacing:1px;">Detail Dokumen</small>
-                                    <table class="w-100" style="font-size: 12px;">
-                                        <tr><td class="text-muted pb-1" style="width: 80px;">No. Resi</td><td class="pb-1 text-black font-w700">#${row.no_resi}</td></tr>
-                                        <tr><td class="text-muted pb-1">Status</td><td class="pb-1"><span class="badge ${parseInt(row.total_qty) === 0 ? 'badge-danger' : 'badge-success'} light" style="font-size: 10px;">${parseInt(row.total_qty) === 0 ? 'DI-RETURN' : 'TERKIRIM'}</span></td></tr>
-                                        <tr><td class="text-muted pb-1">Waktu</td><td class="text-black font-w600 pb-1">${row.shipped_at_formatted} | <span class="text-primary">${row.shipped_time_formatted}</span></td></tr>
-                                        <tr><td class="text-muted">Petugas</td><td class="text-black font-w600">${row.shipped_by}</td></tr>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <h6 class="text-black font-w800 mb-0" style="font-size: 14px;">Rincian Barang & Kendali Return</h6>
-                        </div>
-
-                        <div class="table-responsive border rounded">
-                            <table class="table table-sm table-hover mb-0" style="table-layout: fixed; width: 100%;">
-                                <thead class="bg-light">
-                                    <tr>
-                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 10%;">NO</th>
-                                        <th class="text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 45%;">ITEM & BATCH</th>
-                                        <th class="text-center text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 20%;">JUMLAH</th>
-                                        <th class="text-end text-muted font-w700 border-bottom-0 py-2" style="font-size:10px; width: 25%;">AKSI</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${tableRows || '<tr><td colspan="4" class="text-center py-5 text-muted">Seluruh item telah di-return.</td></tr>'}
-                                </tbody>
-                                <tfoot class="bg-light">
-                                    <tr>
-                                        <td colspan="2" class="text-end py-3 text-black font-w800" style="font-size: 12px; border-bottom: 0;">TOTAL BERSIH</td>
-                                        <td class="text-center py-3 text-black font-w800" style="font-size: 14px; border-bottom: 0;">${totalLabel}</td>
-                                        <td class="text-end py-3 ${totalLabel === 0 ? 'text-danger' : 'text-primary'} font-w800" style="font-size: 16px; border-bottom: 0;">${totalLabel} Dus</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    `;
-                } else {
-                    contentEl.innerHTML = `<div class="text-center text-danger py-4"><i class="fa fa-exclamation-triangle fa-2x mb-2"></i><br>${result.message}</div>`;
+                const r = await res.json();
+                if (r.status === 'success') {
+                    let rows = r.data.map((it, i) => `<tr><td class="text-center small">${i+1}</td><td><div class="font-w700 small text-black">${it.item}</div><div class="text-muted tiny">#${it.batch}</div></td><td class="text-center font-w600 small">${it.label_qty} Dus</td><td class="text-end"><button onclick="returnShipmentItem(${it.shipment_id}, ${it.production_id}, '${it.batch}', ${it.label_qty})" class="btn btn-danger btn-xxs px-2">Return</button></td></tr>`).join('');
+                    contentEl.innerHTML = `<div class="p-3 bg-light rounded mb-3"><div class="text-black font-w800">${row.customer_name}</div><div class="small text-muted">#${row.no_resi}</div></div><div class="table-responsive"><table class="table table-sm"><thead><tr class="small"><th>NO</th><th>ITEM</th><th class="text-center">QTY</th><th class="text-end">AKSI</th></tr></thead><tbody>${rows}</tbody></table></div>`;
                 }
-            } catch (e) {
-                contentEl.innerHTML = '<div class="text-center text-danger py-4"><i class="fa fa-wifi fa-2x mb-2"></i><br>Gagal terhubung ke server.</div>';
-            }
+            } catch (e) { contentEl.innerHTML = 'Error loading details.'; }
         };
 
-        window.returnShipmentItem = function(shipmentId, prodId, batchCode, qty) {
-            Swal.fire({
-                title: 'Return ke Gudang?',
-                text: `Anda akan mengembalikan ${qty} dus dari batch #${batchCode} kembali ke stok gudang. Lanjutkan?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#FFA000',
-                confirmButtonText: 'Ya, Return Barang',
-                cancelButtonText: 'Batal'
-            }).then(async (result) => {
-                if (result.isConfirmed) {
-                    const f = new FormData();
-                    f.append('shipment_id', shipmentId);
-                    f.append('production_id', prodId);
-                    const res = await fetch(`../api/manage_settings.php?action=delete&type=shipment_item`, { method: 'POST', body: f });
-                    const data = await res.json();
-                    if(data.status === 'success') {
-                        toastr.success(`Batch #${batchCode} berhasil di-return ke gudang`);
-                        // Refresh modal rincian tanpa menutupnya
-                        const modalEl = document.getElementById('modalViewShipment');
-                        const resiIndex = window.latestData.findIndex(r => r.id == shipmentId);
-                        if (resiIndex !== -1) {
-                            viewShipmentDetail(resiIndex);
-                        }
-                        fetchShipments(window.currentPage);
-                    } else {
-                        toastr.error(data.message);
-                    }
+        window.returnShipmentItem = function(sid, pid, batch, qty) {
+            Swal.fire({ title: 'Return Barang?', text: `Kembalikan ${qty} dus dari batch #${batch}?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, Return' }).then(async (res) => {
+                if (res.isConfirmed) {
+                    const f = new FormData(); f.append('shipment_id', sid); f.append('production_id', pid);
+                    const r = await fetch(`../api/manage_settings.php?action=delete&type=shipment_item`, { method: 'POST', body: f });
+                    if((await r.json()).status === 'success') { toastr.success('Berhasil Return'); fetchShipments(window.currentPage); bootstrap.Modal.getInstance(document.getElementById('modalViewShipment')).hide(); }
                 }
             });
         };
 
         window.deleteShipment = function(id, name) {
-            Swal.fire({ 
-                title: 'Batalkan Pengiriman?', 
-                text: "Barang akan dikembalikan ke stok gudang.", 
-                icon: 'warning', showCancelButton: true, confirmButtonColor: '#D50000', confirmButtonText: 'Ya, Batalkan' 
-            }).then(async (result) => {
-                if (result.isConfirmed) {
+            Swal.fire({ title: 'Batalkan Pengiriman?', icon: 'warning', showCancelButton: true }).then(async (res) => {
+                if (res.isConfirmed) {
                     const f = new FormData(); f.append('id', id);
-                    const res = await fetch(`../api/manage_settings.php?action=delete&type=shipment`, { method: 'POST', body: f });
-                    const data = await res.json();
-                    if(data.status === 'success') { 
-                        toastr.success('Data Berhasil Dibatalkan'); 
-                        fetchShipments(window.currentPage); 
-                    } else {
-                        toastr.error(data.message);
-                    }
+                    const r = await fetch(`../api/manage_settings.php?action=delete&type=shipment`, { method: 'POST', body: f });
+                    if((await r.json()).status === 'success') { toastr.success('Dibatalkan'); fetchShipments(window.currentPage); }
                 }
             });
         };
 
         function setupPagination(totalP, totalD, current) {
             const controls = document.getElementById('paginationControls');
-            document.getElementById('paginationInfo').innerText = `Data ${(current-1)*10 + 1}-${Math.min(current*10, totalD)} dari ${totalD}`;
+            document.getElementById('paginationInfo').innerText = `Halaman ${current} dari ${totalP} (${totalD} Data)`;
             controls.innerHTML = '';
-            controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == 1 ? 'disabled' : ''}"><a class="page-link" onclick="fetchShipments(${current-1})"><i class="fas fa-chevron-left"></i></a></li>`);
+            controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == 1 ? 'disabled' : ''}"><a class="page-link" onclick="fetchShipments(${current-1})">Prev</a></li>`);
             for (let i = 1; i <= totalP; i++) {
                 if (i == 1 || i == totalP || (i >= current-1 && i <= current+1))
                     controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == i ? 'active' : ''}"><a class="page-link" onclick="fetchShipments(${i})">${i}</a></li>`);
-                else if (i == current - 2 || i == current + 2)
-                    controls.insertAdjacentHTML('beforeend', `<li class="page-item disabled"><a class="page-link">...</a></li>`);
             }
-            controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == totalP ? 'disabled' : ''}"><a class="page-link" onclick="fetchShipments(${current+1})"><i class="fas fa-chevron-right"></i></a></li>`);
+            controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == totalP ? 'disabled' : ''}"><a class="page-link" onclick="fetchShipments(${current+1})">Next</a></li>`);
         }
 
-        window.selectSuperFilter = (item, size, displayLabel) => {
+        window.selectSuperFilter = (item, size, label) => {
             document.getElementById('f_item_val').value = item;
             document.getElementById('f_size_val').value = size;
-            
-            let label = item || 'Semua Item';
-            if(size) label = `${item} (${displayLabel})`;
-            const labelEl = document.getElementById('sf-label');
-            labelEl.innerText = label;
-            if (item) labelEl.classList.remove('text-muted');
-            else labelEl.classList.add('text-muted');
-            
-            const dropdownEl = labelEl.closest('.dropdown');
-            if(dropdownEl && dropdownEl.classList.contains('show')) {
-                dropdownEl.querySelector('[data-bs-toggle="dropdown"]').click();
-            }
+            document.getElementById('sf-label').innerText = label || item || 'Semua Item';
             fetchShipments(1);
         };
 
-        window.resetFilter = () => { document.getElementById('formFilter').reset(); $('#f_daterange').val(''); $('#f_start').val(''); $('#f_end').val(''); selectSuperFilter('', '', ''); }
-        document.getElementById('f_search').oninput = () => { clearTimeout(window.sT); window.sT = setTimeout(() => { fetchShipments(1); }, 500); }
-        $(document).on('change', '.auto-filter', () => { fetchShipments(1); });
-
-        $('#f_daterange').daterangepicker({ autoUpdateInput: false, locale: { cancelLabel: 'Clear', format: 'YYYY-MM-DD' } });
-        $('#f_daterange').on('apply.daterangepicker', function(ev, picker) { $(this).val(picker.startDate.format('YYYY-MM-DD') + ' - ' + picker.endDate.format('YYYY-MM-DD')); $('#f_start').val(picker.startDate.format('YYYY-MM-DD')); $('#f_end').val(picker.endDate.format('YYYY-MM-DD')); fetchShipments(1); });
-        $('#f_daterange').on('cancel.daterangepicker', function(ev, picker) { $(this).val(''); $('#f_start').val(''); $('#f_end').val(''); fetchShipments(1); });
-
-        // Column Toggle Logic
-        $(document).on('change', '.col-checkbox', function() {
-            const colClass = $(this).val();
-            window.columnStates[colClass] = $(this).is(':checked');
-            applyColumnVisibility();
-        });
-
-        function applyColumnVisibility() {
-            for (const [colClass, show] of Object.entries(window.columnStates)) {
-                $(`th.${colClass}, td.${colClass}`).toggleClass('col-hidden', !show);
-            }
-        }
+        window.resetFilter = () => { document.getElementById('formFilter').reset(); selectSuperFilter('', '', ''); fetchShipments(1); }
+        document.getElementById('f_search').oninput = () => { clearTimeout(window.sT); window.sT = setTimeout(() => fetchShipments(1), 500); }
+        
+        $('#f_daterange').daterangepicker({ autoUpdateInput: false });
+        $('#f_daterange').on('apply.daterangepicker', (e, p) => { $(e.target).val(p.startDate.format('YYYY-MM-DD') + ' - ' + p.endDate.format('YYYY-MM-DD')); $('#f_start').val(p.startDate.format('YYYY-MM-DD')); $('#f_end').val(p.endDate.format('YYYY-MM-DD')); fetchShipments(1); });
 
         fetchShipments();
-        document.querySelector('a[href="shipment_data.php"]')?.closest('li')?.classList.add('mm-active');
     </script>
 </body>
 </html>
