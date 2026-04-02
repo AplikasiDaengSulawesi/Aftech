@@ -24,6 +24,16 @@ if ($data) {
     $time     = $conn->real_escape_string($data['production_time']);
     $copies   = (int)$data['copies'];
 
+    // Cek jumlah copies sebelum INSERT (jika batch sudah ada)
+    $curr_copies = 0;
+    $prodId = 0;
+    $resBatch = $conn->query("SELECT id, copies FROM production_labels WHERE batch='$batch' LIMIT 1");
+    if ($resBatch && $resBatch->num_rows > 0) {
+        $rowBatch = $resBatch->fetch_assoc();
+        $curr_copies = (int)$rowBatch['copies'];
+        $prodId = (int)$rowBatch['id'];
+    }
+
     $sql = "INSERT INTO production_labels (item, size, unit, batch, machine, shift, quantity, operator, qc, production_date, production_time, copies, device_model) 
             VALUES ('$item', '$size', '$unit', '$batch', '$machine', '$shift', '$quantity', '$operator', '$qc', '$formattedDate', '$time', $copies, '$device')
             ON DUPLICATE KEY UPDATE 
@@ -34,7 +44,30 @@ if ($data) {
             device_model = '$device'";
 
     if ($conn->query($sql) === TRUE) {
-        // Log otomatis dihapus karena HP sudah mengirim log sendiri via recordLog()
+        if ($prodId === 0) {
+            $prodId = $conn->insert_id;
+        }
+
+        // Cek status QC Checker
+        $qc_check_res = $conn->query("SELECT setting_value FROM app_settings WHERE setting_key='qc_checker_enabled'");
+        $is_qc_enabled = ($qc_check_res && $row = $qc_check_res->fetch_assoc()) ? (int)$row['setting_value'] : 0; 
+
+        // Jika QC dimatikan, otomatis masuk ke gudang
+        if (!$is_qc_enabled) {
+            $conn->begin_transaction();
+            try {
+                $conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prodId, 'Auto-System')");
+                
+                for ($i = 1; $i <= $copies; $i++) {
+                    $label_no = $curr_copies + $i;
+                    $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by) VALUES ($prodId, $label_no, 'Auto-System')");
+                }
+                $conn->commit();
+            } catch (Exception $e) {
+                $conn->rollback();
+            }
+        }
+
         echo json_encode(["status" => "success", "message" => "Berhasil Disimpan"]);
     } else {
         echo json_encode(["status" => "error", "message" => $conn->error]);

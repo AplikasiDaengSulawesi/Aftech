@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php 
+<?php
 include '../includes/header.php';
-require_once '../includes/auth_check.php';
-protect_page('access_control');
 require_once '../includes/db.php';
 ?>
 <style>

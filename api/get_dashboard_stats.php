@@ -6,6 +6,19 @@ header('Content-Type: application/json');
 $stats = [];
 $today = date('Y-m-d');
 
+// If polling only for logs (via header.php)
+if (isset($_GET['logs_only']) && $_GET['logs_only'] == '1') {
+    $log_res = $conn->query("SELECT action, details, timestamp FROM activity_logs ORDER BY id DESC LIMIT 12");
+    $logs = [];
+    while($r = $log_res->fetch_assoc()) { 
+        $r['time'] = date('H:i', strtotime($r['timestamp']));
+        $logs[] = $r; 
+    }
+    $stats['recent_logs'] = $logs;
+    echo json_encode($stats);
+    exit;
+}
+
 // 1. Overall Stats (Based on Dus/Labels)
 $stats['total_production'] = (int)$conn->query("SELECT SUM(copies) FROM production_labels")->fetch_row()[0];
 $stats['total_verified'] = (int)$conn->query("SELECT COUNT(*) FROM warehouse_items")->fetch_row()[0];

@@ -190,6 +190,18 @@ if ($action == 'save') {
             $response = ['status' => 'success'];
         } catch (Exception $e) { $conn->rollback(); $response = ['status' => 'error', 'message' => $e->getMessage()]; }
     }
+} elseif ($action == 'save_app_settings') {
+    $qc_enabled = (int)$_POST['qc_checker_enabled'];
+    $sql = "INSERT INTO app_settings (setting_key, setting_value) VALUES ('qc_checker_enabled', '$qc_enabled') 
+            ON DUPLICATE KEY UPDATE setting_value='$qc_enabled'";
+    
+    if ($conn->query($sql)) {
+        $status_text = $qc_enabled ? 'Aktif' : 'Non-Aktif';
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('EDIT', 'Admin Update QC Checker menjadi $status_text')");
+        $response = ['status' => 'success'];
+    } else {
+        $response = ['status' => 'error', 'message' => $conn->error];
+    }
 } elseif ($action == 'clear_logs') {
     if ($conn->query("TRUNCATE TABLE activity_logs")) {
         $response = ['status' => 'success'];

@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php 
+<?php
 include '../includes/header.php';
-require_once '../includes/auth_check.php';
-protect_page('reports');
 require_once '../includes/db.php';
 
 $items_query = $pdo->query("
@@ -22,6 +20,9 @@ foreach($items_query as $it) {
         'sizes' => $sizes->fetchAll(PDO::FETCH_COLUMN)
     ];
 }
+
+$stmt_qc = $pdo->query("SELECT setting_value FROM app_settings WHERE setting_key='qc_checker_enabled'");
+$qc_checker_enabled = ($stmt_qc->fetchColumn() === '1');
 ?>
 <style>
     .pagination-xs .page-link { padding: 5px 10px; font-size: 12px; }
@@ -81,22 +82,25 @@ foreach($items_query as $it) {
 
                 <!-- KPI WIDGETS -->
                 <div class="row mb-4">
-                    <div class="col-xl-3 col-lg-6 col-sm-6">
+                    <?php $col_class = $qc_checker_enabled ? 'col-xl-3' : 'col-xl-4'; ?>
+                    <div class="col-sm-6 col-lg-6 <?php echo $col_class; ?>">
                         <div class="widget-stat card bg-primary shadow-sm card-kpi">
                             <div class="card-body p-4"><div class="media"><span class="me-3"><i class="fa fa-boxes"></i></span><div class="media-body text-white text-end"><p class="mb-1 text-white font-w600">Total Produksi</p><h3 class="text-white mb-0" id="stat-produced">0</h3><span class="kpi-title-month">Bulan Ini</span></div></div></div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-6 col-sm-6">
+                    <?php if ($qc_checker_enabled): ?>
+                    <div class="col-sm-6 col-lg-6 <?php echo $col_class; ?>">
                         <div class="widget-stat card bg-info shadow-sm card-kpi">
                             <div class="card-body p-4"><div class="media"><span class="me-3"><i class="fa fa-check-circle"></i></span><div class="media-body text-white text-end"><p class="mb-1 text-white font-w600">Total Verified</p><h3 class="text-white mb-0" id="stat-verified">0</h3><span class="kpi-title-month">Bulan Ini</span></div></div></div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-6 col-sm-6">
+                    <?php endif; ?>
+                    <div class="col-sm-6 col-lg-6 <?php echo $col_class; ?>">
                         <div class="widget-stat card bg-success shadow-sm card-kpi">
                             <div class="card-body p-4"><div class="media"><span class="me-3"><i class="fa fa-truck"></i></span><div class="media-body text-white text-end"><p class="mb-1 text-white font-w600">Total Terkirim</p><h3 class="text-white mb-0" id="stat-shipped">0</h3><span class="kpi-title-month">Bulan Ini</span></div></div></div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-6 col-sm-6">
+                    <div class="col-sm-6 col-lg-6 <?php echo $col_class; ?>">
                         <div class="widget-stat card bg-warning shadow-sm card-kpi">
                             <div class="card-body p-4"><div class="media"><span class="me-3"><i class="fa fa-warehouse"></i></span><div class="media-body text-white text-end"><p class="mb-1 text-white font-w600">Sisa Stok</p><h3 class="text-white mb-0" id="stat-stock">0</h3><span class="kpi-title-month">Bulan Ini</span></div></div></div>
                         </div>
@@ -193,6 +197,7 @@ foreach($items_query as $it) {
 
     <?php include '../includes/footer.php' ?>
     <script>
+        window.qc_checker_enabled = <?= $qc_checker_enabled ? 'true' : 'false' ?>;
         window.reportCurrentPage = 1;
 
         function formatCompactNumber(number) {
@@ -219,7 +224,9 @@ foreach($items_query as $it) {
             // Render Headers based on reference pages
             let headerHtml = '<tr><th class="ps-4 text-center" style="width: 50px;"><strong>No</strong></th>';
             if (reportType === 'produksi') {
-                headerHtml += '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL | WAKTU</strong></th><th><strong>ITEM / SIZE</strong></th><th class="text-center"><strong>TOTAL DUS</strong></th><th><strong>MESIN</strong></th><th><strong>SHIFT</strong></th><th class="text-center"><strong>PROGRES QC</strong></th><th class="text-end pe-4"><strong>OP | QC</strong></th></tr>';
+                headerHtml += window.qc_checker_enabled
+                    ? '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL | WAKTU</strong></th><th><strong>ITEM / SIZE</strong></th><th class="text-center"><strong>TOTAL DUS</strong></th><th><strong>MESIN</strong></th><th><strong>SHIFT</strong></th><th class="text-center"><strong>PROGRES QC</strong></th><th class="text-end pe-4"><strong>OP | QC</strong></th></tr>'
+                    : '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL | WAKTU</strong></th><th><strong>ITEM / SIZE</strong></th><th class="text-center"><strong>TOTAL DUS</strong></th><th><strong>MESIN</strong></th><th><strong>SHIFT</strong></th><th class="text-end pe-4"><strong>OP | QC</strong></th></tr>';
             } else if (reportType === 'gudang') {
                 headerHtml += '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL TERIMA</strong></th><th><strong>ITEM / SIZE</strong></th><th class="text-center"><strong>DUS MASUK</strong></th><th class="text-center"><strong>DUS TERKIRIM</strong></th><th class="text-end pe-4"><strong>SISA STOK</strong></th></tr>';
             } else if (reportType === 'pengiriman') {
@@ -227,7 +234,9 @@ foreach($items_query as $it) {
             } else if (reportType === 'pengiriman_batch') {
                 headerHtml += '<th class="text-center"><strong>KODE BATCH</strong></th><th><strong>ITEM & UKURAN</strong></th><th class="text-center"><strong>TOTAL TERKIRIM</strong></th><th><strong>DISTRIBUSI CUSTOMER</strong></th></tr>';
             } else { // rekap
-                headerHtml += '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL</strong></th><th><strong>ITEM & UKURAN</strong></th><th class="text-center"><strong>PRODUKSI</strong></th><th class="text-center"><strong>VERIFIED</strong></th><th class="text-center"><strong>TERKIRIM</strong></th><th class="text-end pe-4"><strong>STOK</strong></th></tr>';
+                headerHtml += window.qc_checker_enabled 
+                    ? '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL</strong></th><th><strong>ITEM & UKURAN</strong></th><th class="text-center"><strong>PRODUKSI</strong></th><th class="text-center"><strong>VERIFIED</strong></th><th class="text-center"><strong>TERKIRIM</strong></th><th class="text-end pe-4"><strong>STOK</strong></th></tr>'
+                    : '<th class="text-center"><strong>BATCH</strong></th><th><strong>TANGGAL</strong></th><th><strong>ITEM & UKURAN</strong></th><th class="text-center"><strong>PRODUKSI</strong></th><th class="text-center"><strong>TERKIRIM</strong></th><th class="text-end pe-4"><strong>STOK</strong></th></tr>';
             }
             thead.innerHTML = headerHtml;
 
@@ -241,7 +250,9 @@ foreach($items_query as $it) {
                 if (result.status === 'success') {
                     const stats = result.summary;
                     document.getElementById('stat-produced').innerText = formatCompactNumber(stats.produced);
-                    document.getElementById('stat-verified').innerText = formatCompactNumber(stats.verified);
+                    if (window.qc_checker_enabled && document.getElementById('stat-verified')) {
+                        document.getElementById('stat-verified').innerText = formatCompactNumber(stats.verified);
+                    }
                     document.getElementById('stat-shipped').innerText = formatCompactNumber(stats.shipped);
                     document.getElementById('stat-stock').innerText = formatCompactNumber(stats.stock);
                     if(result.summary.bulan) document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = result.summary.bulan);
@@ -262,14 +273,16 @@ foreach($items_query as $it) {
                                         <td><div class="text-black font-w700">${row.item}</div><small class="text-muted font-w600">${row.size} ${row.unit}</small></td>
                                         <td class="text-center"><span class="badge badge-light border text-black font-w700">${row.produced_qty} Dus</span></td>
                                         <td><div class="text-black font-w600">${row.machine}</div></td>
-                                        <td><div class="text-muted font-w600">${row.shift}</div></td>
-                                        <td>
+                                        <td><div class="text-muted font-w600">${row.shift}</div></td>`;
+                            if (window.qc_checker_enabled) {
+                                rowHtml += `<td>
                                             <div style="min-width:100px;">
                                                 <div class="text-center mb-1"><span class="font-w900 text-primary" style="font-size:12px;">${row.scanned} / ${row.produced_qty}</span> <small class="text-muted">Verified</small></div>
                                                 <div class="progress" style="height:6px; border-radius:10px;"><div class="progress-bar ${pct === 100 ? 'bg-success' : 'bg-primary'}" style="width: ${pct}%;"></div></div>
                                             </div>
-                                        </td>
-                                        <td class="text-end pe-4"><div class="small"><strong>OP:</strong> ${row.operator} <span class="text-muted mx-1">|</span> <strong>QC:</strong> ${row.qc}</div></td>`;
+                                        </td>`;
+                            }
+                            rowHtml += `<td class="text-end pe-4"><div class="small"><strong>OP:</strong> ${row.operator} <span class="text-muted mx-1">|</span> <strong>QC:</strong> ${row.qc}</div></td>`;
                         } else if (reportType === 'gudang') {
                             rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">${row.batch}</span></td>
                                         <td><small class="text-black font-w600">${formattedDate}</small></td>
@@ -319,9 +332,11 @@ foreach($items_query as $it) {
                             rowHtml += `<td class="text-center"><span class="badge bg-primary text-white batch-badge">${row.batch}</span></td>
                                         <td><small class="text-black font-w600">${formattedDate}</small></td>
                                         <td><div class="text-black font-w700">${row.item}</div><small class="text-muted font-w600">${row.size} ${row.unit}</small></td>
-                                        <td class="text-center"><strong>${row.produced_qty}</strong></td>
-                                        <td class="text-center text-primary font-w700">${row.verified_qty}</td>
-                                        <td class="text-center text-success font-w700">${row.shipped_qty}</td>
+                                        <td class="text-center"><strong>${row.produced_qty}</strong></td>`;
+                            if (window.qc_checker_enabled) {
+                                rowHtml += `<td class="text-center text-primary font-w700">${row.verified_qty}</td>`;
+                            }
+                            rowHtml += `<td class="text-center text-success font-w700">${row.shipped_qty}</td>
                                         <td class="text-end pe-4"><strong>${row.stock_qty}</strong></td>`;
                         }
                         rowHtml += `</tr>`; tbody.insertAdjacentHTML('beforeend', rowHtml);

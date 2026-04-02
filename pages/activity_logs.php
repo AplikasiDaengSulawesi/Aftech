@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php 
+<?php
 include '../includes/header.php';
-require_once '../includes/auth_check.php';
-protect_page('activity_logs');
+require_once '../includes/db.php';
 ?>
 <style>
     .log-table thead th {

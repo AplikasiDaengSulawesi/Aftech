@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php 
+<?php
 include '../includes/header.php';
-require_once '../includes/auth_check.php';
-protect_page('shipment_reports');
 require_once '../includes/db.php';
 
 $append_id = isset($_GET['append_id']) ? (int)$_GET['append_id'] : 0;
@@ -16,11 +14,11 @@ if ($append_id > 0) {
 ?>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
-    .scanner-container { position: sticky; top: 20px; z-index: 5; }
+    .scanner-container { position: sticky; top: 90px; z-index: 1; }
     #reader { width: 100%; border-radius: 15px; overflow: hidden; border: 3px solid #1A237E !important; background: #000; min-height: 250px; }
     #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; border-radius: 12px; }
     
-    .form-shipment-card { position: relative; z-index: 10; }
+    .form-shipment-card { position: relative; z-index: 1; }
     
     .status-panel { 
         min-height: 80px; padding: 15px; border-radius: 10px; margin-top: 15px; 
@@ -124,7 +122,7 @@ if ($append_id > 0) {
                                 <div class="card-body">
                                     <div class="alert alert-info alert-dismissible fade show small py-2 px-3 mb-3 d-flex align-items-center" role="alert">
                                         <i class="fa fa-info-circle me-2 fs-5"></i>
-                                        <div><strong>Tips:</strong> Untuk kenyamanan, sangat disarankan untuk mengunci rotasi layar HP/Tablet Anda.</div>
+                                        <div style="padding-right: 20px;"><strong>Tips:</strong> Untuk kenyamanan, sangat disarankan untuk mengunci rotasi layar HP/Tablet Anda.</div>
                                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
                                     </div>
                                     <div id="reader"></div>

@@ -21,8 +21,8 @@ if (empty($device_name) || empty($device_uuid)) {
     exit;
 }
 
-// Cek apakah sudah pernah request
-$check = $conn->query("SELECT id, status FROM api_keys WHERE device_uuid = '$device_uuid'");
+// Cek apakah sudah pernah request (Gunakan kombinasi Name + UUID agar lebih unik)
+$check = $conn->query("SELECT id, status FROM api_keys WHERE device_uuid = '$device_uuid' AND device_name = '$device_name'");
 if ($check->num_rows > 0) {
     $row = $check->fetch_assoc();
     if ($row['status'] === 'approved') {

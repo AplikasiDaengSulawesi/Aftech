@@ -31,6 +31,8 @@ if ($type == 'item') {
     $res = $conn->query("SELECT * FROM api_keys ORDER BY created_at DESC");
 } elseif ($type == 'role_permissions') {
     $res = $conn->query("SELECT * FROM role_permissions");
+} elseif ($type == 'app_settings') {
+    $res = $conn->query("SELECT * FROM app_settings");
 }
 
 if (isset($res) && $res) {

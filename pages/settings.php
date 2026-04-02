@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php 
+<?php
 include '../includes/header.php';
-require_once '../includes/auth_check.php';
-protect_page('settings');
 require_once '../includes/db.php';
 
 // Data dropdown (Pre-loaded for Modals)
@@ -48,6 +46,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                                 <h5 class="text-black mb-4 ps-2 mt-2 font-w600">Command Center</h5>
                                 <div class="nav flex-column nav-pills settings-nav" id="v-pills-tab" role="tablist">
                                     <button class="nav-link active text-start" data-bs-toggle="pill" data-bs-target="#tab-user"><i class="la la-user-lock"></i> Akses Pengguna</button>
+                                    <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-general"><i class="flaticon-381-controls-3"></i> Checker</button>
                                     <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-customer"><i class="la la-users"></i> Master Customer</button>
                                     <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-item-group"><i class="la la-box"></i> Produk & Ukuran</button>
                                     <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-machine-group"><i class="la la-industry"></i> Mesin & Dus</button>
@@ -61,6 +60,11 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
 
                     <!-- KONTEN -->
                     <div class="col-xl-9 col-lg-8">
+                        <div class="alert alert-primary alert-dismissible fade show small py-2 px-3 shadow-sm d-flex align-items-center mb-4" role="alert" style="border-radius: 12px; border-left: 4px solid var(--af-primary);">
+                            <i class="fa fa-info-circle me-3 fs-3 text-primary"></i>
+                            <div><strong>Catatan Sistem:</strong> Setelah Anda menyimpan perubahan pada halaman pengaturan (menambah/menghapus master data atau mengubah status Checker), sangat disarankan untuk melakukan <strong>Refresh Browser</strong> Anda.</div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
+                        </div>
                         <div class="tab-content">
                             <!-- TAB: USER -->
                             <div class="tab-pane fade show active" id="tab-user">
@@ -74,6 +78,29 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                                             <thead><tr><th class="ps-4">USERNAME</th><th>NAMA</th><th>ROLE</th><th class="text-center">AKSI</th></tr></thead>
                                             <tbody id="tbody-user"></tbody>
                                         </table></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- TAB: UMUM -> CHECKER -->
+                            <div class="tab-pane fade" id="tab-general">
+                                <div class="card content-card shadow-sm">
+                                    <div class="card-header border-0 d-flex justify-content-between align-items-center">
+                                        <h4 class="card-title text-black">Pengaturan Checker</h4>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="formGeneralSettings">
+                                            <div class="mb-4 d-flex align-items-center justify-content-between p-3 border rounded shadow-sm" style="background:#f8f9fa;">
+                                                <div>
+                                                    <h6 class="mb-1 text-primary"><i class="flaticon-381-search-3 me-2"></i>QC Checker (Verifikasi Kualitas)</h6>
+                                                    <small class="text-muted">Jika dimatikan, hasil produksi akan langsung masuk ke Gudang tanpa perlu melalui check scan QC.</small>
+                                                </div>
+                                                <div class="form-check form-switch form-switch-lg">
+                                                    <input class="form-check-input" type="checkbox" role="switch" id="qc_checker_enabled" name="qc_checker_enabled" value="1">
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary mt-2 shadow-sm">Simpan Pengaturan</button>
+                                        </form>
                                     </div>
                                 </div>
                             </div>
@@ -225,7 +252,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
         const itemsPerPage = 10;
 
         window.loadMasterData = async function() {
-            const types = ['item', 'machine', 'user', 'customer', 'unit', 'size', 'quantity', 'shift', 'template'];
+            const types = ['item', 'machine', 'user', 'customer', 'unit', 'size', 'quantity', 'shift', 'template', 'app_settings'];
             let allData = {};
             for(const type of types) {
                 try {
@@ -234,6 +261,14 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                 } catch(e) { allData[type] = []; }
             }
             window.allMasterData = allData;
+
+            // Render App Settings
+            if (allData.app_settings) {
+                const qcSetting = allData.app_settings.find(s => s.setting_key === 'qc_checker_enabled');
+                if (qcSetting) {
+                    document.getElementById('qc_checker_enabled').checked = (qcSetting.setting_value === '1');
+                }
+            }
 
             // Render Groups
             const tbodyItem = document.getElementById('tbody-item-group');
@@ -384,6 +419,21 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
         document.getElementById('formQty').onsubmit = (e) => handleAJAXSave(e, 'quantity', 'modalQty');
         document.getElementById('formTemplate').onsubmit = (e) => handleAJAXSave(e, 'template', 'modalTemplate');
         document.getElementById('formCrud').onsubmit = (e) => handleAJAXSave(e, document.getElementById('crud_type').value, 'modalCrud');
+        
+        const formGeneral = document.getElementById('formGeneralSettings');
+        if (formGeneral) {
+            formGeneral.onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(formGeneral);
+                const isChecked = document.getElementById('qc_checker_enabled').checked ? 1 : 0;
+                formData.set('qc_checker_enabled', isChecked);
+                
+                const res = await fetch(`../api/manage_settings.php?action=save_app_settings`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if(data.status === 'success') toastr.success('Pengaturan berhasil disimpan');
+                else toastr.error(data.message || 'Gagal menyimpan');
+            };
+        }
 
         loadMasterData();
         document.querySelector('a[href="settings.php"]')?.closest('li')?.classList.add('mm-active');

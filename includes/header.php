@@ -293,7 +293,7 @@ $display_title = $page_titles[$current_page] ?? 'AFTECH System';
         const logCont = document.getElementById('header-log-list');
         if(!logCont) return;
         try {
-            const res = await fetch('../api/get_dashboard_stats.php?_nocache=' + Date.now());
+            const res = await fetch('../api/get_dashboard_stats.php?logs_only=1&_nocache=' + Date.now());
             const data = await res.json();
             if(data.recent_logs && data.recent_logs.length > 0) {
                 logCont.innerHTML = '';

@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php 
+<?php
 include '../includes/header.php';
-require_once '../includes/auth_check.php';
-protect_page('production_data');
 require_once '../includes/db.php';
 
 $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")->fetchAll();
@@ -28,6 +26,9 @@ foreach($items_query as $it) {
         'sizes' => $sizes->fetchAll(PDO::FETCH_COLUMN)
     ];
 }
+
+$stmt_qc = $pdo->query("SELECT setting_value FROM app_settings WHERE setting_key='qc_checker_enabled'");
+$qc_checker_enabled = ($stmt_qc->fetchColumn() === '1');
 ?>
 <style>
     .pagination-xs .page-link { padding: 5px 10px; font-size: 12px; }
@@ -103,11 +104,13 @@ foreach($items_query as $it) {
                             <div class="card-body p-4"><div class="media"><span class="me-3"><i class="fa fa-layer-group"></i></span><div class="media-body text-white text-end"><p class="mb-1 text-white font-w600">Total Dus</p><h3 class="text-white mb-0" id="kpi-qty">0</h3><small class="d-block mb-1">Label Dicetak</small><span class="kpi-title-month">Bulan Ini</span></div></div></div>
                         </div>
                     </div>
+                    <?php if ($qc_checker_enabled): ?>
                     <div class="col-xl col-lg-6 col-sm-6 mb-3 mb-xl-0">
                         <div class="widget-stat card bg-warning shadow-sm card-kpi">
                             <div class="card-body p-4"><div class="media"><span class="me-3"><i class="fa fa-clock"></i></span><div class="media-body text-white text-end"><p class="mb-1 text-white font-w600">Antrian QC</p><h3 class="text-white mb-0" id="kpi-belum-scan">0</h3><small class="d-block mb-1">Belum Verifikasi</small><span class="kpi-title-month">Bulan Ini</span></div></div></div>
                         </div>
                     </div>
+                    <?php endif; ?>
                     <div class="col-xl col-lg-6 col-sm-6 mb-3 mb-xl-0">
                         <div class="widget-stat card bg-danger shadow-sm card-kpi">
                             <div class="card-body p-4"><div class="media"><span class="me-3"><i class="fa fa-truck-loading"></i></span><div class="media-body text-white text-end"><p class="mb-1 text-white font-w600">Terkirim</p><h3 class="text-white mb-0" id="kpi-shipped">0</h3><small class="d-block mb-1">Keluar Gudang</small><span class="kpi-title-month">Bulan Ini</span></div></div></div>
@@ -273,6 +276,7 @@ foreach($items_query as $it) {
 
     <?php include '../includes/footer.php' ?>
     <script>
+        window.qc_checker_enabled = <?= $qc_checker_enabled ? 'true' : 'false' ?>;
         window.currentPage = 1; window.latestData = [];
         window.columnStates = { 'col-batch': true, 'col-item': true, 'col-qty': true, 'col-mesin': true, 'col-progres': true, 'col-tim': true, 'col-device': false };
 
@@ -296,7 +300,9 @@ foreach($items_query as $it) {
                 if (result.stats) {
                     document.getElementById('kpi-batch').innerText = formatCompactNumber(result.stats.total_batch);
                     document.getElementById('kpi-qty').innerText = formatCompactNumber(result.stats.total_copies);
-                    document.getElementById('kpi-belum-scan').innerText = formatCompactNumber(result.stats.belum_scan);
+                    if (window.qc_checker_enabled && document.getElementById('kpi-belum-scan')) {
+                        document.getElementById('kpi-belum-scan').innerText = formatCompactNumber(result.stats.belum_scan);
+                    }
                     document.getElementById('kpi-shipped').innerText = formatCompactNumber(result.stats.total_shipped);
                     document.getElementById('kpi-gudang').innerText = formatCompactNumber(result.stats.total_net_stock);
                     
@@ -332,10 +338,12 @@ foreach($items_query as $it) {
                         <td class="text-center col-qty"><span class="badge badge-light border text-black font-w700">${row.copies} Dus</span></td>
                         <td class="col-mesin"><div class="text-black font-w600">${row.machine}</div><small>${row.shift}</small></td>
                         <td class="col-progres">
+                            ${window.qc_checker_enabled ? `
                             <div style="min-width:120px;">
                                 <div class="d-flex justify-content-between align-items-center mb-1"><span class="font-w800 small">${row.scanned}/${row.copies}</span><small>${pct}%</small></div>
                                 <div class="progress" style="height:5px; background:#eee;"><div class="progress-bar ${pct === 100 ? 'bg-success' : 'bg-primary'}" style="width: ${pct}%;"></div></div>
                             </div>
+                            ` : `<span class="badge badge-light border text-primary"><i class="fa fa-truck-loading me-1"></i>By-pass Gudang</span>`}
                         </td>
                         <td class="col-tim"><div class="small"><strong>OP:</strong> ${row.operator}</div><div class="small"><strong>QC:</strong> ${row.qc}</div></td>
                         <td class="col-device col-hidden text-center"><span class="badge badge-light">${row.device_model || '-'}</span></td>

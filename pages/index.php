@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php include '../includes/header.php' ?>
+<?php include '../includes/header.php'; ?>
 <style>
     /* BUKA KUNCI SCROLL TOTAL */
     html, body { height: auto !important; overflow: auto !important; background: #f4f7fe !important; }
@@ -83,7 +83,12 @@
                         
                         <!-- ROW 1: WIDGETS (IDENTIC STYLE) -->
                         <div class="row">
-                            <div class="col-sm-6 col-xl-3">
+                            <?php 
+                                $stmt_qc = $pdo->query("SELECT setting_value FROM app_settings WHERE setting_key='qc_checker_enabled'");
+                                $qc_checker_enabled = ($stmt_qc->fetchColumn() === '1');
+                                $col_class = $qc_checker_enabled ? 'col-xl-3' : 'col-xl-4';
+                            ?>
+                            <div class="col-sm-6 <?php echo $col_class; ?>">
                                 <div class="widget-stat card bg-primary shadow-sm card-kpi">
                                     <div class="card-body p-4">
                                         <div class="media">
@@ -97,7 +102,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-sm-6 col-xl-3">
+                            <?php if ($qc_checker_enabled): ?>
+                            <div class="col-sm-6 <?php echo $col_class; ?>">
                                 <div class="widget-stat card bg-danger shadow-sm card-kpi">
                                     <div class="card-body p-4">
                                         <div class="media">
@@ -111,7 +117,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-sm-6 col-xl-3">
+                            <?php endif; ?>
+                            <div class="col-sm-6 <?php echo $col_class; ?>">
                                 <div class="widget-stat card bg-warning shadow-sm card-kpi">
                                     <div class="card-body p-4">
                                         <div class="media">
@@ -125,7 +132,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-sm-6 col-xl-3">
+                            <div class="col-sm-6 <?php echo $col_class; ?>">
                                 <div class="widget-stat card bg-success shadow-sm card-kpi">
                                     <div class="card-body p-4">
                                         <div class="media">
@@ -203,10 +210,12 @@
                                                 <span class="text-black font-w600 fs-14"><i class="fa fa-circle text-primary me-2"></i>Tersedia</span>
                                                 <span id="k-stok">0</span>
                                             </div>
+                                            <?php if ($qc_checker_enabled): ?>
                                             <div class="d-flex justify-content-between mb-2">
                                                 <span class="text-black font-w600 fs-14"><i class="fa fa-circle text-warning me-2"></i>Menunggu</span>
                                                 <span id="k-pending">0</span>
                                             </div>
+                                            <?php endif; ?>
                                             <div class="d-flex justify-content-between mb-2">
                                                 <span class="text-black font-w600 fs-14"><i class="fa fa-circle text-success me-2"></i>Terkirim</span>
                                                 <span id="k-shipped-legend">0</span>
@@ -235,6 +244,8 @@
 
     <?php include '../includes/footer.php' ?>
     <script>
+        window.qc_checker_enabled = <?= $qc_checker_enabled ? 'true' : 'false' ?>;
+        
         let barChart = null;
         let donutChart = null;
         let currentRange = 'week';
@@ -267,19 +278,25 @@
                 // 2. TAMPILKAN KPI (EXACT NUMBERS)
                 const waitUnit = data.total_production - data.total_verified;
                 const waitLabel = data.total_kapasitas_labels - data.total_stok_labels;
-                const ready = data.total_verified - data.total_shipped;
+                const ready = window.qc_checker_enabled ? (data.total_verified - data.total_shipped) : (data.total_production - data.total_shipped);
 
                 // Production
                 document.getElementById('k-prod').innerText = formatCompactNumber(data.total_production);
                 document.getElementById('k-prod').title = data.total_production.toLocaleString('id-ID');
                 
                 // Widget Antrian QC (Dus)
-                document.getElementById('k-pending-2').innerText = formatCompactNumber(waitLabel);
-                document.getElementById('k-pending-2').title = waitLabel.toLocaleString('id-ID');
+                const pending2 = document.getElementById('k-pending-2');
+                if (pending2) {
+                    pending2.innerText = formatCompactNumber(waitLabel);
+                    pending2.title = waitLabel.toLocaleString('id-ID');
+                }
 
                 // Stock & Pending (Dus)
-                document.getElementById('k-pending').innerText = formatCompactNumber(waitUnit);
-                document.getElementById('k-pending').title = waitUnit.toLocaleString('id-ID');
+                const pendingElement = document.getElementById('k-pending');
+                if (pendingElement) {
+                    pendingElement.innerText = formatCompactNumber(waitUnit);
+                    pendingElement.title = waitUnit.toLocaleString('id-ID');
+                }
                 
                 document.getElementById('k-stok').innerText = formatCompactNumber(ready);
                 document.getElementById('k-stok').title = ready.toLocaleString('id-ID');
@@ -296,44 +313,44 @@
                 document.getElementById('k-shipped-legend').title = data.total_shipped.toLocaleString('id-ID');
 
                 // 2. DONUT (Using Dus)
+                const donutSeries = window.qc_checker_enabled ? [ready, waitUnit, data.total_shipped] : [ready, data.total_shipped];
+                const donutLabels = window.qc_checker_enabled ? ['Ready', 'Pending', 'Shipped'] : ['Ready', 'Shipped'];
+                const donutColors = window.qc_checker_enabled ? ['#1A237E', '#FFC107', '#00C853'] : ['#1A237E', '#00C853'];
+
                 if(!donutChart) {
                     donutChart = new ApexCharts(document.querySelector("#donutChart"), {
-                        series: [ready, waitUnit, data.total_shipped],
+                        series: donutSeries,
                         chart: { type: 'donut', height: 200 },
-                        labels: ['Ready', 'Pending', 'Shipped'],
-                        colors: ['#1A237E', '#FFC107', '#00C853'],
+                        labels: donutLabels,
+                        colors: donutColors,
                         legend: { show: false },
                         dataLabels: { enabled: false },
                         tooltip: {
                             enabled: true,
                             theme: 'dark',
-                            style: {
-                                fontSize: '12px',
-                            }
+                            style: { fontSize: '12px' }
                         },
                         plotOptions: { pie: { donut: { size: '75%' } } }
                     });
                     donutChart.render();
-                } else { donutChart.updateSeries([ready, waitUnit, data.total_shipped]); }
+                } else { donutChart.updateSeries(donutSeries); }
 
                 // 3. BAR CHART (3 Berdampingan)
                 if(data.trend) {
+                    const barSeries = window.qc_checker_enabled 
+                        ? [ { name: 'Produksi', data: data.trend.produced }, { name: 'Verified', data: data.trend.verified }, { name: 'Kirim', data: data.trend.shipped } ]
+                        : [ { name: 'Produksi', data: data.trend.produced }, { name: 'Kirim', data: data.trend.shipped } ];
+                    const barColors = window.qc_checker_enabled ? ['#1A237E', '#FFC107', '#00C853'] : ['#1A237E', '#00C853'];
+
                     const options = {
-                        series: [
-                            { name: 'Produksi', data: data.trend.produced },
-                            { name: 'Verified', data: data.trend.verified },
-                            { name: 'Kirim', data: data.trend.shipped }
-                        ],
+                        series: barSeries,
                         chart: { type: 'bar', height: 350, toolbar: { show: false } },
                         plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 4 } },
-                        colors: ['#1A237E', '#FFC107', '#00C853'],
+                        colors: barColors,
                         dataLabels: { enabled: false },
                         xaxis: { categories: data.trend.labels },
                         legend: { position: 'top', horizontalAlign: 'right' },
-                        tooltip: {
-                            enabled: true,
-                            theme: 'light'
-                        }
+                        tooltip: { enabled: true, theme: 'light' }
                     };
                     if(!barChart) {
                         barChart = new ApexCharts(document.querySelector("#barTrendChart"), options);

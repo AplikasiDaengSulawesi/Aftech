@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<?php 
+<?php
 include '../includes/header.php';
-require_once '../includes/auth_check.php';
-protect_page('qc_checker');
 ?>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>

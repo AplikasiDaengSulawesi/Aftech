@@ -4,6 +4,11 @@
 <?php
 require_once 'auth_check.php';
 $role = $_SESSION['role'] ?? 'gudang'; // Default ke gudang jika tidak set
+
+// Cek Pengaturan Umum QC Checker
+$stmt_qc = $pdo->query("SELECT setting_value FROM app_settings WHERE setting_key='qc_checker_enabled'");
+$qc_setting = $stmt_qc->fetchColumn();
+$qc_checker_enabled = ($qc_setting === '1');
 ?>
 <div class="deznav">
     <div class="deznav-scroll">
@@ -24,7 +29,7 @@ $role = $_SESSION['role'] ?? 'gudang'; // Default ke gudang jika tidak set
             </li>
             <?php endif; ?>
 
-            <?php if(can_access('qc_checker')): ?>
+            <?php if(can_access('qc_checker') && $qc_checker_enabled): ?>
             <li><a href="qc_checker.php" class="ai-icon" aria-expanded="false">
                     <i class="flaticon-381-search-3"></i>
                     <span class="nav-text">QC Checker</span>
