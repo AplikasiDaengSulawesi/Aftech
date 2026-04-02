@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Makassar');
 $host = "localhost";
 $user = "root";
 $pass = "";
@@ -10,6 +11,8 @@ if ($conn->connect_error) {
     echo json_encode(["status" => "error", "message" => "Koneksi ke Database Gagal"]);
     exit;
 }
+
+$conn->query("SET time_zone = '+08:00'");
 
 // ==========================================
 // 🛡️ SECURITY GATEKEEPER (HIBRIDA)
