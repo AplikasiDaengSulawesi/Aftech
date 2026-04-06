@@ -46,7 +46,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                                 <h5 class="text-black mb-4 ps-2 mt-2 font-w600">Command Center</h5>
                                 <div class="nav flex-column nav-pills settings-nav" id="v-pills-tab" role="tablist">
                                     <button class="nav-link active text-start" data-bs-toggle="pill" data-bs-target="#tab-user"><i class="la la-user-lock"></i> Akses Pengguna</button>
-                                    <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-general"><i class="flaticon-381-controls-3"></i> Checker</button>
+                                    <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-general"><i class="la la-check-circle"></i> Checker</button>
                                     <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-customer"><i class="la la-users"></i> Master Customer</button>
                                     <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-item-group"><i class="la la-box"></i> Produk & Ukuran</button>
                                     <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#tab-machine-group"><i class="la la-industry"></i> Mesin & Dus</button>
@@ -93,7 +93,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                                             <div class="mb-4 d-flex align-items-center justify-content-between p-3 border rounded shadow-sm" style="background:#f8f9fa;">
                                                 <div>
                                                     <h6 class="mb-1 text-primary"><i class="flaticon-381-search-3 me-2"></i>QC Checker (Verifikasi Kualitas)</h6>
-                                                    <small class="text-muted">Jika dimatikan, hasil produksi akan langsung masuk ke Gudang tanpa perlu melalui check scan QC.</small>
+                                                    <small class="text-muted">Jika dimatikan, semua dus yang belum di-check akan <strong>otomatis masuk ke Gudang</strong>, dan produksi baru langsung masuk Gudang tanpa proses QC.</small>
                                                 </div>
                                                 <div class="form-check form-switch form-switch-lg">
                                                     <input class="form-check-input" type="checkbox" role="switch" id="qc_checker_enabled" name="qc_checker_enabled" value="1">
@@ -424,19 +424,341 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
         if (formGeneral) {
             formGeneral.onsubmit = async (e) => {
                 e.preventDefault();
-                const formData = new FormData(formGeneral);
-                const isChecked = document.getElementById('qc_checker_enabled').checked ? 1 : 0;
-                formData.set('qc_checker_enabled', isChecked);
+                const isChecked = document.getElementById('qc_checker_enabled').checked;
                 
-                const res = await fetch(`../api/manage_settings.php?action=save_app_settings`, { method: 'POST', body: formData });
-                const data = await res.json();
-                if(data.status === 'success') toastr.success('Pengaturan berhasil disimpan');
-                else toastr.error(data.message || 'Gagal menyimpan');
+                // Jika QC dimatikan, tampilkan peringatan
+                if (!isChecked) {
+                    const confirmResult = await Swal.fire({
+                        title: '<i class="fa fa-exclamation-triangle text-warning me-2"></i> Matikan QC Checker?',
+                        html: `
+                            <div class="text-start" style="font-size: 14px; line-height: 1.8;">
+                                <div class="alert alert-warning py-2 px-3 mb-3" style="border-radius: 10px;">
+                                    <i class="fa fa-info-circle me-1"></i> <strong>Perhatian!</strong> Tindakan ini akan mengubah alur kerja sistem.
+                                </div>
+                                <p class="mb-2">Dengan mematikan QC Checker:</p>
+                                <ul class="ps-3 mb-0">
+                                    <li>Semua dus yang <strong>belum di-check/scan</strong> akan <strong class="text-success">otomatis masuk ke Gudang</strong>.</li>
+                                    <li>Produksi baru selanjutnya juga akan langsung masuk Gudang <strong>tanpa proses QC</strong>.</li>
+                                    <li>Menu <strong>QC Checker</strong> pada sidebar akan disembunyikan.</li>
+                                </ul>
+                            </div>
+                        `,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#D50000',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: '<i class="fa fa-check me-1"></i> Ya, Matikan QC',
+                        cancelButtonText: 'Batal',
+                        width: 520,
+                        customClass: { popup: 'shadow-lg' }
+                    });
+                    
+                    if (!confirmResult.isConfirmed) return;
+                }
+                
+                // Proses simpan
+                const formData = new FormData(formGeneral);
+                formData.set('qc_checker_enabled', isChecked ? 1 : 0);
+
+                // Tampilkan loading
+                Swal.fire({ title: 'Memproses...', html: isChecked ? 'Menyimpan pengaturan...' : 'Memindahkan data ke Gudang...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                
+                try {
+                    const res = await fetch(`../api/manage_settings.php?action=save_app_settings`, { method: 'POST', body: formData });
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        Swal.close();
+                        if (!isChecked && data.auto_transferred > 0) {
+                            // Simpan data transfer ke variabel global untuk PDF
+                            window._lastTransferData = data;
+                            showTransferReport(data);
+                        } else {
+                            toastr.success('Pengaturan berhasil disimpan');
+                        }
+                    } else {
+                        Swal.fire('Gagal', data.message || 'Gagal menyimpan', 'error');
+                    }
+                } catch (err) {
+                    Swal.fire('Error', 'Koneksi ke server gagal', 'error');
+                }
             };
+        }
+
+        // ============================================================
+        // FUNGSI TAMPILKAN LAPORAN DETAIL TRANSFER OTOMATIS
+        // ============================================================
+        function showTransferReport(data) {
+            const details = data.transfer_details || [];
+            const now = new Date();
+            const timestamp = now.toLocaleString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            let tableRows = '';
+            details.forEach((d, idx) => {
+                const pDate = d.production_date ? new Date(d.production_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+                tableRows += `
+                    <tr>
+                        <td class="text-center">${idx + 1}</td>
+                        <td class="font-w700 text-primary">#${d.batch}</td>
+                        <td>${d.item}</td>
+                        <td class="text-center">${d.size} ${d.unit}</td>
+                        <td class="text-center">${d.quantity}</td>
+                        <td class="text-center">${d.machine}</td>
+                        <td class="text-center">${pDate}</td>
+                        <td class="text-center font-w700">${d.total_copies}</td>
+                        <td class="text-center"><span class="badge bg-light text-dark border">${d.already_in_warehouse}</span></td>
+                        <td class="text-center"><span class="badge bg-success text-white font-w700">${d.auto_transferred}</span></td>
+                    </tr>
+                `;
+            });
+
+            const modalHTML = `
+                <div class="modal fade" id="modalTransferReport" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                            <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%); border-radius: 16px 16px 0 0; padding: 20px 25px;">
+                                <div>
+                                    <h5 class="text-white mb-1"><i class="fa fa-file-alt me-2"></i>Laporan Transfer Otomatis</h5>
+                                    <small class="text-white-50">${timestamp}</small>
+                                </div>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <!-- Summary Cards -->
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-4">
+                                        <div class="p-3 rounded-3 text-center" style="background: #E8F5E9; border: 1px solid #C8E6C9;">
+                                            <div class="fs-2 fw-bold text-success">${data.auto_transferred}</div>
+                                            <div class="small text-muted font-w600">Total Dus Dipindahkan</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-3 rounded-3 text-center" style="background: #E8EAF6; border: 1px solid #C5CAE9;">
+                                            <div class="fs-2 fw-bold text-primary">${data.auto_batches}</div>
+                                            <div class="small text-muted font-w600">Batch Terproses</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-3 rounded-3 text-center" style="background: #FFF8E1; border: 1px solid #FFECB3;">
+                                            <div class="fs-2 fw-bold text-warning"><i class="fa fa-robot"></i></div>
+                                            <div class="small text-muted font-w600">Oleh: Auto-System</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Detail Table -->
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-bordered shadow-hover mb-0" id="tableTransferReport">
+                                        <thead style="position: sticky; top: 0; z-index: 2;">
+                                            <tr class="bg-light">
+                                                <th class="text-center" style="width: 40px;">#</th>
+                                                <th>BATCH</th>
+                                                <th>ITEM PRODUK</th>
+                                                <th class="text-center">SIZE</th>
+                                                <th class="text-center">ISI DUS</th>
+                                                <th class="text-center">MESIN</th>
+                                                <th class="text-center">TGL PRODUKSI</th>
+                                                <th class="text-center">TOTAL DUS</th>
+                                                <th class="text-center">SUDAH DI GUDANG</th>
+                                                <th class="text-center">BARU DIPINDAHKAN</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${tableRows}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr style="background: #f8f9fa; font-weight: 700;">
+                                                <td colspan="7" class="text-end pe-3">TOTAL</td>
+                                                <td class="text-center">${details.reduce((s,d) => s + d.total_copies, 0)}</td>
+                                                <td class="text-center">${details.reduce((s,d) => s + d.already_in_warehouse, 0)}</td>
+                                                <td class="text-center text-success font-w800">${data.auto_transferred}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div class="alert alert-info small py-2 px-3 mt-3 mb-0 d-flex align-items-center" style="border-radius: 10px;">
+                                    <i class="fa fa-info-circle me-2 fs-5"></i>
+                                    <span>Data di atas menunjukkan rincian dus yang <strong>belum masuk gudang</strong> dan telah otomatis dipindahkan oleh sistem. Unduh PDF sebagai bukti dokumentasi.</span>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+                                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal"><i class="fa fa-times me-1"></i> Tutup</button>
+                                <button type="button" class="btn btn-primary btn-sm shadow" onclick="downloadTransferPDF()">
+                                    <i class="fa fa-file-pdf me-1"></i> Unduh Laporan PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Hapus modal lama jika ada
+            const oldModal = document.getElementById('modalTransferReport');
+            if (oldModal) { bootstrap.Modal.getInstance(oldModal)?.dispose(); oldModal.remove(); }
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            const modal = new bootstrap.Modal(document.getElementById('modalTransferReport'));
+            modal.show();
+        }
+
+        // ============================================================
+        // FUNGSI GENERATE PDF LAPORAN
+        // ============================================================
+        window.downloadTransferPDF = function() {
+            const data = window._lastTransferData;
+            if (!data || !data.transfer_details) { toastr.error('Data tidak tersedia'); return; }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const now = new Date();
+            const timestamp = now.toLocaleString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            // ---- HEADER ----
+            doc.setFillColor(26, 35, 126); // Indigo Deep
+            doc.rect(0, 0, pageWidth, 32, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.text('AFTECH SYSTEM', 14, 14);
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Laporan Transfer Otomatis ke Gudang', 14, 22);
+            
+            doc.setFontSize(9);
+            doc.text(`Dicetak: ${timestamp}`, pageWidth - 14, 14, { align: 'right' });
+            doc.text(`Oleh: Auto-System`, pageWidth - 14, 22, { align: 'right' });
+
+            // ---- SUMMARY BOX ----
+            const summaryY = 40;
+            doc.setDrawColor(200, 200, 200);
+            
+            // Box 1: Total Dus
+            doc.setFillColor(232, 245, 233);
+            doc.roundedRect(14, summaryY, 80, 22, 3, 3, 'FD');
+            doc.setTextColor(0, 200, 83);
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.text(String(data.auto_transferred), 54, summaryY + 10, { align: 'center' });
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Total Dus Dipindahkan', 54, summaryY + 18, { align: 'center' });
+
+            // Box 2: Batch
+            doc.setFillColor(232, 234, 246);
+            doc.roundedRect(104, summaryY, 80, 22, 3, 3, 'FD');
+            doc.setTextColor(26, 35, 126);
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.text(String(data.auto_batches), 144, summaryY + 10, { align: 'center' });
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Batch Terproses', 144, summaryY + 18, { align: 'center' });
+
+            // Box 3: Status
+            doc.setFillColor(255, 248, 225);
+            doc.roundedRect(194, summaryY, 80, 22, 3, 3, 'FD');
+            doc.setTextColor(255, 143, 0);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('QC CHECKER OFF', 234, summaryY + 10, { align: 'center' });
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Status Saat Ini', 234, summaryY + 18, { align: 'center' });
+
+            // ---- TABEL DETAIL ----
+            const tableData = data.transfer_details.map((d, idx) => {
+                const pDate = d.production_date ? new Date(d.production_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+                return [
+                    idx + 1,
+                    '#' + d.batch,
+                    d.item,
+                    d.size + ' ' + d.unit,
+                    d.quantity,
+                    d.machine,
+                    pDate,
+                    d.total_copies,
+                    d.already_in_warehouse,
+                    d.auto_transferred
+                ];
+            });
+
+            // Footer row
+            const totalCopies = data.transfer_details.reduce((s,d) => s + d.total_copies, 0);
+            const totalExisting = data.transfer_details.reduce((s,d) => s + d.already_in_warehouse, 0);
+
+            doc.autoTable({
+                startY: summaryY + 30,
+                head: [['#', 'Batch', 'Item Produk', 'Size', 'Isi Dus', 'Mesin', 'Tgl Produksi', 'Total Dus', 'Sudah di Gudang', 'Baru Dipindahkan']],
+                body: tableData,
+                foot: [['', '', '', '', '', '', 'TOTAL', totalCopies, totalExisting, data.auto_transferred]],
+                theme: 'grid',
+                headStyles: { 
+                    fillColor: [26, 35, 126], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold',
+                    halign: 'center', cellPadding: 3
+                },
+                bodyStyles: { fontSize: 8, cellPadding: 2.5 },
+                footStyles: { 
+                    fillColor: [245, 245, 245], textColor: [26, 35, 126], fontSize: 9, fontStyle: 'bold',
+                    halign: 'center'
+                },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 10 },
+                    1: { fontStyle: 'bold', textColor: [26, 35, 126] },
+                    3: { halign: 'center' },
+                    4: { halign: 'center' },
+                    5: { halign: 'center' },
+                    6: { halign: 'center' },
+                    7: { halign: 'center', fontStyle: 'bold' },
+                    8: { halign: 'center' },
+                    9: { halign: 'center', fontStyle: 'bold', textColor: [0, 150, 0] }
+                },
+                alternateRowStyles: { fillColor: [248, 249, 250] },
+                margin: { left: 14, right: 14 },
+                didDrawPage: function(data) {
+                    // Footer setiap halaman
+                    const pageCount = doc.internal.getNumberOfPages();
+                    doc.setFontSize(7);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text(`AFTECH System — Laporan Transfer Otomatis`, 14, doc.internal.pageSize.getHeight() - 8);
+                    doc.text(`Halaman ${data.pageNumber} dari ${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 8, { align: 'right' });
+                }
+            });
+
+            // ---- CATATAN KAKI ----
+            const finalY = doc.lastAutoTable.finalY + 10;
+            if (finalY < doc.internal.pageSize.getHeight() - 30) {
+                doc.setFillColor(248, 249, 255);
+                doc.setDrawColor(26, 35, 126);
+                doc.roundedRect(14, finalY, pageWidth - 28, 16, 2, 2, 'FD');
+                doc.setTextColor(26, 35, 126);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Catatan:', 18, finalY + 6);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(80, 80, 80);
+                doc.text('Laporan ini digenerate otomatis oleh sistem saat fitur QC Checker dimatikan. Semua dus yang belum terverifikasi', 18, finalY + 11);
+                doc.text('telah dipindahkan langsung ke gudang oleh Auto-System. Dokumen ini dapat digunakan sebagai bukti audit.', 18, finalY + 15);
+            }
+
+            // Save
+            const fileName = `Laporan_Transfer_Otomatis_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.pdf`;
+            doc.save(fileName);
+            toastr.success('PDF berhasil diunduh');
         }
 
         loadMasterData();
         document.querySelector('a[href="settings.php"]')?.closest('li')?.classList.add('mm-active');
     </script>
+    <!-- jsPDF for report generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>

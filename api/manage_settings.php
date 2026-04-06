@@ -198,7 +198,65 @@ if ($action == 'save') {
     if ($conn->query($sql)) {
         $status_text = $qc_enabled ? 'Aktif' : 'Non-Aktif';
         $conn->query("INSERT INTO activity_logs (action, details) VALUES ('EDIT', 'Admin Update QC Checker menjadi $status_text')");
-        $response = ['status' => 'success'];
+
+        // Jika QC dimatikan, otomatis masukkan SEMUA label yang belum ada di gudang
+        $auto_transferred = 0;
+        $auto_batches = 0;
+        $transfer_details = []; // Detail per-batch untuk laporan
+        if (!$qc_enabled) {
+            $conn->begin_transaction();
+            try {
+                // Ambil semua batch produksi lengkap dengan info produk
+                $res_prod = $conn->query("SELECT id, batch, item, size, unit, quantity, copies, machine, production_date FROM production_labels ORDER BY production_date DESC, batch ASC");
+                while ($prod = $res_prod->fetch_assoc()) {
+                    $prod_id = (int)$prod['id'];
+                    $copies = (int)$prod['copies'];
+                    
+                    // Hitung yang sudah ada di gudang
+                    $existing_res = $conn->query("SELECT COUNT(*) as cnt FROM warehouse_items WHERE production_id = $prod_id");
+                    $existing_count = ($existing_res && $row = $existing_res->fetch_assoc()) ? (int)$row['cnt'] : 0;
+                    
+                    $batch_new_count = 0;
+                    
+                    for ($i = 1; $i <= $copies; $i++) {
+                        $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by) VALUES ($prod_id, $i, 'Auto-System')");
+                        if ($conn->affected_rows > 0) {
+                            $auto_transferred++;
+                            $batch_new_count++;
+                        }
+                    }
+                    
+                    if ($batch_new_count > 0) {
+                        $auto_batches++;
+                        $conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prod_id, 'Auto-System')");
+                        
+                        // Simpan detail untuk laporan
+                        $transfer_details[] = [
+                            'batch' => $prod['batch'],
+                            'item' => $prod['item'],
+                            'size' => $prod['size'],
+                            'unit' => $prod['unit'],
+                            'quantity' => $prod['quantity'],
+                            'machine' => $prod['machine'],
+                            'production_date' => $prod['production_date'],
+                            'total_copies' => $copies,
+                            'already_in_warehouse' => $existing_count,
+                            'auto_transferred' => $batch_new_count
+                        ];
+                    }
+                }
+                
+                if ($auto_transferred > 0) {
+                    $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TRANSFER', 'Auto-System: QC dimatikan, $auto_transferred dus dari $auto_batches batch otomatis masuk Gudang')");
+                }
+                
+                $conn->commit();
+            } catch (Exception $e) {
+                $conn->rollback();
+            }
+        }
+
+        $response = ['status' => 'success', 'auto_transferred' => $auto_transferred, 'auto_batches' => $auto_batches, 'transfer_details' => $transfer_details];
     } else {
         $response = ['status' => 'error', 'message' => $conn->error];
     }
