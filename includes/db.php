@@ -1,8 +1,5 @@
 <?php
-$host = "localhost";
-$user = "root";
-$pass = "";
-$db   = "db_aftech";
+require __DIR__ . '/db_credentials.php';
 
 try {
     // Koneksi tanpa DB dulu untuk pengecekan di seeder
