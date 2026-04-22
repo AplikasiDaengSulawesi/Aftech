@@ -9,9 +9,10 @@ $m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")-
 $m_shifts = $pdo->query("SELECT name FROM master_shifts ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 $items_query = $pdo->query("
-    SELECT i.id, i.name, u.name as unit_name 
-    FROM master_items i 
-    LEFT JOIN master_units u ON i.unit_id = u.id 
+    SELECT i.id, i.name, u.name as unit_name, m.name as default_machine
+    FROM master_items i
+    LEFT JOIN master_units u ON i.unit_id = u.id
+    LEFT JOIN master_machines m ON i.default_machine_id = m.id
     ORDER BY i.name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -19,10 +20,11 @@ $hierarchy_data = [];
 foreach($items_query as $it) {
     $sizes = $pdo->prepare("SELECT size_value FROM master_sizes WHERE item_id = ? ORDER BY CAST(size_value AS UNSIGNED) ASC");
     $sizes->execute([$it['id']]);
-    
+
     $hierarchy_data[$it['name']] = [
-        'unit' => $it['unit_name'],
-        'sizes' => $sizes->fetchAll(PDO::FETCH_COLUMN)
+        'unit'            => $it['unit_name'],
+        'default_machine' => $it['default_machine'],
+        'sizes'           => $sizes->fetchAll(PDO::FETCH_COLUMN)
     ];
 }
 ?>
@@ -96,10 +98,40 @@ foreach($items_query as $it) {
     
     .batch-badge { display: inline-block; white-space: nowrap; padding: 5px 10px; border-radius: 6px; font-size: 11px !important; font-weight: 800; }
     @media (max-width: 767px) { .batch-badge { white-space: normal; word-break: break-all; max-width: 140px; } }
+    .warehouse-method-badge {
+        display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.2px; border: 1px solid transparent;
+    }
+    .warehouse-method-badge.scan { background: #e8f5e9; color: #1b5e20; border-color: #c8e6c9; }
+    .warehouse-method-badge.manual { background: #fff8e1; color: #ef6c00; border-color: #ffe0b2; }
+    .warehouse-method-badge.hybrid { background: #e3f2fd; color: #1565c0; border-color: #bbdefb; }
 
     .card-kpi { border-radius: 15px; border: none; transition: 0.3s; background: #fff; }
     .card-kpi .card-body { padding: 1.5rem; }
     .kpi-title-month { font-size: 11px; opacity: 0.9; font-weight: 500; color: #fff !important; }
+
+    /* TAB WAREHOUSE */
+    .wh-tabs { border: 0; gap: 8px; margin-bottom: 16px; }
+    .wh-tabs .nav-link {
+        background: #fff; color: #555; border: 1px solid #e3e6f0; border-radius: 999px;
+        padding: 8px 18px; font-weight: 700; font-size: 13px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .wh-tabs .nav-link:hover { color: #1A237E; border-color: #c5cae9; }
+    .wh-tabs .nav-link.active { background: #1A237E; color: #fff; border-color: #1A237E; }
+    .wh-tabs .nav-link i { margin-right: 6px; }
+
+    .cancel-category-badge {
+        display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.2px; border: 1px solid transparent;
+    }
+    .cancel-category-badge.production { background: #fff8e1; color: #ef6c00; border-color: #ffe0b2; }
+    .cancel-category-badge.warehouse  { background: #ffebee; color: #c62828; border-color: #ffcdd2; }
+    .device-chip {
+        display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700;
+        background: #e8eaf6; color: #1A237E; border: 1px solid #c5cae9; max-width: 180px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
+    }
 </style>
 <body>
     <div id="preloader"><div class="sk-three-bounce"><div class="sk-child sk-bounce1"></div><div class="sk-child sk-bounce2"></div><div class="sk-child sk-bounce3"></div></div></div>
@@ -173,6 +205,21 @@ foreach($items_query as $it) {
                     </div>
                 </div>
 
+                <ul class="nav wh-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab-stock-btn" data-bs-toggle="tab" data-bs-target="#tabStock" type="button" role="tab" aria-controls="tabStock" aria-selected="true">
+                            <i class="fa fa-boxes"></i>Stock Gudang
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-history-btn" data-bs-toggle="tab" data-bs-target="#tabHistory" type="button" role="tab" aria-controls="tabHistory" aria-selected="false">
+                            <i class="fa fa-ban"></i>Riwayat Pembatalan Label
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                <div class="tab-pane fade show active" id="tabStock" role="tabpanel" aria-labelledby="tab-stock-btn">
                 <div class="row">
                     <div class="col-12">
                         <div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
@@ -183,6 +230,9 @@ foreach($items_query as $it) {
                                         <p class="mb-0 small text-muted">Klik baris untuk melihat peta dus atau mengosongkan batch</p>
                                     </div>
                                     <div class="header-btn-group">
+                                        <button type="button" class="btn btn-primary btn-xs shadow-sm font-w600" data-bs-toggle="modal" data-bs-target="#modalAddStock">
+                                            <i class="fas fa-plus-circle me-1"></i> Tambah Stok
+                                        </button>
                                         <div class="dropdown">
                                             <button class="btn btn-light btn-xs shadow-sm dropdown-toggle font-w600 w-100" type="button" data-bs-toggle="dropdown">
                                                 <i class="fas fa-columns me-1 text-primary"></i> Pilih Kolom
@@ -193,6 +243,7 @@ foreach($items_query as $it) {
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-item" id="chk-item" checked><label class="form-check-label small font-w600" for="chk-item">Item / Size</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-qty" id="chk-qty" checked><label class="form-check-label small font-w600" for="chk-qty">Total Dus</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-mesin" id="chk-mesin" checked><label class="form-check-label small font-w600" for="chk-mesin">Mesin / Shift</label></div>
+                                                <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-method" id="chk-method" checked><label class="form-check-label small font-w600" for="chk-method">Metode Input</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-progres" id="chk-progres" checked><label class="form-check-label small font-w600" for="chk-progres">Verified</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-shipped" id="chk-shipped" checked><label class="form-check-label small font-w600" for="chk-shipped">Terkirim</label></div>
                                                 <div class="form-check mb-2"><input class="form-check-input col-checkbox" type="checkbox" value="col-pending" id="chk-pending"><label class="form-check-label small font-w600" for="chk-pending">Sisa Stok</label></div>
@@ -274,7 +325,23 @@ foreach($items_query as $it) {
                                             <input type="hidden" name="shift" id="f_shift_val">
                                         </div>
                                     </div>
-                                    <div class="col-12 col-md-5"><input type="text" id="f_daterange" class="form-control form-control-sm daterange-picker" placeholder="Pilih Tanggal Masuk Gudang" readonly><input type="hidden" name="start_date" id="f_start"><input type="hidden" name="end_date" id="f_end"></div>
+                                    <div class="col-6 col-md-2">
+                                        <div class="dropdown w-100">
+                                            <button class="form-control form-control-sm d-flex justify-content-between align-items-center text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+                                                <span id="sf-input-label" class="text-truncate text-muted">Semua Metode</span>
+                                                <i class="fa fa-caret-down opacity-50 ms-2 text-muted"></i>
+                                            </button>
+                                            <ul class="dropdown-menu shadow-lg border-0 mt-1" style="border-radius: 12px; font-family: 'Poppins', sans-serif; font-size: 13px; min-width: 100%;">
+                                                <li><a class="dropdown-item font-w600 text-black" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectInputMethodFilter('', 'Semua Metode')">Semua Metode</a></li>
+                                                <li><hr class="dropdown-divider m-0"></li>
+                                                <li><a class="dropdown-item" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectInputMethodFilter('scan', 'Scan QR')">Scan QR</a></li>
+                                                <li><a class="dropdown-item" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectInputMethodFilter('manual', 'Input Manual')">Input Manual</a></li>
+                                                <li><a class="dropdown-item" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectInputMethodFilter('hybrid', 'Hybrid')">Hybrid</a></li>
+                                            </ul>
+                                            <input type="hidden" name="input_method" id="f_input_method">
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-3"><input type="text" id="f_daterange" class="form-control form-control-sm daterange-picker" placeholder="Pilih Tanggal Masuk Gudang" readonly><input type="hidden" name="start_date" id="f_start"><input type="hidden" name="end_date" id="f_end"></div>
                                 </form>
                             </div>
                         </div>
@@ -293,6 +360,7 @@ foreach($items_query as $it) {
                                                 <th class="col-item"><strong>ITEM / SIZE</strong></th>
                                                 <th class="col-qty text-center"><strong>TOTAL DUS</strong></th>
                                                 <th class="col-mesin"><strong>MESIN</strong></th>
+                                                <th class="col-method text-center"><strong>INPUT</strong></th>
                                                 <th class="col-progres text-center"><strong>VERIFIED</strong></th>
                                                 <th class="col-shipped text-center"><strong>TERKIRIM</strong></th>
                                                 <th class="col-pending text-center"><strong>SISA STOK</strong></th>
@@ -311,6 +379,226 @@ foreach($items_query as $it) {
                             </div>
                         </div>
                     </div>
+                </div>
+                </div> <!-- /tabStock -->
+
+                <!-- ============== TAB: RIWAYAT PEMBATALAN LABEL ============== -->
+                <div class="tab-pane fade" id="tabHistory" role="tabpanel" aria-labelledby="tab-history-btn">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
+                                <div class="card-body p-3 p-md-4">
+                                    <div class="filter-card-header">
+                                        <div>
+                                            <h4 class="text-black mb-0 font-w800">Riwayat Pembatalan Label</h4>
+                                            <p class="mb-0 small text-muted">Seluruh pembatalan label (kategori <b>production</b> &amp; <b>warehouse</b>). Filter termasuk <b>device_id</b>.</p>
+                                        </div>
+                                        <div class="header-btn-group">
+                                            <span class="badge bg-light text-dark border shadow-sm font-w700 d-flex align-items-center" style="font-size:11px;">
+                                                <i class="fa fa-layer-group me-1 text-warning"></i>Production: <span id="hist-cnt-prod" class="ms-1">0</span>
+                                            </span>
+                                            <span class="badge bg-light text-dark border shadow-sm font-w700 d-flex align-items-center" style="font-size:11px;">
+                                                <i class="fa fa-warehouse me-1 text-danger"></i>Warehouse: <span id="hist-cnt-wh" class="ms-1">0</span>
+                                            </span>
+                                            <span class="badge bg-light text-dark border shadow-sm font-w700 d-flex align-items-center" style="font-size:11px;">
+                                                <i class="fa fa-mobile-alt me-1 text-primary"></i>Device: <span id="hist-cnt-dev" class="ms-1">0</span>
+                                            </span>
+                                            <button onclick="resetHistoryFilter()" class="btn btn-light btn-xs shadow-sm text-danger font-w600">
+                                                <i class="fa fa-undo me-1"></i> Reset Filter
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <form id="formHistoryFilter" class="row g-2">
+                                        <div class="col-12 col-md-3">
+                                            <input type="text" id="h_search" name="search" class="form-control form-control-sm" placeholder="Cari batch / item / alasan / nomor label...">
+                                        </div>
+                                        <div class="col-6 col-md-2">
+                                            <div class="dropdown w-100">
+                                                <button class="form-control form-control-sm d-flex justify-content-between align-items-center text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+                                                    <span id="hf-item-label" class="text-truncate text-muted">Semua Item</span>
+                                                    <i class="fa fa-caret-down opacity-50 ms-2 text-muted"></i>
+                                                </button>
+                                                <ul class="dropdown-menu shadow-lg border-0 mt-1" style="max-height: 350px; overflow-y: auto; border-radius: 12px; font-family: 'Poppins', sans-serif; font-size: 13px; min-width: 100%;">
+                                                    <li><a class="dropdown-item font-w600 text-black" style="padding: 10px 15px;" href="javascript:void(0)" onclick="selectHistoryItemFilter('', '', '')">Semua Item</a></li>
+                                                    <li><hr class="dropdown-divider m-0"></li>
+                                                    <?php foreach($hierarchy_data as $item => $data): ?>
+                                                        <li>
+                                                            <div class="d-flex justify-content-between align-items-center dropdown-item" style="cursor: default; padding: 5px 15px;">
+                                                                <a class="text-black font-w600 text-decoration-none flex-grow-1" style="opacity: 0.7;" href="javascript:void(0)" onclick="selectHistoryItemFilter('<?= $item ?>', '', '')"><?= $item ?></a>
+                                                                <?php if(!empty($data['sizes'])): ?>
+                                                                <a class="text-primary" style="font-size: 16px; margin-left: 10px;" data-bs-toggle="collapse" href="#hcollapse-<?= md5($item) ?>" onclick="event.stopPropagation();"><i class="fa fa-plus-circle" style="color: #1A237E;"></i></a>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                        </li>
+                                                        <?php if(!empty($data['sizes'])): ?>
+                                                        <div class="collapse bg-white" id="hcollapse-<?= md5($item) ?>">
+                                                            <?php foreach($data['sizes'] as $sz): ?>
+                                                            <?php $displayLabel = $sz . ' ' . $data['unit']; ?>
+                                                            <li><a class="dropdown-item text-muted" style="padding: 8px 15px 8px 25px;" href="javascript:void(0)" onclick="selectHistoryItemFilter('<?= $item ?>', '<?= $sz ?>', '<?= $displayLabel ?>')"><?= $displayLabel ?></a></li>
+                                                            <?php endforeach; ?>
+                                                        </div>
+                                                        <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </ul>
+                                                <input type="hidden" name="item" id="h_item_val">
+                                                <input type="hidden" name="size" id="h_size_val">
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-2">
+                                            <input type="text" id="h_batch" name="batch" class="form-control form-control-sm" placeholder="Filter Batch">
+                                        </div>
+                                        <div class="col-6 col-md-2">
+                                            <input type="text" id="h_device" name="device_id" class="form-control form-control-sm" placeholder="Filter Device ID / UUID">
+                                        </div>
+                                        <div class="col-6 col-md-2">
+                                            <select id="h_category" name="category" class="form-control form-control-sm">
+                                                <option value="">Semua Kategori</option>
+                                                <option value="production">Production</option>
+                                                <option value="warehouse">Warehouse</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-3">
+                                            <input type="text" id="h_daterange" class="form-control form-control-sm" placeholder="Rentang Tanggal Pembatalan" readonly>
+                                            <input type="hidden" name="start_date" id="h_start">
+                                            <input type="hidden" name="end_date" id="h_end">
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0" style="border-radius: 15px;">
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table shadow-hover mb-0">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th class="ps-4"><strong>WAKTU BATAL</strong></th>
+                                                    <th><strong>BATCH</strong></th>
+                                                    <th><strong>ITEM / SIZE</strong></th>
+                                                    <th class="text-center"><strong>LABEL NO</strong></th>
+                                                    <th class="text-center"><strong>KATEGORI</strong></th>
+                                                    <th><strong>DEVICE</strong></th>
+                                                    <th><strong>DIBATALKAN OLEH</strong></th>
+                                                    <th><strong>ALASAN</strong></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="historyTableBody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="card-footer border-0 d-flex flex-column flex-md-row justify-content-between align-items-center p-4 gap-3">
+                                    <div id="historyPaginationInfo" class="small text-muted font-w600"></div>
+                                    <nav><ul class="pagination pagination-xs mb-0" id="historyPaginationControls"></ul></nav>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- /tabHistory -->
+
+                </div> <!-- /tab-content -->
+            </div>
+        </div>
+
+        <!-- MODAL TAMBAH STOK GUDANG -->
+        <div class="modal fade" id="modalAddStock" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-radius: 20px 20px 0 0;">
+                        <h5 class="modal-title text-white font-w700"><i class="fa fa-plus-circle me-2"></i>Tambah Stok ke Gudang</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form id="formAddStock">
+                        <div class="modal-body p-4">
+                            <div class="alert alert-info border-0 small mb-3" style="border-radius: 10px;">
+                                <i class="fa fa-info-circle me-1"></i> Stok yang ditambahkan langsung masuk ke gudang. Jika <b>Kode Batch</b> sudah ada, <code>copies</code> akan diakumulasi (append mode).
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Item <span class="text-danger">*</span></label>
+                                    <select class="form-control" id="as_item" required>
+                                        <option value="">-- Pilih Item --</option>
+                                        <?php foreach($hierarchy_data as $itm => $dat): ?>
+                                            <option value="<?= htmlspecialchars($itm) ?>" data-unit="<?= htmlspecialchars($dat['unit']) ?>"><?= htmlspecialchars($itm) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small font-w700">Size <span class="text-danger">*</span></label>
+                                    <select class="form-control" id="as_size" required>
+                                        <option value="">-- Pilih Size --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small font-w700">Unit</label>
+                                    <input type="text" class="form-control" id="as_unit" readonly placeholder="auto">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Mesin <span class="text-danger">*</span></label>
+                                    <select class="form-control" id="as_machine" required>
+                                        <option value="">-- Pilih Mesin --</option>
+                                        <?php foreach($m_machines as $mc): ?>
+                                            <option value="<?= htmlspecialchars($mc['name']) ?>"><?= htmlspecialchars($mc['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Shift <span class="text-danger">*</span></label>
+                                    <select class="form-control" id="as_shift" required>
+                                        <option value="">-- Pilih Shift --</option>
+                                        <?php foreach($m_shifts as $sh): ?>
+                                            <option value="<?= htmlspecialchars($sh['name']) ?>"><?= htmlspecialchars($sh['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Operator</label>
+                                    <input type="text" class="form-control" id="as_operator" placeholder="Nama operator">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">QC</label>
+                                    <input type="text" class="form-control" id="as_qc" placeholder="Nama QC">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small font-w700">Tanggal Produksi</label>
+                                    <input type="date" class="form-control" id="as_date" value="<?= date('Y-m-d') ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small font-w700">Jam Produksi</label>
+                                    <input type="time" class="form-control" id="as_time" value="<?= date('H:i') ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small font-w700">Qty per Dus <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="as_quantity" placeholder="Contoh: 1000" required>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Jumlah Dus (Copies) <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="as_copies" min="1" value="1" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Kode Batch <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="as_batch" placeholder="Mis. 180426-01A-SED-1000-ADMIN-100PCS" required>
+                                        <button type="button" class="btn btn-light border" onclick="autoGenerateBatch()" title="Auto-generate dari field di atas"><i class="fa fa-magic"></i></button>
+                                    </div>
+                                    <small class="text-muted">Format: <code>ddmmyy-mesinShift-item-qty-operator-sizeUnit</code></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button>
+                            <button type="submit" class="btn btn-primary btn-sm shadow" id="btnSubmitAddStock">
+                                <i class="fa fa-save me-1"></i> Simpan & Masuk Gudang
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -339,13 +627,20 @@ foreach($items_query as $it) {
     <script>
         window.currentPage = 1;
         window.latestData = [];
-        window.columnStates = { 'col-batch': true, 'col-item': true, 'col-qty': true, 'col-mesin': true, 'col-progres': true, 'col-shipped': true, 'col-pending': true, 'col-qc': true };
+        window.columnStates = { 'col-batch': true, 'col-item': true, 'col-qty': true, 'col-mesin': true, 'col-method': true, 'col-progres': true, 'col-shipped': true, 'col-pending': true, 'col-qc': true };
+
+        function getWarehouseInputMeta(inputMethod) {
+            const normalized = String(inputMethod || '').toLowerCase();
+            if (normalized === 'manual') return { key: 'manual', icon: 'fa-keyboard', label: 'Input Manual' };
+            if (normalized === 'hybrid') return { key: 'hybrid', icon: 'fa-exchange-alt', label: 'Hybrid' };
+            return { key: 'scan', icon: 'fa-qrcode', label: 'Scan QR' };
+        }
 
         function renderSkeleton() {
             const tbody = document.getElementById('warehouseTableBody');
             tbody.innerHTML = '';
             for(let i=0; i<5; i++) {
-                tbody.insertAdjacentHTML('beforeend', `<tr><td class="ps-4"><div class="skeleton" style="height:20px; width:80px;"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton" style="height:15px; width:80%;"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text"></div></td></tr>`);
+                tbody.insertAdjacentHTML('beforeend', `<tr><td class="ps-4"><div class="skeleton" style="height:20px; width:80px;"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton" style="height:15px; width:80%;"></div></td><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text"></div></td></tr>`);
             }
         }
 
@@ -441,7 +736,19 @@ foreach($items_query as $it) {
             fetchWarehouseStock(1);
         };
 
-        window.resetFilter = () => { document.getElementById('formFilter').reset(); $('#f_daterange').val(''); $('#f_start').val(''); $('#f_end').val(''); selectSuperFilter('', '', ''); selectMesinFilter('', '', ''); }
+        window.selectInputMethodFilter = (inputMethod, label) => {
+            document.getElementById('f_input_method').value = inputMethod;
+            const labelEl = document.getElementById('sf-input-label');
+            labelEl.innerText = label || 'Semua Metode';
+            if (inputMethod) labelEl.classList.remove('text-muted');
+            else labelEl.classList.add('text-muted');
+
+            const dropdownEl = labelEl.closest('.dropdown');
+            if (dropdownEl && dropdownEl.classList.contains('show')) dropdownEl.querySelector('[data-bs-toggle="dropdown"]').click();
+            fetchWarehouseStock(1);
+        };
+
+        window.resetFilter = () => { document.getElementById('formFilter').reset(); $('#f_daterange').val(''); $('#f_start').val(''); $('#f_end').val(''); selectSuperFilter('', '', ''); selectMesinFilter('', '', ''); selectInputMethodFilter('', 'Semua Metode'); }
         document.getElementById('f_search').oninput = () => { clearTimeout(window.sT); window.sT = setTimeout(() => { fetchWarehouseStock(1); }, 500); }
         $(document).on('change', '.auto-filter', () => { fetchWarehouseStock(1); });
 
@@ -468,7 +775,7 @@ foreach($items_query as $it) {
             if (!data.length) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="text-center py-5">
+                        <td colspan="9" class="text-center py-5">
                             <div class="py-4">
                                 <i class="fa fa-boxes fa-4x text-light mb-3"></i>
                                 <h5 class="text-muted">Gudang Kosong atau Tidak Ada Data.</h5>
@@ -486,6 +793,7 @@ foreach($items_query as $it) {
                 const shipped = parseInt(row.total_shipped_labels || 0);
                 const stock = verified - shipped;
                 const limit = parseInt(row.copies || 0);
+                const inputMeta = getWarehouseInputMeta(row.batch_input_method);
                 
                 let dateFormatted = '-- ---';
                 if(row.last_entry) { 
@@ -504,6 +812,9 @@ foreach($items_query as $it) {
                             ${parseInt(row.copies) > 0 ? `<span class="badge badge-light border text-black shadow-sm font-w700" style="font-size:12px;">${row.copies} Dus</span>` : `<span class="badge badge-danger light font-w800" style="font-size:10px;">BELUM ADA</span>`}
                         </td>
                         <td class="col-mesin ${window.columnStates['col-mesin'] ? '' : 'col-hidden'}"><span class="text-black font-w600">${row.machine || '-'}</span><br><small>${row.shift || '-'}</small></td>
+                        <td class="col-method text-center ${window.columnStates['col-method'] ? '' : 'col-hidden'}">
+                            <span class="warehouse-method-badge ${inputMeta.key}"><i class="fa ${inputMeta.icon}"></i>${inputMeta.label}</span>
+                        </td>
                         <td class="col-progres text-center ${window.columnStates['col-progres'] ? '' : 'col-hidden'}">
                             <span class="text-black font-w800">${verified}</span>
                         </td>
@@ -617,6 +928,231 @@ foreach($items_query as $it) {
 
         fetchWarehouseStock(1);
         document.querySelector('a[href="warehouse_inventory.php"]')?.closest('li')?.classList.add('mm-active');
+
+        // ================= TAMBAH STOK GUDANG =================
+        const hierarchyData = <?= json_encode($hierarchy_data) ?>;
+
+        document.getElementById('as_item').addEventListener('change', function() {
+            const item       = this.value;
+            const sizeSel    = document.getElementById('as_size');
+            const unitInp    = document.getElementById('as_unit');
+            const machineSel = document.getElementById('as_machine');
+            sizeSel.innerHTML = '<option value="">-- Pilih Size --</option>';
+            unitInp.value = '';
+            if (item && hierarchyData[item]) {
+                unitInp.value = hierarchyData[item].unit || '';
+                (hierarchyData[item].sizes || []).forEach(s => {
+                    sizeSel.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`);
+                });
+
+                // Auto-select mesin default (masih bisa di-override manual)
+                const defMachine = hierarchyData[item].default_machine;
+                if (defMachine) {
+                    const opt = Array.from(machineSel.options).find(o => o.value === defMachine);
+                    if (opt) {
+                        machineSel.value = defMachine;
+                        machineSel.classList.add('is-valid');
+                        setTimeout(() => machineSel.classList.remove('is-valid'), 1500);
+                    }
+                }
+            }
+        });
+
+        window.autoGenerateBatch = function() {
+            const item     = document.getElementById('as_item').value;
+            const size     = document.getElementById('as_size').value;
+            const unit     = document.getElementById('as_unit').value;
+            const machine  = document.getElementById('as_machine').value;
+            const shift    = document.getElementById('as_shift').value;
+            const operator = document.getElementById('as_operator').value || 'ADMIN';
+            const quantity = document.getElementById('as_quantity').value;
+            const dateVal  = document.getElementById('as_date').value;
+            if (!item || !size || !machine || !shift || !quantity || !dateVal) {
+                toastr.warning('Lengkapi item, size, mesin, shift, qty, tanggal dulu');
+                return;
+            }
+            const d = new Date(dateVal);
+            const dd = String(d.getDate()).padStart(2,'0');
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const yy = String(d.getFullYear()).slice(-2);
+            const shiftCode = (machine.match(/\d+/) || ['01'])[0] + (shift.match(/[A-Z]$/i) || ['A'])[0].toUpperCase();
+            const itemPrefix = item.substring(0,3).toUpperCase();
+            const opCode = operator.substring(0, 4).toUpperCase().replace(/\s+/g,'');
+            const batch = `${dd}${mm}${yy}-${shiftCode}-${itemPrefix}-${quantity}-${opCode}-${size}${unit}`;
+            document.getElementById('as_batch').value = batch;
+        };
+
+        document.getElementById('formAddStock').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSubmitAddStock');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> Menyimpan...';
+
+            const fd = new FormData();
+            fd.append('batch',           document.getElementById('as_batch').value.trim());
+            fd.append('item',            document.getElementById('as_item').value);
+            fd.append('size',            document.getElementById('as_size').value);
+            fd.append('unit',            document.getElementById('as_unit').value);
+            fd.append('machine',         document.getElementById('as_machine').value);
+            fd.append('shift',           document.getElementById('as_shift').value);
+            fd.append('quantity',        document.getElementById('as_quantity').value);
+            fd.append('operator',        document.getElementById('as_operator').value);
+            fd.append('qc',              document.getElementById('as_qc').value);
+            fd.append('production_date', document.getElementById('as_date').value);
+            fd.append('production_time', document.getElementById('as_time').value);
+            fd.append('copies',          document.getElementById('as_copies').value);
+
+            try {
+                const r = await fetch('../api/manage_settings.php?action=add_warehouse_stock', { method: 'POST', body: fd });
+                const res = await r.json();
+                if (res.status === 'success') {
+                    toastr.success(`Stok masuk gudang: ${res.copies} dus (label #${res.first_label_no}–${res.last_label_no})`);
+                    bootstrap.Modal.getInstance(document.getElementById('modalAddStock')).hide();
+                    document.getElementById('formAddStock').reset();
+                    document.getElementById('as_date').value = new Date().toISOString().slice(0,10);
+                    fetchWarehouseStock(1);
+                } else {
+                    toastr.error(res.message || 'Gagal menyimpan');
+                }
+            } catch (err) {
+                toastr.error('Koneksi error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-save me-1"></i> Simpan & Masuk Gudang';
+            }
+        });
+
+        // ================= RIWAYAT PEMBATALAN LABEL =================
+        window.historyState = { page: 1, initialized: false };
+
+        $('#h_daterange').daterangepicker({ autoUpdateInput: false, locale: { cancelLabel: 'Clear', format: 'YYYY-MM-DD' } });
+        $('#h_daterange').on('apply.daterangepicker', function(ev, picker) {
+            $(this).val(picker.startDate.format('YYYY-MM-DD') + ' - ' + picker.endDate.format('YYYY-MM-DD'));
+            $('#h_start').val(picker.startDate.format('YYYY-MM-DD'));
+            $('#h_end').val(picker.endDate.format('YYYY-MM-DD'));
+            fetchCancelledHistory(1);
+        });
+        $('#h_daterange').on('cancel.daterangepicker', function() {
+            $(this).val(''); $('#h_start').val(''); $('#h_end').val(''); fetchCancelledHistory(1);
+        });
+
+        window.selectHistoryItemFilter = (item, size, displayLabel) => {
+            document.getElementById('h_item_val').value = item;
+            document.getElementById('h_size_val').value = size;
+            const labelEl = document.getElementById('hf-item-label');
+            labelEl.innerText = item ? (size ? `${item} (${displayLabel})` : item) : 'Semua Item';
+            labelEl.classList.toggle('text-muted', !item);
+            const dropdownEl = labelEl.closest('.dropdown');
+            if (dropdownEl && dropdownEl.classList.contains('show')) dropdownEl.querySelector('[data-bs-toggle="dropdown"]').click();
+            fetchCancelledHistory(1);
+        };
+
+        window.resetHistoryFilter = () => {
+            document.getElementById('formHistoryFilter').reset();
+            $('#h_daterange').val(''); $('#h_start').val(''); $('#h_end').val('');
+            selectHistoryItemFilter('', '', '');
+        };
+
+        function debounceHistory(fn, delay = 450) {
+            return () => { clearTimeout(window.hT); window.hT = setTimeout(fn, delay); };
+        }
+        ['h_search', 'h_batch', 'h_device'].forEach(id => {
+            document.getElementById(id).addEventListener('input', debounceHistory(() => fetchCancelledHistory(1)));
+        });
+        document.getElementById('h_category').addEventListener('change', () => fetchCancelledHistory(1));
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        window.fetchCancelledHistory = async function(page = 1) {
+            const tbody = document.getElementById('historyTableBody');
+            if (!tbody) return;
+            const params = new URLSearchParams(new FormData(document.getElementById('formHistoryFilter')));
+            params.set('page', page);
+            params.set('limit', 10);
+            try {
+                const res = await fetch(`../api/get_cancelled_labels_history.php?${params.toString()}&_nocache=${Date.now()}`, {
+                    cache: 'no-store',
+                    headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+                });
+                const r = await res.json();
+                document.getElementById('hist-cnt-prod').innerText = (r.stats?.cnt_production ?? 0).toLocaleString('id-ID');
+                document.getElementById('hist-cnt-wh').innerText   = (r.stats?.cnt_warehouse ?? 0).toLocaleString('id-ID');
+                document.getElementById('hist-cnt-dev').innerText  = (r.stats?.cnt_devices ?? 0).toLocaleString('id-ID');
+                renderHistoryRows(r.data || []);
+                setupHistoryPagination(r.pages || 0, r.total || 0, page);
+                window.historyState.page = page;
+            } catch (e) { console.error('History AJAX Error:', e); }
+        };
+
+        function renderHistoryRows(data) {
+            const tbody = document.getElementById('historyTableBody');
+            if (!data.length) {
+                tbody.innerHTML = `
+                    <tr><td colspan="8" class="text-center py-5">
+                        <div class="py-4">
+                            <i class="fa fa-ban fa-3x text-light mb-3"></i>
+                            <h5 class="text-muted">Belum ada riwayat pembatalan label.</h5>
+                        </div>
+                    </td></tr>`;
+                return;
+            }
+            const monthNames = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+            tbody.innerHTML = '';
+            data.forEach(row => {
+                const d = row.cancelled_at ? new Date(row.cancelled_at.replace(' ', 'T')) : null;
+                const dateFmt = d ? `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}` : '-';
+                const cat = (row.category || '').toLowerCase();
+                const deviceHtml = row.device_id
+                    ? `<span class="device-chip" title="${escapeHtml(row.device_id)}">${escapeHtml(row.device_name || row.device_id)}</span>`
+                    : '<span class="text-muted small">—</span>';
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td class="ps-4">
+                            <div class="text-black font-w700 small">${dateFmt}</div>
+                            <small class="text-muted">${row.cancelled_time || ''} WITA</small>
+                        </td>
+                        <td><span class="badge bg-primary text-white batch-badge">${escapeHtml(row.batch || '-')}</span></td>
+                        <td>
+                            <div class="text-black font-w700">${escapeHtml(row.item || '-')}</div>
+                            <small class="text-black">${escapeHtml(row.size || '')} ${escapeHtml(row.unit || '')}</small>
+                        </td>
+                        <td class="text-center"><span class="badge badge-light border text-black font-w700">#${row.label_no}</span></td>
+                        <td class="text-center"><span class="cancel-category-badge ${cat}">${escapeHtml(row.category || '-')}</span></td>
+                        <td>${deviceHtml}</td>
+                        <td><div class="small text-black font-w600">${escapeHtml(row.cancelled_by || '-')}</div></td>
+                        <td><div class="small text-muted">${escapeHtml(row.reason || '-')}</div></td>
+                    </tr>
+                `);
+            });
+        }
+
+        function setupHistoryPagination(totalP, totalD, current) {
+            const controls = document.getElementById('historyPaginationControls');
+            document.getElementById('historyPaginationInfo').innerText =
+                totalD ? `Data ${(current-1)*10 + 1}-${Math.min(current*10, totalD)} dari ${totalD}` : '';
+            controls.innerHTML = '';
+            if (!totalP) return;
+            controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == 1 ? 'disabled' : ''}"><a class="page-link" onclick="fetchCancelledHistory(${current-1})"><i class="fas fa-chevron-left"></i></a></li>`);
+            for (let i = 1; i <= totalP; i++) {
+                if (i == 1 || i == totalP || (i >= current-1 && i <= current+1)) {
+                    controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == i ? 'active' : ''}"><a class="page-link" onclick="fetchCancelledHistory(${i})">${i}</a></li>`);
+                } else if (i == current - 2 || i == current + 2) {
+                    controls.insertAdjacentHTML('beforeend', `<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+            controls.insertAdjacentHTML('beforeend', `<li class="page-item ${current == totalP ? 'disabled' : ''}"><a class="page-link" onclick="fetchCancelledHistory(${current+1})"><i class="fas fa-chevron-right"></i></a></li>`);
+        }
+
+        document.getElementById('tab-history-btn').addEventListener('shown.bs.tab', () => {
+            if (!window.historyState.initialized) {
+                window.historyState.initialized = true;
+                fetchCancelledHistory(1);
+            }
+        });
     </script>
 </body>
 </html>

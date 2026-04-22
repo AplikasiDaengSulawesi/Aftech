@@ -10,6 +10,23 @@ header('Pragma: no-cache');
 $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
 $user = $_SESSION['full_name'] ?? 'Warehouse User';
 
+function normalize_shipment_input_method($value) {
+    $value = strtolower(trim((string)$value));
+    if (in_array($value, ['scan', 'manual', 'campuran'], true)) {
+        return $value;
+    }
+    return 'scan';
+}
+
+function merge_shipment_input_methods($existing, $incoming) {
+    $existing = normalize_shipment_input_method($existing);
+    $incoming = normalize_shipment_input_method($incoming);
+    if ($existing === $incoming) {
+        return $existing;
+    }
+    return 'campuran';
+}
+
 if ($action === 'get_batch_data') {
     $qr_input = isset($_GET['qr']) ? $conn->real_escape_string($_GET['qr']) : '';
     if (empty($qr_input)) die(json_encode(['status' => 'error', 'message' => 'QR Kosong']));
@@ -52,12 +69,78 @@ if ($action === 'get_batch_data') {
             'item' => $prod['item'],
             'size' => $prod['size'] . ' ' . $prod['unit'],
             'copies' => (int)$prod['copies'],
+            'input_method' => 'scan',
             'scanned_label' => $scanned_label, // Label pemicu
             'in_warehouse' => $in_warehouse,
             'already_shipped' => $already_shipped
         ]
     ]);
 } 
+elseif ($action === 'search_batches') {
+    // Cari batch dengan stok tersedia (untuk input manual tanpa barcode)
+    $q = isset($_GET['q']) ? $conn->real_escape_string(trim($_GET['q'])) : '';
+    $where = '';
+    if ($q !== '') {
+        $where = "WHERE (p.batch LIKE '%$q%' OR p.item LIKE '%$q%' OR p.size LIKE '%$q%')";
+    }
+    $sql = "
+        SELECT p.id, p.batch, p.item, p.size, p.unit, p.copies,
+               (SELECT COUNT(*) FROM warehouse_items w WHERE w.production_id = p.id) AS wh_count,
+               (SELECT COUNT(*) FROM distributor_shipments d WHERE d.production_id = p.id) AS ship_count
+        FROM production_labels p
+        $where
+        ORDER BY p.id DESC
+        LIMIT 30
+    ";
+    $res = $conn->query($sql);
+    $data = [];
+    while ($r = $res->fetch_assoc()) {
+        $avail = (int)$r['wh_count'] - (int)$r['ship_count'];
+        if ($avail <= 0) continue;
+        $r['id'] = (int)$r['id'];
+        $r['copies'] = (int)$r['copies'];
+        $r['available'] = $avail;
+        unset($r['wh_count'], $r['ship_count']);
+        $data[] = $r;
+    }
+    echo json_encode(['status' => 'success', 'data' => $data]);
+}
+elseif ($action === 'get_batch_manual') {
+    // Ambil data batch untuk input manual (tanpa validasi scanned label)
+    $prod_id = isset($_GET['production_id']) ? (int)$_GET['production_id'] : 0;
+    if ($prod_id <= 0) die(json_encode(['status' => 'error', 'message' => 'Production ID tidak valid']));
+
+    $res = $conn->query("SELECT id, item, size, unit, machine, batch, copies FROM production_labels WHERE id = $prod_id");
+    if ($res->num_rows === 0) die(json_encode(['status' => 'error', 'message' => 'Batch tidak ditemukan']));
+    $prod = $res->fetch_assoc();
+
+    $in_warehouse = [];
+    $res_wh = $conn->query("SELECT label_no FROM warehouse_items WHERE production_id = $prod_id");
+    while ($r = $res_wh->fetch_assoc()) $in_warehouse[] = (int)$r['label_no'];
+
+    $already_shipped = [];
+    $res_shipped = $conn->query("SELECT label_no FROM distributor_shipments WHERE production_id = $prod_id");
+    while ($r = $res_shipped->fetch_assoc()) $already_shipped[] = (int)$r['label_no'];
+
+    if (count($in_warehouse) - count($already_shipped) <= 0) {
+        die(json_encode(['status' => 'error', 'message' => 'Batch ini tidak memiliki stok tersedia']));
+    }
+
+    echo json_encode([
+        'status' => 'success',
+        'data' => [
+            'production_id' => (int)$prod['id'],
+            'batch' => $prod['batch'],
+            'item' => $prod['item'],
+            'size' => $prod['size'] . ' ' . $prod['unit'],
+            'copies' => (int)$prod['copies'],
+            'input_method' => 'manual',
+            'scanned_label' => null,
+            'in_warehouse' => $in_warehouse,
+            'already_shipped' => $already_shipped
+        ]
+    ]);
+}
 elseif ($action === 'submit_bulk') {
     $customer_name = isset($_POST['customer_name']) ? $conn->real_escape_string($_POST['customer_name']) : '';
     $customer_contact = isset($_POST['customer_contact']) ? $conn->real_escape_string($_POST['customer_contact']) : '';
@@ -65,6 +148,7 @@ elseif ($action === 'submit_bulk') {
     $shipment_date = isset($_POST['shipment_date']) ? $conn->real_escape_string($_POST['shipment_date']) : date('Y-m-d');
     $cart_json = isset($_POST['cart']) ? $_POST['cart'] : '';
     $append_to = isset($_POST['append_to']) ? (int)$_POST['append_to'] : 0;
+    $input_method = normalize_shipment_input_method($_POST['input_method'] ?? 'scan');
 
     $cart = json_decode($cart_json, true);
 
@@ -116,10 +200,17 @@ elseif ($action === 'submit_bulk') {
     // 2. Insert Header (Nota) atau Update Header Lama
         if ($append_to > 0) {
         $shipment_id = $append_to;
-        $conn->query("UPDATE outbound_shipments SET total_qty = total_qty + $total_qty, total_actual_qty = total_actual_qty + $total_actual_qty WHERE id = $shipment_id");
+        $existing_method = 'scan';
+        $existing_res = $conn->query("SELECT input_method FROM outbound_shipments WHERE id = $shipment_id LIMIT 1");
+        if ($existing_res && $existing_res->num_rows > 0) {
+            $existing_method = $existing_res->fetch_assoc()['input_method'] ?? 'scan';
+        }
+        $final_input_method = $conn->real_escape_string(merge_shipment_input_methods($existing_method, $input_method));
+        $conn->query("UPDATE outbound_shipments SET total_qty = total_qty + $total_qty, total_actual_qty = total_actual_qty + $total_actual_qty, input_method = '$final_input_method' WHERE id = $shipment_id");
     } else {
-    $conn->query("INSERT INTO outbound_shipments (customer_name, customer_contact, customer_address, shipment_date, total_qty, shipped_by, total_actual_qty)
-                  VALUES ('$customer_name', '$customer_contact', '$customer_address', '$shipment_date', $total_qty, '$user', $total_actual_qty)");
+    $final_input_method = $conn->real_escape_string($input_method);
+    $conn->query("INSERT INTO outbound_shipments (customer_name, customer_contact, customer_address, shipment_date, total_qty, shipped_by, total_actual_qty, input_method)
+                  VALUES ('$customer_name', '$customer_contact', '$customer_address', '$shipment_date', $total_qty, '$user', $total_actual_qty, '$final_input_method')");
         $shipment_id = $conn->insert_id;
         }
 

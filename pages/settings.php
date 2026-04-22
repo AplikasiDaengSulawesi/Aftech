@@ -137,7 +137,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                                     </div>
                                     <div class="card-body p-0">
                                         <div class="table-responsive"><table class="table shadow-hover">
-                                            <thead><tr><th class="ps-4">NAMA PRODUK</th><th>SATUAN</th><th>DAFTAR UKURAN (SIZE)</th><th class="text-center">AKSI</th></tr></thead>
+                                            <thead><tr><th class="ps-4">NAMA PRODUK</th><th>SATUAN</th><th>MESIN DEFAULT</th><th>DAFTAR UKURAN (SIZE)</th><th class="text-center">AKSI</th></tr></thead>
                                             <tbody id="tbody-item-group"></tbody>
                                         </table></div>
                                     </div>
@@ -156,7 +156,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                                     </div>
                                     <div class="card-body p-0">
                                         <div class="table-responsive"><table class="table shadow-hover">
-                                            <thead><tr><th class="ps-4">NAMA MESIN</th><th>STATUS</th><th>DAFTAR ISI (DUS)</th><th class="text-center">AKSI</th></tr></thead>
+                                            <thead><tr><th class="ps-4">NAMA MESIN</th><th>STATUS</th><th>ITEM TERKAIT</th><th>DAFTAR ISI (DUS)</th><th class="text-center">AKSI</th></tr></thead>
                                             <tbody id="tbody-machine-group"></tbody>
                                         </table></div>
                                     </div>
@@ -228,7 +228,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
         <div class="modal fade" id="modalCustomer" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg"><form id="formCustomer"><div class="modal-header bg-primary text-white border-0"><h5>Data Customer</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><input type="hidden" name="id" id="customer_id"><div class="mb-3"><label class="font-w600 small">Nama Customer</label><input type="text" name="name" id="customer_name" class="form-control" required></div><div class="mb-3"><label class="font-w600 small">Kontak / No. HP</label><input type="text" name="contact" id="customer_contact" class="form-control"></div><div class="mb-2"><label class="font-w600 small">Alamat Lengkap</label><textarea name="address" id="customer_address" class="form-control" rows="3"></textarea></div></div><div class="modal-footer border-0"><button type="submit" class="btn btn-primary btn-sm shadow w-100">Simpan Customer</button></div></form></div></div></div>
 
         <!-- Item Modal -->
-        <div class="modal fade" id="modalItem" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg"><form id="formItem"><div class="modal-header bg-primary text-white border-0"><h5>Data Produk</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><input type="hidden" name="id" id="item_id"><div class="mb-3"><label class="font-w600 small">Nama Produk</label><input type="text" name="name" id="item_name" class="form-control" required></div><div class="mb-2"><label class="font-w600 small">Unit Dasar</label><select name="unit_id" id="item_unit" class="form-control default-select"><?php foreach($units as $u) echo "<option value='{$u['id']}'>{$u['name']}</option>"; ?></select></div></div><div class="modal-footer border-0"><button type="submit" class="btn btn-primary btn-sm shadow w-100">Simpan</button></div></form></div></div></div>
+        <div class="modal fade" id="modalItem" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg"><form id="formItem"><div class="modal-header bg-primary text-white border-0"><h5>Data Produk</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><input type="hidden" name="id" id="item_id"><div class="mb-3"><label class="font-w600 small">Nama Produk</label><input type="text" name="name" id="item_name" class="form-control" required></div><div class="mb-3"><label class="font-w600 small">Unit Dasar</label><select name="unit_id" id="item_unit" class="form-control default-select"><?php foreach($units as $u) echo "<option value='{$u['id']}'>{$u['name']}</option>"; ?></select></div><div class="mb-2"><label class="font-w600 small">Mesin Default <small class="text-muted">(opsional)</small></label><select name="default_machine_id" id="item_default_machine" class="form-control default-select"><option value="">-- Tidak Ada --</option><?php foreach($machines as $m) echo "<option value='{$m['id']}'>{$m['name']}</option>"; ?></select></div></div><div class="modal-footer border-0"><button type="submit" class="btn btn-primary btn-sm shadow w-100">Simpan</button></div></form></div></div></div>
         
         <!-- Size Modal -->
         <div class="modal fade" id="modalSize" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg"><form id="formSize"><div class="modal-header bg-primary text-white border-0"><h5>Data Ukuran</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><input type="hidden" name="id" id="size_id"><div class="mb-3"><label class="font-w600 small">Produk</label><select name="item_id" id="size_item" class="form-control default-select"><?php foreach($items as $i) echo "<option value='{$i['id']}'>{$i['name']}</option>"; ?></select></div><div class="mb-2"><label class="font-w600 small">Nilai Size</label><input type="text" name="size_value" id="size_val" class="form-control" required></div></div><div class="modal-footer border-0 d-flex justify-content-between"><button type="button" id="btnDeleteSize" class="btn btn-danger btn-sm shadow" style="display:none;">Hapus</button><button type="submit" class="btn btn-primary btn-sm shadow flex-grow-1 ms-2">Simpan</button></div></form></div></div></div>
@@ -271,13 +271,20 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
             }
 
             // Render Groups
+            const machineById = {};
+            (allData.machine || []).forEach(m => { machineById[m.id] = m; });
+
             const tbodyItem = document.getElementById('tbody-item-group');
             if(tbodyItem) {
                 tbodyItem.innerHTML = '';
                 allData.item.forEach(item => {
                     const itemSizes = allData.size.filter(s => s.item_id == item.id);
                     const sizeHtml = itemSizes.map(s => `<span class="badge-size" onclick='openSizeModal(${JSON.stringify(s)})'>${s.size_value}</span>`).join('');
-                    tbodyItem.insertAdjacentHTML('beforeend', `<tr><td class="ps-4 font-w600">${item.name}</td><td><span class="badge badge-light">${item.unit_name || '-'}</span></td><td><div class="badge-group">${sizeHtml || '<small class="text-muted">No Size</small>'}</div></td><td class="text-center"><button onclick='openItemModal(${JSON.stringify(item)})' class="btn btn-primary btn-xs sharp me-1"><i class="fa fa-pencil"></i></button><button onclick="deleteMaster('item', ${item.id})" class="btn btn-danger btn-xs sharp"><i class="fa fa-trash"></i></button></td></tr>`);
+                    const defMachine = item.default_machine_id ? machineById[item.default_machine_id] : null;
+                    const machineHtml = defMachine
+                        ? `<span class="badge bg-primary text-white font-w600"><i class="la la-industry me-1"></i>${defMachine.name}</span>`
+                        : `<small class="text-muted fst-italic">Belum di-set</small>`;
+                    tbodyItem.insertAdjacentHTML('beforeend', `<tr><td class="ps-4 font-w600">${item.name}</td><td><span class="badge badge-light">${item.unit_name || '-'}</span></td><td>${machineHtml}</td><td><div class="badge-group">${sizeHtml || '<small class="text-muted">No Size</small>'}</div></td><td class="text-center"><button onclick='openItemModal(${JSON.stringify(item)})' class="btn btn-primary btn-xs sharp me-1"><i class="fa fa-pencil"></i></button><button onclick="deleteMaster('item', ${item.id})" class="btn btn-danger btn-xs sharp"><i class="fa fa-trash"></i></button></td></tr>`);
                 });
             }
 
@@ -287,8 +294,12 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
                 allData.machine.forEach(m => {
                     const mQtys = allData.quantity.filter(q => q.machine_id == m.id);
                     const qtyHtml = mQtys.map(q => `<span class="badge-qty" onclick='openQtyModal(${JSON.stringify(q)})'>${q.qty_value}</span>`).join('');
+                    const relatedItems = (allData.item || []).filter(i => i.default_machine_id == m.id);
+                    const itemHtml = relatedItems.length
+                        ? relatedItems.map(i => `<span class="badge bg-light text-primary border border-primary font-w600 me-1">${i.name}</span>`).join('')
+                        : `<small class="text-muted fst-italic">Tidak ada</small>`;
                     const st = m.status === 'active' ? 'bg-success' : 'bg-danger';
-                    tbodyMachine.insertAdjacentHTML('beforeend', `<tr><td class="ps-4 font-w600">${m.name}</td><td><span class="badge badge-status ${st} text-white">${m.status.toUpperCase()}</span></td><td><div class="badge-group">${qtyHtml || '<small class="text-muted">No Qty</small>'}</div></td><td class="text-center"><button onclick='openMachineModal(${JSON.stringify(m)})' class="btn btn-primary btn-xs sharp me-1"><i class="fa fa-pencil"></i></button><button onclick="deleteMaster('machine', ${m.id})" class="btn btn-danger btn-xs sharp"><i class="fa fa-trash"></i></button></td></tr>`);
+                    tbodyMachine.insertAdjacentHTML('beforeend', `<tr><td class="ps-4 font-w600">${m.name}</td><td><span class="badge badge-status ${st} text-white">${m.status.toUpperCase()}</span></td><td>${itemHtml}</td><td><div class="badge-group">${qtyHtml || '<small class="text-muted">No Qty</small>'}</div></td><td class="text-center"><button onclick='openMachineModal(${JSON.stringify(m)})' class="btn btn-primary btn-xs sharp me-1"><i class="fa fa-pencil"></i></button><button onclick="deleteMaster('machine', ${m.id})" class="btn btn-danger btn-xs sharp"><i class="fa fa-trash"></i></button></td></tr>`);
                 });
             }
 
@@ -373,7 +384,7 @@ $shifts = $pdo->query("SELECT * FROM master_shifts ORDER BY name ASC")->fetchAll
         
         window.openUserModal = (data=null) => { document.getElementById('formUser').reset(); document.getElementById('user_id').value = data ? data.id : ''; if(data) { document.getElementById('user_username').value = data.username; document.getElementById('user_full_name').value = data.full_name; document.getElementById('user_role').value = data.role; } $('.default-select').selectpicker('refresh'); cleanModal('modalUser').show(); };
         window.openCustomerModal = (data=null) => { document.getElementById('formCustomer').reset(); document.getElementById('customer_id').value = data ? data.id : ''; if(data) { document.getElementById('customer_name').value = data.name; document.getElementById('customer_contact').value = data.contact; document.getElementById('customer_address').value = data.address; } cleanModal('modalCustomer').show(); };
-        window.openItemModal = (data=null) => { document.getElementById('formItem').reset(); document.getElementById('item_id').value = data ? data.id : ''; if(data) { document.getElementById('item_name').value = data.name; document.getElementById('item_unit').value = data.unit_id; } $('.default-select').selectpicker('refresh'); cleanModal('modalItem').show(); };
+        window.openItemModal = (data=null) => { document.getElementById('formItem').reset(); document.getElementById('item_id').value = data ? data.id : ''; if(data) { document.getElementById('item_name').value = data.name; document.getElementById('item_unit').value = data.unit_id; document.getElementById('item_default_machine').value = data.default_machine_id || ''; } $('.default-select').selectpicker('refresh'); cleanModal('modalItem').show(); };
         window.openMachineModal = (data=null) => { document.getElementById('formMachine').reset(); document.getElementById('machine_id').value = data ? data.id : ''; if(data) { document.getElementById('machine_name').value = data.name; document.getElementById('machine_status').value = data.status; } $('.default-select').selectpicker('refresh'); cleanModal('modalMachine').show(); };
         window.openSizeModal = (data=null) => { document.getElementById('formSize').reset(); document.getElementById('size_id').value = data ? data.id : ''; document.getElementById('btnDeleteSize').style.display = data ? 'block' : 'none'; document.getElementById('btnDeleteSize').onclick = () => deleteMaster('size', data.id); if(data) { document.getElementById('size_item').value = data.item_id; document.getElementById('size_val').value = data.size_value; } $('.default-select').selectpicker('refresh'); cleanModal('modalSize').show(); };
         window.openQtyModal = (data=null) => { document.getElementById('formQty').reset(); document.getElementById('qty_id').value = data ? data.id : ''; document.getElementById('btnDeleteQty').style.display = data ? 'block' : 'none'; document.getElementById('btnDeleteQty').onclick = () => deleteMaster('quantity', data.id); if(data) { document.getElementById('qty_machine').value = data.machine_id; document.getElementById('qty_val').value = data.qty_value; } $('.default-select').selectpicker('refresh'); cleanModal('modalQty').show(); };

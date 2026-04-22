@@ -29,6 +29,9 @@ if ($type == 'item') {
     $res = $conn->query("SELECT * FROM master_templates ORDER BY template_name ASC");
 } elseif ($type == 'api_key') {
     $res = $conn->query("SELECT * FROM api_keys ORDER BY created_at DESC");
+    if (!$res) {
+        $res = $conn->query("SELECT * FROM api_keys ORDER BY id DESC");
+    }
 } elseif ($type == 'role_permissions') {
     $res = $conn->query("SELECT * FROM role_permissions");
 } elseif ($type == 'app_settings') {

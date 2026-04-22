@@ -12,19 +12,42 @@ $header = $stmt->fetch();
 
 if (!$header) die("Data pengiriman tidak ditemukan.");
 
-// Fetch Details Grouped by Item & Size (Focus on Dus)
+// Fetch Details per Batch (agar label_no tidak bercampur antar batch)
 $stmtDet = $pdo->prepare("
-    SELECT p.item, p.size, p.unit, 
-           GROUP_CONCAT(DISTINCT p.machine SEPARATOR ', ') as machines,
-           GROUP_CONCAT(DISTINCT p.shift SEPARATOR ', ') as shifts,
-           SUM(b.label_qty) as dus_qty
+    SELECT p.id AS production_id, p.item, p.size, p.unit, p.batch,
+           p.machine, p.shift,
+           b.label_qty AS dus_qty,
+           GROUP_CONCAT(d.label_no ORDER BY d.label_no SEPARATOR ',') AS label_nos
     FROM outbound_shipment_batches b
     JOIN production_labels p ON b.production_id = p.id
+    LEFT JOIN distributor_shipments d
+      ON d.shipment_id = b.shipment_id AND d.production_id = p.id
     WHERE b.shipment_id = ?
-    GROUP BY p.item, p.size, p.unit
+    GROUP BY p.id, b.id
+    ORDER BY p.item, p.size, p.id
 ");
 $stmtDet->execute([$id]);
 $details = $stmtDet->fetchAll();
+
+// Kompak list label_no jadi range, mis. [1,2,3,5,7,8] → "1-3, 5, 7-8"
+function compact_label_ranges($csv) {
+    if (!$csv) return '-';
+    $nums = array_values(array_unique(array_map('intval', explode(',', $csv))));
+    sort($nums, SORT_NUMERIC);
+    if (!$nums) return '-';
+    $ranges = [];
+    $start = $prev = $nums[0];
+    for ($i = 1; $i < count($nums); $i++) {
+        if ($nums[$i] === $prev + 1) {
+            $prev = $nums[$i];
+            continue;
+        }
+        $ranges[] = ($start === $prev) ? "$start" : "$start-$prev";
+        $start = $prev = $nums[$i];
+    }
+    $ranges[] = ($start === $prev) ? "$start" : "$start-$prev";
+    return implode(', ', $ranges);
+}
 
 // 1. Calculate Daily Sequence (Urutan pengiriman hari itu)
 $stmtSeq = $pdo->prepare("SELECT COUNT(id) as seq FROM outbound_shipments WHERE shipment_date = ? AND id <= ?");
@@ -187,10 +210,10 @@ $total_pages = count($pages);
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 50px;">NO</th>
+                    <th style="width: 40px;">NO</th>
                     <th>NAMA ITEM & UKURAN</th>
-                    <th style="text-align: center; width: 120px;">JUMLAH DUS</th>
-                    <th style="text-align: center; width: 120px;">KETERANGAN</th>
+                    <th style="text-align: center; width: 90px;">JUMLAH DUS</th>
+                    <th style="text-align: center; width: 180px;">NO. LABEL</th>
                 </tr>
             </thead>
             <tbody>
@@ -198,12 +221,15 @@ $total_pages = count($pages);
                 <tr class="item">
                     <td><?php echo $global_no++; ?></td>
                     <td>
-                        <strong style="font-size: 15px;"><?php echo $row['item']; ?> (<?php echo $row['size']; ?> <?php echo $row['unit']; ?>) |<small style="color: #666; font-weight: 600;"><?php echo strtoupper($row['machines']); ?></small></strong><br>
+                        <strong style="font-size: 15px;"><?php echo htmlspecialchars($row['item']); ?> (<?php echo htmlspecialchars($row['size']); ?> <?php echo htmlspecialchars($row['unit']); ?>) | <small style="color: #666; font-weight: 600;"><?php echo strtoupper(htmlspecialchars($row['machine'])); ?></small></strong><br>
+                        <small style="color: #888;">Batch: <?php echo htmlspecialchars($row['batch']); ?> &middot; <?php echo htmlspecialchars($row['shift']); ?></small>
                     </td>
                     <td style="text-align: center; font-weight: bold; font-size: 15px; color: #1A237E;">
                         <?php echo $row['dus_qty']; ?> Dus
                     </td>
-                    <td style="text-align: center; font-size: 12px; color: #666;">-</td>
+                    <td style="text-align: center; font-size: 11px; color: #333; font-family: 'Consolas', 'Courier New', monospace;">
+                        <?php echo htmlspecialchars(compact_label_ranges($row['label_nos'])); ?>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                 
