@@ -6,6 +6,7 @@ header('Content-Type: application/json');
 
 $qr_input = isset($_GET['batch']) ? $conn->real_escape_string($_GET['batch']) : '';
 $scanned_by = $_SESSION['full_name'] ?? 'QC User';
+$input_method = 'scan';
 
 if (empty($qr_input)) {
     echo json_encode(['status' => 'error', 'message' => 'Data QR Kosong!']);
@@ -50,7 +51,7 @@ if ($check->num_rows > 0) {
 
 // 5. Simpan Langsung ke Gudang
 try {
-    $conn->query("INSERT INTO warehouse_items (production_id, label_no, transferred_by) VALUES ($prod_pk, $label_no, '$scanned_by')");
+    $conn->query("INSERT INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prod_pk, $label_no, '$scanned_by', '$input_method')");
 
     // Ambil list semua dus yang sudah di Gudang untuk dirender ulang di Grid UI Scanner
     $scanned_list = [];

@@ -10,6 +10,7 @@ require_once '../includes/db.php';
     .badge-status { padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; }
     .bg-light-warning { background-color: #fff9e6 !important; }
     .pin-code-display { font-family: monospace; font-weight: 900; color: #1A237E; letter-spacing: 1px; font-size: 14px; }
+    .inline-action-group { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
     
     /* TABLE STYLE */
     .table-responsive-md .shadow-hover tbody tr { cursor: pointer; transition: 0.2s; }
@@ -126,49 +127,55 @@ require_once '../includes/db.php';
                 const data = await res.json();
                 window.latestAccessData = data;
                 renderTable(data);
-            } catch(e) { console.error(e); }
+            } catch(e) {
+                console.error(e);
+                document.getElementById('tbody-access').innerHTML = `<tr><td colspan="5" class="text-center py-4 text-danger">Gagal memuat data perangkat.</td></tr>`;
+            }
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('tbody-access');
             tbody.innerHTML = '';
             data.forEach((row, index) => {
+                const escapedDeviceName = String(row.device_name || '').replace(/'/g, "\\'");
+                const safeApiKey = String(row.api_key || '');
+                const apiKeyActions = safeApiKey
+                    ? `
+                            <button class="btn btn-light btn-xs sharp shadow-sm" onclick="event.stopPropagation(); requestSensitiveAccess(() => toggleApiKeyVisibility(${row.id}, '${safeApiKey.replace(/'/g, "\\'")}'))">
+                                <i class="fa fa-eye" id="apikey-icon-${row.id}"></i>
+                            </button>
+                            <button class="btn btn-light btn-xs sharp shadow-sm ms-1" onclick="event.stopPropagation(); requestSensitiveAccess(() => copyApiKey('${safeApiKey.replace(/'/g, "\\'")}'))">
+                                <i class="fa fa-copy"></i>
+                            </button>
+                      `
+                    : `<span class="badge badge-warning light font-w700">Belum dibuat</span>`;
                 let html = `
-                <tr onclick="showAccessActions(${index})">
+                <tr>
                     <td class="ps-4">
                         <div class="font-w600 ${row.status==='pending'?'text-warning':'text-primary'}">${row.device_name}</div>
                         <small class="text-muted d-block" style="font-size:9px;">${row.device_uuid || '-'}</small>
                     </td>
                     <td>
                         <div class="d-flex align-items-center">
-                            <div class="small font-w900 text-black me-3" style="letter-spacing:1px; font-family:monospace; min-width:80px;" id="apikey-text-${row.id}">********</div>
-                            <button class="btn btn-light btn-xs sharp shadow-sm" onclick="event.stopPropagation(); toggleApiKeyVisibility(${row.id}, '${row.api_key}')">
-                                <i class="fa fa-eye" id="apikey-icon-${row.id}"></i>
-                            </button>
+                            <div class="small font-w900 text-black me-3" style="letter-spacing:1px; font-family:monospace; min-width:80px;" id="apikey-text-${row.id}">${safeApiKey ? '********' : '-'}</div>
+                            ${apiKeyActions}
                         </div>
                     </td>
                     <td><span class="pin-code-display">${row.reset_pin || '-'}</span></td>
                     <td><span class="badge badge-${row.status==='approved'?'success':'warning'} light font-w800">${row.status.toUpperCase()}</span></td>
-                    <td class="text-center text-muted"><small>Klik Baris</small></td>
+                    <td class="text-center">
+                        <div class="inline-action-group">
+                            ${row.status === 'pending'
+                                ? `<button class="btn btn-success btn-xs shadow-sm" onclick="openApproveModal(${row.id}, '${escapedDeviceName}')"><i class="fa fa-check me-1"></i> Setujui</button>`
+                                : `<button class="btn btn-primary btn-xs shadow-sm" onclick="openEditPinModal(${row.id}, '${row.reset_pin || ''}')"><i class="fa fa-key me-1"></i> PIN</button>`
+                            }
+                            <button class="btn btn-danger btn-xs shadow-sm" onclick="deleteAccess(${row.id})"><i class="fa fa-trash me-1"></i> Hapus</button>
+                        </div>
+                    </td>
                 </tr>`;
                 tbody.insertAdjacentHTML('beforeend', html);
             });
         }
-
-        window.showAccessActions = function(index) {
-            const row = window.latestAccessData[index];
-            let actionsHtml = '';
-            if (row.status === 'pending') {
-                actionsHtml = `<button onclick="Swal.close(); openApproveModal(${row.id}, '${row.device_name}')" class="action-item"><i class="fa fa-check icon-view" style="background:#e8f5e9; color:#2e7d32;"></i> Setujui Akses</button>`;
-            } else {
-                actionsHtml = `<button onclick="Swal.close(); openEditPinModal(${row.id}, '${row.reset_pin}')" class="action-item"><i class="fa fa-key icon-edit"></i> Ubah PIN Reset</button>`;
-            }
-
-            Swal.fire({
-                html: `<div class="swal2-close-custom" onclick="Swal.close()"><i class="fa fa-times"></i></div><div class="text-center mb-3"><small class="text-muted d-block mb-1">Perangkat</small><strong class="text-black">${row.device_name}</strong></div><div class="action-list">${actionsHtml}<button onclick="Swal.close(); deleteAccess(${row.id})" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Hapus Akses</button></div>`,
-                showConfirmButton: false, padding: '1.2rem', width: '320px', borderRadius: '15px'
-            });
-        };
 
         async function loadPermissions() {
             try {
@@ -191,11 +198,77 @@ require_once '../includes/db.php';
             if(d.status === 'success') toastr.success('Hak Akses Diperbarui!');
         }
 
+        let sensitiveAccessExpiresAt = 0;
+
+        async function validateSensitivePassword(password) {
+            const formData = new FormData();
+            formData.append('password', password);
+            const res = await fetch(`../api/manage_settings.php?action=validate_sensitive_access`, { method: 'POST', body: formData });
+            return res.json();
+        }
+
+        window.requestSensitiveAccess = async (callback) => {
+            if (Date.now() < sensitiveAccessExpiresAt) {
+                callback();
+                return;
+            }
+
+            const result = await Swal.fire({
+                title: 'Validasi Password',
+                text: 'Masukkan password Anda untuk membuka akses API key.',
+                input: 'password',
+                inputPlaceholder: 'Password akun Anda',
+                inputAttributes: { autocapitalize: 'off', autocorrect: 'off' },
+                showCancelButton: true,
+                confirmButtonText: 'Validasi',
+                confirmButtonColor: '#1A237E',
+                preConfirm: async (password) => {
+                    if (!password) {
+                        Swal.showValidationMessage('Password wajib diisi');
+                        return false;
+                    }
+                    const response = await validateSensitivePassword(password);
+                    if (response.status !== 'success') {
+                        Swal.showValidationMessage(response.message || 'Password tidak valid');
+                        return false;
+                    }
+                    return true;
+                }
+            });
+
+            if (result.isConfirmed) {
+                sensitiveAccessExpiresAt = Date.now() + 60 * 1000;
+                toastr.success('Akses API key dibuka selama 1 menit');
+                callback();
+            }
+        };
+
         window.toggleApiKeyVisibility = (id, key) => {
             const txt = document.getElementById(`apikey-text-${id}`);
             const ico = document.getElementById(`apikey-icon-${id}`);
             if (txt.innerText === '********') { txt.innerText = key; ico.className = 'fa fa-eye-slash'; }
             else { txt.innerText = '********'; ico.className = 'fa fa-eye'; }
+        }
+
+        window.copyApiKey = async (key) => {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(key);
+                } else {
+                    const temp = document.createElement('textarea');
+                    temp.value = key;
+                    temp.style.position = 'fixed';
+                    temp.style.opacity = '0';
+                    document.body.appendChild(temp);
+                    temp.focus();
+                    temp.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(temp);
+                }
+                toastr.success('API Key berhasil disalin');
+            } catch (e) {
+                toastr.error('Gagal menyalin API Key');
+            }
         }
 
         window.openApproveModal = (id, name) => { document.getElementById('approve_id').value = id; document.getElementById('approve_name').value = name; new bootstrap.Modal(document.getElementById('modalApprove')).show(); }

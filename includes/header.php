@@ -328,6 +328,32 @@ $display_title = $page_titles[$current_page] ?? 'AFTECH System';
             }
         } catch(e) {}
     }
-    fetchHeaderLogs();
-    setInterval(fetchHeaderLogs, 10000);
+    // Polling terkontrol: 60 detik, pause saat tab hidden, defer fetch pertama sampai idle
+    let headerLogPollId = null;
+    const HEADER_LOG_INTERVAL_MS = 60000;
+
+    function startHeaderLogPolling() {
+        if (headerLogPollId) return;
+        headerLogPollId = setInterval(fetchHeaderLogs, HEADER_LOG_INTERVAL_MS);
+    }
+    function stopHeaderLogPolling() {
+        if (!headerLogPollId) return;
+        clearInterval(headerLogPollId);
+        headerLogPollId = null;
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopHeaderLogPolling();
+        } else {
+            fetchHeaderLogs();
+            startHeaderLogPolling();
+        }
+    });
+
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => { fetchHeaderLogs(); startHeaderLogPolling(); }, { timeout: 2000 });
+    } else {
+        setTimeout(() => { fetchHeaderLogs(); startHeaderLogPolling(); }, 500);
+    }
 </script>

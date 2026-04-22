@@ -40,6 +40,13 @@ if (!empty($_GET['start_date']) && !empty($_GET['end_date'])) {
     $where_clauses[] = "DATE(w.transferred_at) BETWEEN '$start' AND '$end'";
 }
 
+$input_method_filter = strtolower(trim((string)($_GET['input_method'] ?? '')));
+$valid_input_methods = ['scan', 'manual', 'hybrid'];
+$having = '';
+if (in_array($input_method_filter, $valid_input_methods, true)) {
+    $having = "HAVING batch_input_method = '" . $conn->real_escape_string($input_method_filter) . "'";
+}
+
 $where = "WHERE " . implode(" AND ", $where_clauses);
 
 $bulan_indonesia = [
@@ -49,7 +56,11 @@ $bulan_indonesia = [
 ];
 $bulan_ini = '(' . $bulan_indonesia[date('m')] . ' ' . date('Y') . ')';
 
-if (!empty($_GET['start_date']) || !empty($_GET['end_date']) || !empty($_GET['search']) || !empty($_GET['item']) || !empty($_GET['size']) || !empty($_GET['machine']) || !empty($_GET['shift'])) {
+if (
+    !empty($_GET['start_date']) || !empty($_GET['end_date']) || !empty($_GET['search']) ||
+    !empty($_GET['item']) || !empty($_GET['size']) || !empty($_GET['machine']) ||
+    !empty($_GET['shift']) || $input_method_filter !== ''
+) {
     $bulan_ini = 'Hasil Filter';
 }
 
@@ -57,28 +68,38 @@ $statsWhere = $where;
 if ($bulan_ini !== 'Hasil Filter') {
     $currentMonth = date('m');
     $currentYear = date('Y');
-    $statsWhere = "WHERE MONTH(w.transferred_at) = '$currentMonth' AND YEAR(w.transferred_at) = '$currentYear'";
+    $statsWhere = $where . " AND MONTH(w.transferred_at) = '$currentMonth' AND YEAR(w.transferred_at) = '$currentYear'";
 }
 
-$statsSql = "
-    SELECT p.id, p.copies, p.quantity,
-           COUNT(w.id) as total_in_warehouse,
-           (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as total_shipped
+$batch_method_sql = "CASE
+    WHEN COUNT(DISTINCT COALESCE(NULLIF(w.input_method, ''), 'scan')) > 1 THEN 'hybrid'
+    ELSE MAX(COALESCE(NULLIF(w.input_method, ''), 'scan'))
+END";
+
+$baseStatsSql = "
+    SELECT
+        p.id,
+        p.copies,
+        p.quantity,
+        COUNT(w.id) as total_in_warehouse,
+        (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as total_shipped,
+        $batch_method_sql as batch_input_method
     FROM warehouse_items w
     JOIN production_labels p ON w.production_id = p.id
     $statsWhere
     GROUP BY p.id
+    $having
 ";
 
-$statsRes = $conn->query($statsSql);
+$statsRes = $conn->query($baseStatsSql);
 $total_batch = 0;
-$total_stok = 0; // Net Stock (Verified - Shipped)
-$total_verified = 0; // Total labels that entered
+$total_stok = 0;
+$total_verified = 0;
 $total_kapasitas = 0;
 $total_shipped = 0;
 
 if ($statsRes) {
-    while($row = $statsRes->fetch_assoc()) {
+    while ($row = $statsRes->fetch_assoc()) {
         $total_batch++;
         $verified = (int)$row['total_in_warehouse'];
         $shipped = (int)$row['total_shipped'];
@@ -89,35 +110,44 @@ if ($statsRes) {
     }
 }
 
-// Hitung total baris untuk paginasi (menggunakan subquery karena GROUP BY)
-$totalSql = "SELECT COUNT(DISTINCT p.id) as total
-             FROM warehouse_items w
-             JOIN production_labels p ON w.production_id = p.id
-             $where";
+$baseListSql = "
+    SELECT
+        p.id as production_id,
+        p.batch,
+        p.item,
+        p.copies,
+        p.unit,
+        p.size,
+        p.quantity,
+        p.machine,
+        p.shift,
+        COUNT(w.id) as total_in_warehouse,
+        (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as total_shipped_labels,
+        MAX(w.transferred_at) as last_entry,
+        (SELECT transferred_by FROM warehouse_items WHERE production_id = p.id ORDER BY transferred_at DESC LIMIT 1) as pengirim,
+        $batch_method_sql as batch_input_method
+    FROM warehouse_items w
+    JOIN production_labels p ON w.production_id = p.id
+    $where
+    GROUP BY p.id
+    $having
+";
+
+$totalSql = "SELECT COUNT(*) as total FROM ($baseListSql) warehouse_batches";
 $totalRes = $conn->query($totalSql);
-$totalData = $totalRes->fetch_assoc()['total'] ?? 0;
-$totalPages = ceil($totalData / $limit);
+$totalData = $totalRes ? (int)($totalRes->fetch_assoc()['total'] ?? 0) : 0;
+$totalPages = $limit > 0 ? (int)ceil($totalData / $limit) : 1;
 
-// Menghitung jumlah label per batch di gudang dan mengambil pengirim terakhir
-$sql = "SELECT p.id as production_id, p.batch, p.item, p.copies, p.unit, p.size, p.quantity, p.machine, p.shift,
-               COUNT(w.id) as total_in_warehouse,
-               (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as total_shipped_labels,
-               MAX(w.transferred_at) as last_entry,
-               (SELECT transferred_by FROM warehouse_items WHERE production_id = p.id ORDER BY transferred_at DESC LIMIT 1) as pengirim
-        FROM warehouse_items w
-        JOIN production_labels p ON w.production_id = p.id
-        $where
-        GROUP BY p.id
-        ORDER BY last_entry DESC
-        LIMIT $offset, $limit";
-
+$sql = $baseListSql . " ORDER BY last_entry DESC LIMIT $offset, $limit";
 $res = $conn->query($sql);
 $data = [];
 
-while($row = $res->fetch_assoc()) {
-    $row['last_entry_time'] = date('H:i:s', strtotime($row['last_entry']));
-    $row['last_entry_date'] = date('d/m/Y', strtotime($row['last_entry']));
-    $data[] = $row;
+if ($res) {
+    while ($row = $res->fetch_assoc()) {
+        $row['last_entry_time'] = date('H:i:s', strtotime($row['last_entry']));
+        $row['last_entry_date'] = date('d/m/Y', strtotime($row['last_entry']));
+        $data[] = $row;
+    }
 }
 
 echo json_encode([
@@ -128,7 +158,7 @@ echo json_encode([
     'stats' => [
         'total_batch' => $total_batch,
         'total_verified' => $total_verified,
-        'total_stok' => $total_stok, // Net stock (Verified - Shipped)
+        'total_stok' => $total_stok,
         'total_kapasitas' => $total_kapasitas,
         'total_shipped' => $total_shipped,
         'bulan' => $bulan_ini

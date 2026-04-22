@@ -1,9 +1,6 @@
 <?php
 date_default_timezone_set('Asia/Makassar');
-$host = "localhost";
-$user = "root";
-$pass = "";
-$db   = "db_aftech";
+require __DIR__ . '/../includes/db_credentials.php';
 
 $conn = new mysqli($host, $user, $pass, $db);
 

@@ -21,7 +21,11 @@ if ($action == 'save') {
     if ($type == 'item') {
         $name = $conn->real_escape_string($_POST['name']);
         $u_id = (int)$_POST['unit_id'];
-        $sql = (!empty($id)) ? "UPDATE master_items SET name='$name', unit_id=$u_id WHERE id=$id" : "INSERT INTO master_items (name, unit_id) VALUES ('$name', $u_id)";
+        $m_id_raw = $_POST['default_machine_id'] ?? '';
+        $m_id_sql = ($m_id_raw === '' || $m_id_raw === null) ? 'NULL' : (int)$m_id_raw;
+        $sql = (!empty($id))
+            ? "UPDATE master_items SET name='$name', unit_id=$u_id, default_machine_id=$m_id_sql WHERE id=$id"
+            : "INSERT INTO master_items (name, unit_id, default_machine_id) VALUES ('$name', $u_id, $m_id_sql)";
         $log_detail = "Admin Update Item: $name";
     } elseif ($type == 'size') {
         $val = $conn->real_escape_string($_POST['size_value']);
@@ -126,7 +130,7 @@ if ($action == 'save') {
             $batch_name = ($batch_res && $b_row = $batch_res->fetch_assoc()) ? $b_row['batch'] : $prod_id;
             
             foreach ($labels as $no) {
-                $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by) VALUES ($prod_id, $no, '$admin_name')");
+                $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prod_id, $no, '$admin_name', 'manual')");
             }
             $conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prod_id, '$admin_name')");
             $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TRANSFER', 'Kirim ".count($labels)." unit Batch #$batch_name ke Gudang')");
@@ -174,6 +178,25 @@ if ($action == 'save') {
     } else {
         $response = ['status' => 'error', 'message' => $conn->error];
     }
+} elseif ($action == 'validate_sensitive_access') {
+    $password = $_POST['password'] ?? '';
+    $user_id = (int)($_SESSION['user_id'] ?? 0);
+
+    if ($user_id <= 0 || $password === '') {
+        $response = ['status' => 'error', 'message' => 'Password wajib diisi'];
+    } else {
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user = $result ? $result->fetch_assoc() : null;
+
+        if ($user && password_verify($password, $user['password'])) {
+            $response = ['status' => 'success'];
+        } else {
+            $response = ['status' => 'error', 'message' => 'Password tidak valid'];
+        }
+    }
 } elseif ($action == 'save_role_permissions') {
     $perms = json_decode($_POST['permissions'], true);
     if (!empty($perms)) {
@@ -189,6 +212,71 @@ if ($action == 'save') {
             $conn->commit();
             $response = ['status' => 'success'];
         } catch (Exception $e) { $conn->rollback(); $response = ['status' => 'error', 'message' => $e->getMessage()]; }
+    }
+} elseif ($action == 'add_warehouse_stock') {
+    $batch    = $conn->real_escape_string(trim($_POST['batch'] ?? ''));
+    $item     = $conn->real_escape_string(trim($_POST['item'] ?? ''));
+    $size     = $conn->real_escape_string(trim($_POST['size'] ?? ''));
+    $unit     = $conn->real_escape_string(trim($_POST['unit'] ?? ''));
+    $machine  = $conn->real_escape_string(trim($_POST['machine'] ?? ''));
+    $shift    = $conn->real_escape_string(trim($_POST['shift'] ?? ''));
+    $quantity = $conn->real_escape_string(trim($_POST['quantity'] ?? ''));
+    $operator = $conn->real_escape_string(trim($_POST['operator'] ?? ''));
+    $qc       = $conn->real_escape_string(trim($_POST['qc'] ?? ''));
+    $prod_date = $conn->real_escape_string($_POST['production_date'] ?? date('Y-m-d'));
+    $prod_time = $conn->real_escape_string($_POST['production_time'] ?? date('H:i:s'));
+    $copies   = (int)($_POST['copies'] ?? 0);
+
+    if ($batch === '' || $item === '' || $copies <= 0) {
+        $response = ['status' => 'error', 'message' => 'Wajib: batch, item, copies > 0'];
+    } else {
+        $curr_copies = 0;
+        $prodId = 0;
+        $resBatch = $conn->query("SELECT id, copies FROM production_labels WHERE batch='$batch' LIMIT 1");
+        if ($resBatch && $resBatch->num_rows > 0) {
+            $r = $resBatch->fetch_assoc();
+            $curr_copies = (int)$r['copies'];
+            $prodId = (int)$r['id'];
+        }
+
+        $sql = "INSERT INTO production_labels (batch, item, size, unit, machine, shift, quantity, operator, qc, production_date, production_time, copies, device_model)
+                VALUES ('$batch', '$item', '$size', '$unit', '$machine', '$shift', '$quantity', '$operator', '$qc', '$prod_date', '$prod_time', $copies, 'Web-Admin')
+                ON DUPLICATE KEY UPDATE
+                copies = copies + VALUES(copies),
+                shift = VALUES(shift),
+                qc = VALUES(qc),
+                production_time = '$prod_time',
+                device_model = 'Web-Admin'";
+
+        if ($conn->query($sql)) {
+            if ($prodId === 0) { $prodId = $conn->insert_id; }
+
+            $first_label = $curr_copies + 1;
+            $last_label  = $curr_copies + $copies;
+
+            $conn->begin_transaction();
+            try {
+                $conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prodId, '$admin_name')");
+                for ($i = $first_label; $i <= $last_label; $i++) {
+                    $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prodId, $i, '$admin_name', 'manual')");
+                }
+                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TAMBAH_STOK', 'Admin tambah $copies dus ke gudang — Batch #$batch (label $first_label..$last_label)')");
+                $conn->commit();
+                $response = [
+                    'status' => 'success',
+                    'production_id'  => $prodId,
+                    'batch'          => $batch,
+                    'first_label_no' => $first_label,
+                    'last_label_no'  => $last_label,
+                    'copies'         => $copies
+                ];
+            } catch (Exception $e) {
+                $conn->rollback();
+                $response = ['status' => 'error', 'message' => $e->getMessage()];
+            }
+        } else {
+            $response = ['status' => 'error', 'message' => $conn->error];
+        }
     }
 } elseif ($action == 'save_app_settings') {
     $qc_enabled = (int)$_POST['qc_checker_enabled'];
@@ -219,7 +307,7 @@ if ($action == 'save') {
                     $batch_new_count = 0;
                     
                     for ($i = 1; $i <= $copies; $i++) {
-                        $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by) VALUES ($prod_id, $i, 'Auto-System')");
+                        $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prod_id, $i, 'Auto-System', 'scan')");
                         if ($conn->affected_rows > 0) {
                             $auto_transferred++;
                             $batch_new_count++;

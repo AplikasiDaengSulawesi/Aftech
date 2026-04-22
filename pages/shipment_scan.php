@@ -14,11 +14,17 @@ if ($append_id > 0) {
 ?>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
-    .scanner-container { position: sticky; top: 90px; z-index: 1; }
+    .shipment-top-row { align-items: stretch; }
+    .shipment-panel-col { display: flex; }
+    .scanner-container { position: sticky; top: 90px; z-index: 1; width: 100%; height: 100%; display: flex; }
+    .scanner-container > .card { width: 100%; height: 100%; }
     #reader { width: 100%; border-radius: 15px; overflow: hidden; border: 3px solid #1A237E !important; background: #000; min-height: 250px; }
     #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; border-radius: 12px; }
     
-    .form-shipment-card { position: relative; z-index: 1; }
+    .form-shipment-card { position: relative; z-index: 1; width: 100%; display: flex; flex-direction: column; }
+    .form-shipment-card .card-body { display: flex; flex: 1 1 auto; flex-direction: column; }
+    .form-shipment-card #shipmentForm { display: flex; flex: 1 1 auto; flex-direction: column; }
+    .shipment-form-actions { margin-top: auto; }
     
     .status-panel { 
         min-height: 80px; padding: 15px; border-radius: 10px; margin-top: 15px; 
@@ -95,6 +101,59 @@ if ($append_id > 0) {
         display: flex; align-items: center; justify-content: center; cursor: pointer; color: #999; font-size: 12px;
     }
 
+    /* SHIPMENT CARD COLLAPSE (per baris pengiriman) */
+    .shipment-col-header { font-size: 11px; color: #666; letter-spacing: 0.5px; text-transform: uppercase; }
+    .sh-col { padding: 0 8px; }
+    .sh-col.col-time { flex: 0 0 18%; }
+    .sh-col.col-customer { flex: 1 1 auto; }
+    .sh-col.col-method { flex: 0 0 14%; }
+    .sh-col.col-total { flex: 0 0 12%; }
+    .sh-col.col-by { flex: 0 0 14%; }
+    .sh-col.col-chev { flex: 0 0 40px; text-align: center; }
+
+    .shipment-card { border: 1px solid #e0e4ec; border-radius: 10px; overflow: hidden; background: #fff; margin-bottom: 8px; transition: box-shadow 0.2s; }
+    .shipment-card:hover { box-shadow: 0 2px 8px rgba(26, 35, 126, 0.08); }
+    .shipment-card.open { border-color: #1A237E; box-shadow: 0 4px 16px rgba(26, 35, 126, 0.12); }
+    .shipment-card-header { padding: 14px 12px; cursor: pointer; display: flex; align-items: center; transition: background 0.15s; }
+    .shipment-card-header:hover { background: #f8f9ff; }
+    .shipment-card.open .shipment-card-header { background: #eef2ff; border-bottom: 1px solid #e0e4ec; }
+    .shipment-card-body { padding: 20px; background: #fafbfc; }
+    .shipment-card-body.d-none { display: none !important; }
+    .shipment-method-badge {
+        display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.2px; border: 1px solid transparent;
+    }
+    .shipment-method-badge.scan { background: #e8f5e9; color: #1b5e20; border-color: #c8e6c9; }
+    .shipment-method-badge.manual { background: #fff8e1; color: #ef6c00; border-color: #ffe0b2; }
+    .shipment-method-badge.campuran { background: #e3f2fd; color: #1565c0; border-color: #bbdefb; }
+    .shipment-method-badge.legacy { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
+
+    .ship-chev { transition: transform 0.25s ease; color: #1A237E; font-size: 13px; display: inline-block; }
+    .ship-chev.rotated { transform: rotate(180deg); }
+
+    .batch-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+    .batch-detail-row { padding: 10px 12px; border: 1px solid #e0e4ec; border-radius: 8px; background: #fff; min-width: 0; }
+    .batch-meta-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    .batch-meta-main { min-width: 0; }
+    .batch-meta-info { font-size: 11px; color: #666; line-height: 1.35; }
+    .batch-chip {
+        font-family: 'Courier New', monospace; font-size: 9px; background: #eef2ff;
+        color: #1A237E; padding: 2px 6px; border-radius: 999px; display: inline-block;
+        margin: 1px; font-weight: 600; border: 1px solid #d6dcff;
+    }
+    .batch-chips { max-height: 44px; overflow: hidden; transition: max-height 0.25s ease; }
+    .batch-chips.expanded { max-height: 220px; overflow-y: auto; }
+
+    @media (max-width: 991px) {
+        .shipment-panel-col { display: block; }
+        .shipment-card-header { flex-wrap: wrap; }
+        .sh-col.col-time, .sh-col.col-customer, .sh-col.col-method,
+        .sh-col.col-total, .sh-col.col-by { flex: 0 0 50%; padding: 4px 8px; }
+        .sh-col.col-chev { flex: 0 0 100%; text-align: center; padding-top: 4px; }
+        .batch-meta-line { align-items: flex-start; }
+        .batch-detail-grid { grid-template-columns: 1fr; }
+    }
+
     /* RESPONSIVE MOBILE/TABLET ADJUSTMENTS */
     @media (max-width: 991px) {
         .scanner-container { position: static; margin-bottom: 20px; z-index: 0; }
@@ -111,11 +170,11 @@ if ($append_id > 0) {
         <div class="content-body">
             <div class="container-fluid">
             
-                <div class="row">
+                <div class="row shipment-top-row">
                     <!-- SCANNER -->
-                    <div class="col-xl-4 col-lg-5 col-md-12 mb-4 mb-lg-0">
+                    <div class="col-xl-4 col-lg-5 col-md-12 mb-4 mb-lg-0 shipment-panel-col">
                         <div class="scanner-container">
-                            <div class="card shadow-sm border-0">
+                            <div class="card shadow-sm border-0 h-100">
                                 <div class="card-header border-0 pb-0">
                                     <h4 class="card-title text-black">Quick Scan Unit</h4>
                                 </div>
@@ -147,13 +206,22 @@ if ($append_id > 0) {
                                         </div>
                                     </div>
                                     <button class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="resumeScanner()">Resume Scanner</button>
+
+                                    <div class="d-flex align-items-center my-3">
+                                        <hr class="flex-grow-1 my-0">
+                                        <small class="text-muted px-2">atau</small>
+                                        <hr class="flex-grow-1 my-0">
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="openManualModal()">
+                                        <i class="fa fa-keyboard me-2"></i> Input Manual (Tanpa Barcode)
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- FORM PENGIRIMAN BULK -->
-                    <div class="col-xl-8 col-lg-7">
+                    <div class="col-xl-8 col-lg-7 mb-4 mb-lg-0 shipment-panel-col">
                         <div class="card shadow-sm border-0 h-100 form-shipment-card">
                             <div class="card-header border-bottom flex-column align-items-start">
                                 <div class="d-flex justify-content-between w-100 mb-3">
@@ -213,7 +281,7 @@ if ($append_id > 0) {
                                         <!-- Grid visual per batch akan dirender di sini -->
                                     </div>
 
-                                    <div class="mt-4 pt-3 border-top">
+                                    <div class="mt-4 pt-3 border-top shipment-form-actions">
                                         <div class="row g-2">
                                             <div class="col-12 col-sm-8">
                                                 <button type="submit" class="btn btn-primary shadow-sm w-100" id="btn-submit" disabled style="height: 42px; font-weight: 600; font-size: 12px; border-radius: 8px;">
@@ -239,28 +307,48 @@ if ($append_id > 0) {
                     </div>
                 </div>
 
-                <!-- TABEL HISTORI PENGIRIMAN -->
+                <!-- LIST HISTORI PENGIRIMAN (CARD COLLAPSE) -->
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card shadow-sm border-0" style="border-radius: 15px;">
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table shadow-hover mb-0">
-                                        <thead class="bg-light">
-                                            <tr>
-                                                <th class="ps-4"><strong>WAKTU PENGIRIMAN</strong></th>
-                                                <th><strong>CUSTOMER</strong></th>
-                                                <th><strong>ITEM & UKURAN</strong></th>
-                                                <th><strong>TOTAL DUS</strong></th>
-                                                <th><strong>DIKIRIM OLEH</strong></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="historyTableBody">
-                                            <tr><td colspan="5" class="text-center py-5 text-muted">Memuat data histori...</td></tr>
-                                        </tbody>
-                                    </table>
+                            <div class="card-body p-3">
+                                <div class="shipment-col-header d-none d-lg-flex px-3 py-2 bg-light rounded mb-2">
+                                    <div class="sh-col col-time"><strong>WAKTU PENGIRIMAN</strong></div>
+                                    <div class="sh-col col-customer"><strong>CUSTOMER</strong></div>
+                                    <div class="sh-col col-method"><strong>INPUT</strong></div>
+                                    <div class="sh-col col-total"><strong>TOTAL DUS</strong></div>
+                                    <div class="sh-col col-by"><strong>DIKIRIM OLEH</strong></div>
+                                    <div class="sh-col col-chev"></div>
+                                </div>
+                                <div id="historyListContainer">
+                                    <div class="text-center py-5 text-muted">Memuat data histori...</div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL INPUT MANUAL (TANPA BARCODE) -->
+        <div class="modal fade" id="modalManualAdd" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-radius: 20px 20px 0 0;">
+                        <h5 class="modal-title text-white font-w700"><i class="fa fa-keyboard me-2"></i>Input Manual (Tanpa Barcode)</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-info py-2 px-3 mb-3 border-0" style="font-size: 13px;">
+                            <i class="fa fa-info-circle me-2"></i> Pilih batch yang akan ditambahkan ke keranjang, lalu pilih nomor dus di grid.
+                        </div>
+                        <label class="form-label font-w600 text-black" style="font-size: 12px;">Cari Batch / Item / Ukuran</label>
+                        <div class="position-relative">
+                            <input type="text" class="form-control border-primary" id="manualSearchInput" placeholder="Ketik batch, nama item, atau ukuran..." autocomplete="off">
+                            <i class="fa fa-search position-absolute" style="right: 12px; top: 12px; color: #1A237E;"></i>
+                        </div>
+                        <div class="mt-3" id="manualSearchResults" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Results rendered here -->
                         </div>
                     </div>
                 </div>
@@ -323,8 +411,8 @@ if ($append_id > 0) {
 
         // Fungsi Global untuk Muat Histori (FULL LIVE AJAX)
         window.loadHistory = async function() {
-            const tbody = document.getElementById('historyTableBody');
-            if (!tbody) return;
+            const container = document.getElementById('historyListContainer');
+            if (!container) return;
 
             try {
                 const uniqueUrl = `../api/process_shipment.php?action=history&_nocache=${Date.now()}`;
@@ -345,14 +433,235 @@ if ($append_id > 0) {
 
                 renderHistoryRows(response.data || response);
             } catch (e) {
+                container.innerHTML = '<div class="text-center py-5 text-danger">Gagal memuat data histori.</div>';
                 console.error("AJAX Fetch failed:", e);
             }
         };
 
+        // --- SHIPMENT CARD COLLAPSE (per baris pengiriman) ---
+        const shipmentDetailsCache = {}; // shipmentId -> { header, data } | Promise
+        const openShipmentCards = new Set(); // shipmentId, preserved across auto-refresh
+
+        function compactLabelRanges(nosStr) {
+            if (!nosStr) return '-';
+            const nos = nosStr.split(',').map(n => parseInt(n)).filter(n => !isNaN(n)).sort((a, b) => a - b);
+            if (nos.length === 0) return '-';
+            const ranges = [];
+            let start = nos[0], prev = nos[0];
+            for (let i = 1; i < nos.length; i++) {
+                if (nos[i] === prev + 1) { prev = nos[i]; }
+                else {
+                    ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+                    start = nos[i]; prev = nos[i];
+                }
+            }
+            ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+            return ranges.join(', ');
+        }
+
+        function getShipmentMethodMeta(inputMethod) {
+            const normalized = String(inputMethod || '').toLowerCase();
+            if (normalized === 'manual') {
+                return { key: 'manual', icon: 'fa-keyboard', label: 'Input Manual' };
+            }
+            if (normalized === 'campuran') {
+                return { key: 'campuran', icon: 'fa-exchange-alt', label: 'Campuran' };
+            }
+            if (normalized === 'scan') {
+                return { key: 'scan', icon: 'fa-qrcode', label: 'Scan QR' };
+            }
+            return { key: 'legacy', icon: 'fa-clock', label: 'Tanpa Data' };
+        }
+
+        function normalizeItemInputMethod(inputMethod, scannedLabel) {
+            if (inputMethod === 'manual' || inputMethod === 'scan' || inputMethod === 'campuran') {
+                return inputMethod;
+            }
+            if (scannedLabel === null) {
+                return 'manual';
+            }
+            if (scannedLabel !== undefined) {
+                return 'scan';
+            }
+            return 'scan';
+        }
+
+        function mergeItemInputMethods(existingMethod, incomingMethod) {
+            const existing = normalizeItemInputMethod(existingMethod);
+            const incoming = normalizeItemInputMethod(incomingMethod);
+            if (existing === incoming) return existing;
+            return 'campuran';
+        }
+
+        async function fetchShipmentDetails(shipmentId) {
+            const existing = shipmentDetailsCache[shipmentId];
+            if (existing && !(existing.then)) return existing;
+            if (existing && typeof existing.then === 'function') return existing;
+
+            const promise = (async () => {
+                const res = await fetch(`../api/get_shipment_details.php?id=${shipmentId}`);
+                const result = await res.json();
+                if (result.status !== 'success') throw new Error(result.message || 'Gagal');
+                return { header: result.header || {}, data: result.data || [] };
+            })();
+            shipmentDetailsCache[shipmentId] = promise;
+            try {
+                const data = await promise;
+                shipmentDetailsCache[shipmentId] = data;
+                return data;
+            } catch (e) {
+                delete shipmentDetailsCache[shipmentId];
+                throw e;
+            }
+        }
+
+        function renderShipmentCardBody(shipmentId, header, details) {
+            if (!header) header = {};
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            let shipDateFmt = '-';
+            if (header.shipment_date) {
+                const d = new Date(header.shipment_date);
+                shipDateFmt = `${d.getDate().toString().padStart(2,'0')} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+            }
+            let shipTime = '-';
+            if (header.shipped_at) {
+                const parts = header.shipped_at.split(' ');
+                shipTime = parts.length > 1 ? parts[1] : parts[0];
+            }
+            const methodMeta = getShipmentMethodMeta(header.input_method);
+
+            let totalLabel = 0;
+            let batchesHTML = '';
+            if (!details || details.length === 0) {
+                batchesHTML = '<div class="text-center text-muted py-3"><small>Tidak ada rincian batch.</small></div>';
+            } else {
+                batchesHTML = details.map(d => {
+                    totalLabel += parseInt(d.label_qty || 0);
+                    const nosArr = (d.label_nos || '').split(',').filter(x => x !== '');
+                    const compact = compactLabelRanges(d.label_nos);
+                    const chipsHTML = nosArr.map(n => `<span class="batch-chip">${n}</span>`).join('');
+                    const needToggle = nosArr.length > 15;
+                    const chipId = `chips-${shipmentId}-${d.production_id}`;
+                    return `
+                        <div class="batch-detail-row">
+                            <div class="batch-meta-line">
+                                <div class="batch-meta-main">
+                                    <div class="text-primary font-w800" style="font-size:12px; line-height:1.2;">#${d.batch} <span class="text-black font-w700">${d.item}</span></div>
+                                    <div class="batch-meta-info">${d.size} ${d.unit} &bull; ${d.machine || '-'} / Shift ${d.shift || '-'}</div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge badge-primary text-white font-w700" style="font-size:10px; padding:4px 8px;">${d.label_qty} Dus</span>
+                                </div>
+                            </div>
+                            <div class="mb-1">
+                                <small class="text-muted" style="font-size:10px;">No. Label: <strong class="text-black">${compact}</strong></small>
+                            </div>
+                            <div class="batch-chips" id="${chipId}">
+                                ${chipsHTML}
+                            </div>
+                            ${needToggle ? `<button type="button" class="btn btn-link btn-sm p-0 mt-1" style="font-size:11px;" onclick="event.stopPropagation(); toggleChipsExpand('${chipId}', this)">Lihat semua ${nosArr.length} nomor</button>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const custName = (header.customer_name || '').replace(/"/g, '&quot;');
+
+            return `
+                <div class="row g-3 mb-3">
+                    <div class="col-md-7">
+                        <div class="p-3 border rounded bg-white h-100">
+                            <small class="text-muted text-uppercase d-block mb-2" style="font-size:10px; letter-spacing:1px; font-weight:700;">Customer</small>
+                            <div class="text-black font-w800 mb-1" style="font-size:15px;">${custName}</div>
+                            <div class="small text-muted"><i class="fa fa-phone-alt me-2" style="width:14px;"></i>${header.customer_contact || '-'}</div>
+                            <div class="small text-muted"><i class="fa fa-map-marker-alt me-2" style="width:14px;"></i>${header.customer_address || '-'}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="p-3 border rounded bg-white h-100">
+                            <small class="text-muted text-uppercase d-block mb-2" style="font-size:10px; letter-spacing:1px; font-weight:700;">Pengiriman</small>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <small class="text-muted d-block" style="font-size:10px;">Tanggal</small>
+                                    <div class="text-black font-w700" style="font-size:12px;">${shipDateFmt}</div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block" style="font-size:10px;">Jam Input</small>
+                                    <div class="text-black font-w700" style="font-size:12px;">${shipTime} WITA</div>
+                                </div>
+                                <div class="col-6 mt-2">
+                                    <small class="text-muted d-block" style="font-size:10px;">Dikirim Oleh</small>
+                                    <div class="text-black font-w700" style="font-size:12px;">${header.shipped_by || '-'}</div>
+                                </div>
+                                <div class="col-6 mt-2">
+                                    <small class="text-muted d-block" style="font-size:10px;">Total Dus</small>
+                                    <div class="text-success font-w800" style="font-size:13px;">${totalLabel} Dus</div>
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <small class="text-muted d-block mb-1" style="font-size:10px;">Metode Input</small>
+                                    <span class="shipment-method-badge ${methodMeta.key}"><i class="fa ${methodMeta.icon}"></i>${methodMeta.label}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <h6 class="text-black font-w800 mb-0" style="font-size:13px;"><i class="fa fa-boxes me-2 text-primary"></i>Rincian Batch & Nomor Label</h6>
+                </div>
+
+                <div class="batch-detail-grid">${batchesHTML}</div>
+
+                <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 pt-3 border-top">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation(); window.open('print_invoice.php?id=${shipmentId}', '_blank')"><i class="fa fa-print me-1"></i> Cetak Ulang Surat Jalan</button>
+                </div>
+            `;
+        }
+
+        window.toggleShipmentCard = async function(shipmentId) {
+            const shipmentKey = String(shipmentId);
+            const card = document.querySelector(`.shipment-card[data-id="${shipmentId}"]`);
+            const body = document.getElementById(`ship-body-${shipmentId}`);
+            const chev = document.querySelector(`.ship-chev-${shipmentId}`);
+            if (!card || !body) return;
+
+            if (!body.classList.contains('d-none')) {
+                body.classList.add('d-none');
+                card.classList.remove('open');
+                chev?.classList.remove('rotated');
+                openShipmentCards.delete(shipmentKey);
+                return;
+            }
+
+            body.classList.remove('d-none');
+            card.classList.add('open');
+            chev?.classList.add('rotated');
+            openShipmentCards.add(shipmentKey);
+
+            if (body.dataset.loaded !== 'true') {
+                try {
+                    const { header, data } = await fetchShipmentDetails(shipmentId);
+                    body.innerHTML = renderShipmentCardBody(shipmentId, header, data);
+                    body.dataset.loaded = 'true';
+                } catch (e) {
+                    body.innerHTML = '<div class="text-center text-danger py-3"><i class="fa fa-exclamation-triangle me-2"></i>Gagal memuat detail</div>';
+                }
+            }
+        };
+
+        window.toggleChipsExpand = function(chipId, btn) {
+            const el = document.getElementById(chipId);
+            if (!el) return;
+            const expanded = el.classList.toggle('expanded');
+            const total = el.children.length;
+            btn.innerText = expanded ? 'Sembunyikan' : `Lihat semua ${total} nomor`;
+        };
+
         function renderHistoryRows(data) {
-            const tbody = document.getElementById('historyTableBody');
+            const container = document.getElementById('historyListContainer');
+            if (!container) return;
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Belum ada data pengiriman hari ini.</td></tr>';
+                container.innerHTML = '<div class="text-center py-5 text-muted">Belum ada data pengiriman hari ini.</div>';
                 return;
             }
 
@@ -360,56 +669,81 @@ if ($append_id > 0) {
 
             let html = '';
             data.forEach(row => {
-                const dateObj = new Date(row.shipment_date);
-                const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
-                
-                let time = '';
-                if (row.shipped_at) {
-                    const parts = row.shipped_at.split(' ');
-                    time = parts.length > 1 ? parts[1] : parts[0];
-                }
-                
-                let itemsHTML = '';
-                if (row.item_summary) {
-                    const items = row.item_summary.split(';');
-                    const aggregated = {};
+                const shipmentId = String(row.id);
+                const methodMeta = getShipmentMethodMeta(row.input_method);
+                const shippedAtRaw = row.shipped_at || '';
+                const shipmentDateRaw = row.shipment_date || '';
+                let formattedDate = '-';
+                let time = '-';
 
-                    items.forEach(it => {
+                if (shippedAtRaw) {
+                    const [datePart, timePart = ''] = shippedAtRaw.split(' ');
+                    if (datePart) {
+                        const dateObj = new Date(`${datePart}T00:00:00`);
+                        if (!Number.isNaN(dateObj.getTime())) {
+                            formattedDate = `${dateObj.getDate().toString().padStart(2, '0')} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+                        }
+                    }
+                    time = timePart || '-';
+                } else if (shipmentDateRaw) {
+                    const dateObj = new Date(`${shipmentDateRaw}T00:00:00`);
+                    if (!Number.isNaN(dateObj.getTime())) {
+                        formattedDate = `${dateObj.getDate().toString().padStart(2, '0')} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+                    }
+                }
+
+                // Agregasi item summary per (item+size)
+                const aggregated = {};
+                if (row.item_summary) {
+                    row.item_summary.split(';').forEach(it => {
                         const parts = it.split('|');
                         const nameSize = parts[0];
                         const count = parseInt(parts[1] || '0');
-                        
-                        if (aggregated[nameSize]) {
-                            aggregated[nameSize] += count;
-                        } else {
-                            aggregated[nameSize] = count;
-                        }
+                        aggregated[nameSize] = (aggregated[nameSize] || 0) + count;
                     });
-
-                    itemsHTML = Object.entries(aggregated).map(([nameSize, totalCount]) => {
-                        return `<div class="mb-2"><div class="text-black font-w700" style="font-size:13px; line-height:1.1;">${nameSize}</div><small class="text-muted font-w600" style="font-size:11px;">${totalCount} Dus</small></div>`;
-                    }).join('');
+                }
+                const isOpen = openShipmentCards.has(shipmentId);
+                const openClass = isOpen ? 'open' : '';
+                const bodyHiddenClass = isOpen ? '' : 'd-none';
+                const chevRotated = isOpen ? 'rotated' : '';
+                const cached = shipmentDetailsCache[shipmentId];
+                const hasCache = cached && !cached.then;
+                let bodyContent = '<div class="text-center py-3"><i class="fa fa-spinner fa-spin text-primary me-2"></i>Memuat rincian...</div>';
+                let loadedAttr = '';
+                if (isOpen && hasCache) {
+                    bodyContent = renderShipmentCardBody(shipmentId, cached.header, cached.data);
+                    loadedAttr = 'data-loaded="true"';
                 }
 
                 html += `
-                    <tr onclick="showRowActions(${row.id}, '${row.customer_name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
-                        <td class="ps-4">
-                            <span class="text-black font-w600" style="font-size:13px;">${formattedDate}</span><br>
-                            <small class="text-muted font-w500">${time} WITA</small>
-                        </td>
-                        <td>
-                            <div class="text-primary font-w700" style="font-size:14px;">${row.customer_name}</div>
-                            <small class="text-muted"><i class="fa fa-phone-alt me-1" style="font-size:10px;"></i>${row.customer_contact || '-'}</small>
-                        </td>
-                        <td>${itemsHTML || '-'}</td>
-                        <td>
-                            <div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty || 0} Dus</div>
-                        </td>
-                        <td><small class="font-w600 text-black">${row.shipped_by}</small></td>
-                    </tr>
+                    <div class="shipment-card ${openClass}" data-id="${shipmentId}">
+                        <div class="shipment-card-header" onclick="toggleShipmentCard('${shipmentId}')">
+                            <div class="sh-col col-time">
+                                <span class="text-black font-w600" style="font-size:13px;">${formattedDate}</span><br>
+                                <small class="text-muted font-w500">${time} WITA</small>
+                            </div>
+                            <div class="sh-col col-customer">
+                                <div class="text-primary font-w700" style="font-size:14px;">${row.customer_name}</div>
+                                <small class="text-muted"><i class="fa fa-phone-alt me-1" style="font-size:10px;"></i>${row.customer_contact || '-'}</small>
+                            </div>
+                            <div class="sh-col col-method">
+                                <span class="shipment-method-badge ${methodMeta.key}"><i class="fa ${methodMeta.icon}"></i>${methodMeta.label}</span>
+                            </div>
+                            <div class="sh-col col-total">
+                                <div class="badge badge-success text-white font-w800" style="font-size:12px; padding: 5px 10px; border-radius:6px;">${row.total_qty || 0} Dus</div>
+                            </div>
+                            <div class="sh-col col-by"><small class="font-w600 text-black">${row.shipped_by}</small></div>
+                            <div class="sh-col col-chev">
+                                <i class="fa fa-chevron-down ship-chev ship-chev-${shipmentId} ${chevRotated}"></i>
+                            </div>
+                        </div>
+                        <div class="shipment-card-body ${bodyHiddenClass}" id="ship-body-${shipmentId}" ${loadedAttr}>
+                            ${bodyContent}
+                        </div>
+                    </div>
                 `;
             });
-            tbody.innerHTML = html;
+            container.innerHTML = html;
         }
 
         window.showRowActions = function(id, name) {
@@ -722,9 +1056,12 @@ if ($append_id > 0) {
             document.getElementById('empty-cart').style.display = 'none';
             const pid = data.production_id;
             const labelScanned = data.scanned_label;
+            const incomingInputMethod = normalizeItemInputMethod(data.input_method, labelScanned);
             if (!carts[activeCartId].items[pid]) {
-                carts[activeCartId].items[pid] = { batch: data.batch, item: data.item, size: data.size, copies: data.copies, in_warehouse: data.in_warehouse, already_shipped: data.already_shipped, selected: new Set() };
+                carts[activeCartId].items[pid] = { batch: data.batch, item: data.item, size: data.size, copies: data.copies, input_method: incomingInputMethod, in_warehouse: data.in_warehouse, already_shipped: data.already_shipped, selected: new Set() };
                 renderBatchGridHTML(pid, carts[activeCartId].items[pid]);
+            } else {
+                carts[activeCartId].items[pid].input_method = mergeItemInputMethods(carts[activeCartId].items[pid].input_method, incomingInputMethod);
             }
             if (carts[activeCartId].items[pid].in_warehouse.includes(labelScanned) && !carts[activeCartId].items[pid].already_shipped.includes(labelScanned)) {
                 if (!carts[activeCartId].items[pid].selected.has(labelScanned)) {
@@ -815,6 +1152,12 @@ if ($append_id > 0) {
             const btn = document.getElementById('btn-submit');
             let finalCart = {}; for (const p in carts[activeCartId].items) { if (carts[activeCartId].items[p].selected.size > 0) finalCart[p] = Array.from(carts[activeCartId].items[p].selected); }
             if (Object.keys(finalCart).length === 0) return toastr.warning("Kosong!");
+            let shipmentInputMethod = '';
+            for (const p in finalCart) {
+                const itemMethod = normalizeItemInputMethod(carts[activeCartId].items[p].input_method);
+                shipmentInputMethod = shipmentInputMethod ? mergeItemInputMethods(shipmentInputMethod, itemMethod) : itemMethod;
+            }
+            shipmentInputMethod = shipmentInputMethod || 'scan';
             btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>...';
             try {
                 const f = new FormData(); 
@@ -823,6 +1166,7 @@ if ($append_id > 0) {
                 f.append('customer_address', document.getElementById('customer_address').value); 
                 f.append('shipment_date', document.getElementById('shipment_date').value); 
                 f.append('cart', JSON.stringify(finalCart));
+                f.append('input_method', shipmentInputMethod);
                 f.append('append_to', <?php echo $append_id; ?>);
                 
                 const res = await fetch('../api/process_shipment.php?action=submit_bulk', { method: 'POST', body: f });
@@ -839,6 +1183,71 @@ if ($append_id > 0) {
                 } else toastr.error(d.message);
             } catch (err) { toastr.error('Error.'); } finally { btn.disabled = false; btn.innerHTML = '<i class="fa fa-paper-plane me-2"></i> Proses Pengiriman'; }
         }
+
+        // --- MANUAL INPUT (TANPA BARCODE) ---
+        let manualSearchTimer = null;
+
+        window.openManualModal = function() {
+            document.getElementById('manualSearchInput').value = '';
+            new bootstrap.Modal(document.getElementById('modalManualAdd')).show();
+            setTimeout(() => document.getElementById('manualSearchInput').focus(), 300);
+            searchManualBatches('');
+        };
+
+        async function searchManualBatches(q) {
+            const container = document.getElementById('manualSearchResults');
+            container.innerHTML = '<div class="text-center text-muted py-3"><i class="fa fa-spinner fa-spin me-1"></i> Memuat...</div>';
+            try {
+                const res = await fetch(`../api/process_shipment.php?action=search_batches&q=${encodeURIComponent(q)}`);
+                const result = await res.json();
+                if (result.status !== 'success' || !result.data || result.data.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted py-4"><i class="fa fa-box-open fa-2x mb-2"></i><br>Tidak ada batch dengan stok tersedia.</div>';
+                    return;
+                }
+                let html = '<div class="list-group">';
+                result.data.forEach(b => {
+                    const inCart = !!carts[activeCartId].items[b.id];
+                    html += `
+                        <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="pickManualBatch(${b.id})" ${inCart ? 'disabled' : ''}>
+                            <div class="text-start">
+                                <div class="text-primary font-w700" style="font-size: 14px;">#${b.batch}</div>
+                                <small class="text-black font-w600">${b.item} (${b.size} ${b.unit})</small>
+                            </div>
+                            <div class="text-end">
+                                ${inCart ? '<span class="badge badge-secondary text-white" style="font-size: 11px;">Sudah di Keranjang</span>' : `<span class="badge badge-success text-white" style="font-size: 12px;">${b.available} Tersedia</span>`}
+                            </div>
+                        </button>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div class="text-center text-danger py-4"><i class="fa fa-wifi fa-2x mb-2"></i><br>Gagal memuat data.</div>';
+            }
+        }
+
+        document.getElementById('manualSearchInput').addEventListener('input', (e) => {
+            clearTimeout(manualSearchTimer);
+            manualSearchTimer = setTimeout(() => searchManualBatches(e.target.value), 250);
+        });
+
+        window.pickManualBatch = async function(prodId) {
+            try {
+                const res = await fetch(`../api/process_shipment.php?action=get_batch_manual&production_id=${prodId}`);
+                const result = await res.json();
+                if (result.status !== 'success') {
+                    toastr.error(result.message || 'Gagal memuat batch');
+                    return;
+                }
+                addToCart(result.data);
+                bootstrap.Modal.getInstance(document.getElementById('modalManualAdd')).hide();
+                toastr.success(`Batch #${result.data.batch} ditambahkan. Pilih nomor dus di grid.`);
+                const card = document.getElementById(`batch-card-${result.data.production_id}`);
+                if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {
+                toastr.error('Gagal memuat batch');
+            }
+        };
 
         switchCart(1);
         window.loadHistory();
