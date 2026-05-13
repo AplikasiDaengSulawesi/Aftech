@@ -146,10 +146,100 @@ if ($action == 'save') {
         if ($conn->query("DELETE FROM warehouse_items WHERE production_id=$prod_id AND label_no IN ($label_list)")) {
             $batch_res = $conn->query("SELECT batch FROM production_labels WHERE id=$prod_id");
             $batch_name = ($batch_res && $b_row = $batch_res->fetch_assoc()) ? $b_row['batch'] : $prod_id;
-            
+
             $conn->query("INSERT INTO activity_logs (action, details) VALUES ('RETUR', 'Kembalikan ".count($labels)." unit Batch #$batch_name ke Produksi')");
             $response = ['status' => 'success'];
         }
+    }
+} elseif ($action == 'return_shipment_labels') {
+    // Return label-level dari pengiriman distributor.
+    // condition=utuh  -> label dikembalikan ke warehouse_items (stok tersedia kembali)
+    // condition=rusak -> label dihapus dari warehouse_items (tidak masuk stok), hanya tercatat di shipment_returns
+    $shipment_id = (int)($_POST['shipment_id'] ?? 0);
+    $prod_id     = (int)($_POST['production_id'] ?? 0);
+    $labels      = json_decode($_POST['labels'] ?? '[]', true);
+    $condition   = strtolower(trim($_POST['condition'] ?? 'utuh'));
+    $reason      = $conn->real_escape_string(trim($_POST['reason'] ?? ''));
+    if (!in_array($condition, ['utuh', 'rusak'], true)) $condition = 'utuh';
+
+    if ($shipment_id <= 0 || $prod_id <= 0 || empty($labels) || !is_array($labels)) {
+        echo json_encode(['status' => 'error', 'message' => 'Parameter tidak lengkap (shipment_id, production_id, labels wajib).']);
+        exit;
+    }
+
+    $labels_int = array_values(array_unique(array_map('intval', $labels)));
+    $label_list = implode(',', $labels_int);
+
+    $conn->begin_transaction();
+    try {
+        // 1. Ambil info batch + qty per paket
+        $resP = $conn->query("SELECT batch, quantity FROM production_labels WHERE id=$prod_id");
+        if (!$resP || !($rowP = $resP->fetch_assoc())) throw new Exception('Batch tidak ditemukan.');
+        $batchStr = $rowP['batch'];
+        $perPaket = (int)$rowP['quantity'];
+
+        // 2. Validasi: pastikan semua label memang ada di distributor_shipments untuk nota ini
+        $resChk = $conn->query("SELECT COUNT(*) AS cnt FROM distributor_shipments WHERE shipment_id=$shipment_id AND production_id=$prod_id AND label_no IN ($label_list)");
+        $foundCount = ($resChk && $r = $resChk->fetch_assoc()) ? (int)$r['cnt'] : 0;
+        if ($foundCount !== count($labels_int)) {
+            throw new Exception("Sebagian label tidak terdaftar pada nota ini (ditemukan $foundCount dari " . count($labels_int) . ").");
+        }
+
+        $qty       = count($labels_int);
+        $unit_back = $qty * $perPaket;
+
+        // 3a. Catat parent ke shipment_return_batches (satu event = satu baris)
+        $stmtParent = $conn->prepare("INSERT INTO shipment_return_batches (shipment_id, production_id, condition_status, label_qty, unit_qty, reason, returned_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtParent->bind_param("iisiiss", $shipment_id, $prod_id, $condition, $qty, $unit_back, $reason, $admin_name);
+        $stmtParent->execute();
+        $return_batch_id = $conn->insert_id;
+
+        // 3b. Catat detail per-label ke shipment_returns (hanya FK + label_no; sisanya di parent)
+        $stmtRet = $conn->prepare("INSERT INTO shipment_returns (return_batch_id, label_no) VALUES (?, ?)");
+        foreach ($labels_int as $no) {
+            $stmtRet->bind_param("ii", $return_batch_id, $no);
+            $stmtRet->execute();
+        }
+
+        // 4. Hapus dari distributor_shipments (label tidak lagi terkirim)
+        $conn->query("DELETE FROM distributor_shipments WHERE shipment_id=$shipment_id AND production_id=$prod_id AND label_no IN ($label_list)");
+
+        // 5. Jika kondisi rusak -> keluarkan juga dari warehouse_items agar tidak masuk stok
+        if ($condition === 'rusak') {
+            $conn->query("DELETE FROM warehouse_items WHERE production_id=$prod_id AND label_no IN ($label_list)");
+        }
+
+        // 6. Recalculate outbound_shipment_batches untuk pasangan shipment_id+production_id
+        $resBatch = $conn->query("SELECT COUNT(*) AS cnt FROM distributor_shipments WHERE shipment_id=$shipment_id AND production_id=$prod_id");
+        $remaining = ($resBatch && $rb = $resBatch->fetch_assoc()) ? (int)$rb['cnt'] : 0;
+        if ($remaining > 0) {
+            $remaining_unit = $remaining * $perPaket;
+            $conn->query("UPDATE outbound_shipment_batches SET label_qty=$remaining, unit_qty=$remaining_unit WHERE shipment_id=$shipment_id AND production_id=$prod_id");
+        } else {
+            $conn->query("DELETE FROM outbound_shipment_batches WHERE shipment_id=$shipment_id AND production_id=$prod_id");
+        }
+
+        // 7. Update total di header nota
+        $conn->query("UPDATE outbound_shipments SET
+                        total_qty        = (SELECT COALESCE(SUM(label_qty), 0) FROM outbound_shipment_batches WHERE shipment_id=$shipment_id),
+                        total_actual_qty = (SELECT COALESCE(SUM(unit_qty), 0)  FROM outbound_shipment_batches WHERE shipment_id=$shipment_id)
+                      WHERE id=$shipment_id");
+
+        $cond_label = ($condition === 'rusak') ? 'RUSAK' : 'UTUH';
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('RETUR', 'Return $qty dus ($cond_label) Batch #$batchStr dari Nota ID #$shipment_id" . ($condition === 'utuh' ? ' kembali ke Gudang' : '') . "')");
+
+        $conn->commit();
+        echo json_encode([
+            'status'    => 'success',
+            'returned'  => $qty,
+            'condition' => $condition,
+            'shipment_id' => $shipment_id,
+        ]);
+        exit;
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        exit;
     }
 } elseif ($action == 'approve_api_key') {
     $id = (int)$_POST['id'];
