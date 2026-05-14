@@ -71,16 +71,18 @@ try {
     die("Gagal menyiapkan surat jalan: " . htmlspecialchars($e->getMessage()));
 }
 
-// Detail item per BATCH (satu baris per production batch).
-// Info batch tidak ditampilkan — pakai info mesin yang dipakai produksi.
+// Detail item digabung per (item + size + unit + mesin).
+// Beberapa batch produksi yang menghasilkan barang sama di mesin sama akan dijumlahkan,
+// meskipun beda tanggal produksi atau penerbitan label.
 $stmtDet = $pdo->prepare("
     SELECT p.item, p.size, p.unit, p.machine,
-           b.label_qty,
-           b.unit_qty
+           SUM(b.label_qty) AS label_qty,
+           SUM(b.unit_qty)  AS unit_qty
     FROM outbound_shipment_batches b
     JOIN production_labels p ON b.production_id = p.id
     WHERE b.shipment_id = ?
-    ORDER BY p.item, p.size, p.id
+    GROUP BY p.item, p.size, p.unit, p.machine
+    ORDER BY p.item, p.size, p.machine
 ");
 $stmtDet->execute([$id]);
 $details = $stmtDet->fetchAll(PDO::FETCH_ASSOC);
