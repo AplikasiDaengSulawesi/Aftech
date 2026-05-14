@@ -649,7 +649,7 @@ foreach($items_query as $it) {
                     <div class="action-list">
                         <button onclick="Swal.close(); viewShipmentDetail(${index})" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Dus</button>
                         <button onclick="Swal.close(); window.location.href='shipment_scan.php?append_id=${row.id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Dus Susulan</button>
-                        <button onclick="Swal.close(); window.open('print_invoice.php?id=${row.id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan</button>
+                        <button onclick="Swal.close(); window.open('print_surat_jalan.php?id=${row.id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan (Dot Matrix)</button>
                         <button onclick="Swal.close(); deleteShipment(${row.id}, '${row.customer_name}')" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
                 `,
