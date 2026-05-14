@@ -613,7 +613,7 @@ if ($append_id > 0) {
                 <div class="batch-detail-grid">${batchesHTML}</div>
 
                 <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 pt-3 border-top">
-                    <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation(); window.open('print_invoice.php?id=${shipmentId}', '_blank')"><i class="fa fa-print me-1"></i> Cetak Ulang Surat Jalan</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation(); window.open('print_surat_jalan.php?id=${shipmentId}', '_blank')"><i class="fa fa-print me-1"></i> Cetak Surat Jalan (Dot Matrix)</button>
                 </div>
             `;
         }
@@ -757,7 +757,8 @@ if ($append_id > 0) {
                     <div class="action-list">
                         <button onclick="Swal.close(); viewShipmentDetail(${id}, '${name.replace(/'/g, "\\'")}')" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Dus</button>
                         <button onclick="Swal.close(); window.location.href='shipment_scan.php?append_id=${id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Dus Susulan</button>
-                        <button onclick="Swal.close(); window.open('print_invoice.php?id=${id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan</button>
+                        <button onclick="Swal.close(); window.open('print_surat_jalan.php?id=${id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan (Dot Matrix)</button>
+                        <button onclick="Swal.close(); window.open('print_invoice.php?id=${id}', '_blank')" class="action-item"><i class="fa fa-file-pdf icon-print"></i> Cetak Nota A4 (Digital)</button>
                         <button onclick="Swal.close(); deleteShipment(${id})" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
                 `,
@@ -1176,7 +1177,21 @@ if ($append_id > 0) {
                     <?php if($append_id > 0): ?>
                     Swal.fire({ title: 'Berhasil Susulan', text: "Kembali ke data histori?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Ya' }).then((r) => { if (r.isConfirmed) window.location.href = 'shipment_data.php'; else clearCart(); });
                     <?php else: ?>
-                    Swal.fire({ title: 'Pengiriman Berhasil', text: "Apakah Anda ingin mencetak Surat Jalan sekarang?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Cetak Surat Jalan' }).then((r) => { if (r.isConfirmed) window.open(`print_invoice.php?id=${d.shipment_id}`, '_blank'); });
+                    Swal.fire({
+                        title: 'Pengiriman Berhasil',
+                        text: "Pilih format cetak Surat Jalan:",
+                        icon: 'success',
+                        showCancelButton: true,
+                        showDenyButton: true,
+                        confirmButtonColor: '#1A237E',
+                        denyButtonColor: '#3F51B5',
+                        confirmButtonText: 'Surat Jalan (Dot Matrix)',
+                        denyButtonText: 'Nota A4 (Digital)',
+                        cancelButtonText: 'Nanti Saja'
+                    }).then((r) => {
+                        if (r.isConfirmed) window.open(`print_surat_jalan.php?id=${d.shipment_id}`, '_blank');
+                        else if (r.isDenied) window.open(`print_invoice.php?id=${d.shipment_id}`, '_blank');
+                    });
                     <?php endif; ?>
                     if (Object.keys(carts).length > 1) { delete carts[activeCartId]; activeCartId = Object.keys(carts)[0]; switchCart(activeCartId); } else clearCart();
                     window.loadHistory();
