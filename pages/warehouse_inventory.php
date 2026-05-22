@@ -230,6 +230,9 @@ foreach($items_query as $it) {
                                         <p class="mb-0 small text-muted">Klik baris untuk melihat peta dus atau mengosongkan batch</p>
                                     </div>
                                     <div class="header-btn-group">
+                                        <a href="warehouse_stock_opname.php" class="btn btn-success btn-xs shadow-sm font-w600">
+                                            <i class="fas fa-clipboard-check me-1"></i> Stock Opname
+                                        </a>
                                         <button type="button" class="btn btn-primary btn-xs shadow-sm font-w600" data-bs-toggle="modal" data-bs-target="#modalAddStock">
                                             <i class="fas fa-plus-circle me-1"></i> Tambah Stok
                                         </button>

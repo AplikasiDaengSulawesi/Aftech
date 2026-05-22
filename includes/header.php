@@ -21,7 +21,8 @@ $page_titles = [
     'settings.php' => 'Pengaturan Master Data',
     'qc_checker.php' => 'Pengecekan QC',
     'shipment_scan.php' => 'Quick Scan Pengiriman',
-	'access_control.php' => 'Hak Akses'
+	'access_control.php' => 'Hak Akses',
+    'warehouse_stock_opname.php' => 'Stock Opname Gudang'
 ];
 $display_title = $page_titles[$current_page] ?? 'AFTECH System';
 ?>
