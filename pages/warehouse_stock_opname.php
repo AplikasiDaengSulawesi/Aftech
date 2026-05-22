@@ -848,16 +848,6 @@ if ($defaultSessionId === 0 && !empty($openSessions)) {
                         </div>
                     </div>
 
-                    <div class="card batch-card mb-4">
-                        <div class="card-header border-0 pb-0">
-                            <h4 class="card-title text-black mb-1">Detail Batch</h4>
-                            <p class="small text-muted mb-0">Klik tombol detail pada tabel batch untuk melihat label yang cocok, lebih, dan kurang.</p>
-                        </div>
-                        <div class="card-body" id="batchDetailArea">
-                            <div class="text-muted text-center py-4">Belum ada batch yang dipilih.</div>
-                        </div>
-                    </div>
-
                     <div class="row">
                         <div class="col-lg-6 mb-4">
                             <div class="card batch-card h-100">
@@ -972,7 +962,6 @@ async function loadSnapshot(sessionId, preserveDetailBatch = null) {
         latestSnapshot = null;
         batchRenderLimit = 15;
         document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Pilih sesi untuk memulai.</td></tr>';
-        document.getElementById('batchDetailArea').innerHTML = '<div class="text-muted text-center py-4">Belum ada batch yang dipilih.</div>';
         document.getElementById('unknownBatchArea').innerHTML = 'Belum ada batch tidak terdaftar.';
         document.getElementById('issueArea').innerHTML = 'Belum ada isu scan.';
         document.getElementById('sessionBadgeText').innerText = 'Belum ada sesi dipilih';
@@ -996,22 +985,67 @@ function renderPreviewChips(labels, type) {
     return labels.map(labelNo => `<span class="label-chip ${type}">#${labelNo}</span>`).join('');
 }
 
+function findPreviewSessionItem(batch, labelNo, allowedStatuses) {
+    if (!latestSnapshot?.session_items?.length) return null;
+    return latestSnapshot.session_items.find(item =>
+        item.batch === batch &&
+        Number(item.label_no) === Number(labelNo) &&
+        allowedStatuses.includes(item.scan_status)
+    ) || null;
+}
+
 function renderBatchLabelPreview(row) {
+   // SESUDAH — matchedHtml
+const matchedHtml = row.matched_labels_count
+    ? `<div class="d-flex flex-wrap gap-1">
+        ${row.matched_labels.map(labelNo => `
+            <span class="label-chip match">#${labelNo}</span>
+        `).join('')}
+      </div>`
+    : '<span class="text-muted small">Tidak ada label.</span>';
+
+// SESUDAH — missingHtml
+const missingHtml = row.missing_labels_count
+    ? `<div class="d-flex flex-wrap gap-1">
+        ${row.missing_labels.map(labelNo => `
+            <span class="label-chip missing d-inline-flex align-items-center gap-1">
+                #${labelNo}
+                ${isAdmin ? `<i class="fa fa-trash" style="font-size:10px;cursor:pointer;opacity:0.75;" onclick="removeMissingStock('${row.batch}', ${row.production_id}, ${labelNo})" title="Hapus dari Stok"></i>` : ''}
+            </span>
+        `).join('')}
+      </div>`
+    : '<span class="text-muted small">Tidak ada label.</span>';
+
+// SESUDAH — extraHtml
+const extraHtml = row.extra_labels_count
+    ? `<div class="d-flex flex-wrap gap-1">
+        ${row.extra_labels.map(labelNo => `
+            <span class="label-chip extra d-inline-flex align-items-center gap-1">
+                #${labelNo}
+                ${isAdmin ? `
+                    <i class="fa fa-plus-circle" style="font-size:10px;cursor:pointer;opacity:0.75;" onclick="resolveSessionItem('${row.batch}', ${labelNo}, 'add_to_stock')" title="Masuk Stok"></i>
+                    <i class="fa fa-times-circle" style="font-size:10px;cursor:pointer;opacity:0.75;" onclick="resolveSessionItem('${row.batch}', ${labelNo}, 'mark_damaged')" title="Tandai Rusak"></i>
+                ` : ''}
+            </span>
+        `).join('')}
+      </div>`
+    : '<span class="text-muted small">Tidak ada label.</span>';
+    
     return `
         <tr>
             <td colspan="6" class="p-0">
                 <div class="batch-label-preview">
                     <div class="preview-section">
                         <div class="preview-title">Label Cocok (${formatNum(row.matched_labels_count)})</div>
-                        ${renderPreviewChips(row.matched_labels, 'match')}
+                        ${matchedHtml}
                     </div>
                     <div class="preview-section">
                         <div class="preview-title">Label Tidak Ada di Gudang (${formatNum(row.missing_labels_count)})</div>
-                        ${renderPreviewChips(row.missing_labels, 'missing')}
+                        ${missingHtml}
                     </div>
                     <div class="preview-section">
                         <div class="preview-title">Label Selisih Lebih (${formatNum(row.extra_labels_count)})</div>
-                        ${renderPreviewChips(row.extra_labels, 'extra')}
+                        ${extraHtml}
                     </div>
                 </div>
             </td>
@@ -1068,9 +1102,7 @@ function renderSnapshot(data, preserveDetailBatch = null) {
                     </span>
                     <div class="small text-muted mt-1">Kurang ${formatNum(row.missing_labels_count)} • Lebih ${formatNum(row.extra_labels_count)}</div>
                 </td>
-                <td class="text-center">
-                    <button class="btn btn-outline-primary btn-xs" onclick="showBatchDetail('${row.batch}')">Detail</button>
-                </td>
+                <td class="text-center"><span class="text-muted small">Label di bawah</span></td>
             </tr>
             ${renderBatchLabelPreview(row)}
         `).join('');
@@ -1114,73 +1146,12 @@ function renderSnapshot(data, preserveDetailBatch = null) {
     if (summary.extra_labels) quickIssues.push(`${summary.extra_labels} selisih lebih`);
     if (summary.missing_labels) quickIssues.push(`${summary.missing_labels} selisih kurang`);
     document.getElementById('quickIssues').innerHTML = quickIssues.length ? quickIssues.join(' • ') : 'Semua scan bersih.';
-
-    const detailBatch = preserveDetailBatch || null;
-    if (detailBatch) {
-        showBatchDetail(detailBatch);
-    } else {
-        document.getElementById('batchDetailArea').innerHTML = '<div class="text-muted text-center py-4">Klik tombol detail jika ingin fokus ke satu batch.</div>';
-    }
 }
 
 function loadMoreBatches() {
     if (!latestSnapshot?.batches?.length) return;
     batchRenderLimit += 15;
-    const focusedBatch = document.querySelector('#batchDetailArea h5')?.innerText?.replace('#', '') || null;
-    renderSnapshot(latestSnapshot, focusedBatch);
-}
-
-function findBatch(batch) {
-    return latestSnapshot?.batches?.find(row => row.batch === batch) || null;
-}
-
-function renderLabelChips(labels, type, batchRow) {
-    if (!labels.length) return '<span class="text-muted small">Tidak ada label.</span>';
-    return labels.map(labelNo => {
-        const actionButton = type === 'extra' && isAdmin
-            ? `<div class="mt-2 d-flex gap-1">
-                    <button class="btn btn-success btn-xs" onclick="resolveSessionItem('${batchRow.batch}', ${labelNo}, 'add_to_stock')">Masuk Stok</button>
-                    <button class="btn btn-danger btn-xs" onclick="resolveSessionItem('${batchRow.batch}', ${labelNo}, 'mark_damaged')">Rusak</button>
-               </div>`
-            : type === 'missing' && isAdmin
-                ? `<div class="mt-2"><button class="btn btn-outline-danger btn-xs" onclick="removeMissingStock('${batchRow.batch}', ${batchRow.production_id}, ${labelNo})">Hapus dari Stok</button></div>`
-                : '';
-
-        return `<div class="mb-2">
-            <span class="label-chip ${type}">#${labelNo}</span>
-            ${actionButton}
-        </div>`;
-    }).join('');
-}
-
-function showBatchDetail(batch) {
-    const row = findBatch(batch);
-    const area = document.getElementById('batchDetailArea');
-    if (!row) {
-        area.innerHTML = '<div class="text-muted text-center py-4">Detail batch tidak ditemukan.</div>';
-        return;
-    }
-
-    area.innerHTML = `
-        <div class="mb-3">
-            <h5 class="text-black font-w800 mb-1">#${row.batch}</h5>
-            <div class="small text-muted">${row.item || '-'} • ${row.size || '-'} ${row.unit || ''}</div>
-        </div>
-        <div class="detail-grid">
-            <div class="detail-box">
-                <h6 class="text-success">Cocok (${formatNum(row.matched_labels_count)})</h6>
-                ${renderLabelChips(row.matched_labels, 'match', row)}
-            </div>
-            <div class="detail-box">
-                <h6 class="text-danger">Selisih Lebih (${formatNum(row.extra_labels_count)})</h6>
-                ${renderLabelChips(row.extra_labels, 'extra', row)}
-            </div>
-            <div class="detail-box">
-                <h6 class="text-warning">Tidak Ada di Gudang (${formatNum(row.missing_labels_count)})</h6>
-                ${renderLabelChips(row.missing_labels, 'missing', row)}
-            </div>
-        </div>
-    `;
+    renderSnapshot(latestSnapshot);
 }
 
 async function submitScan(barcode) {
@@ -1190,7 +1161,6 @@ async function submitScan(barcode) {
     }
     if (isProcessing) return;
     isProcessing = true;
-    const preserveBatch = document.querySelector('#batchDetailArea h5')?.innerText?.replace('#', '') || null;
 
     try {
         const formData = new FormData();
@@ -1198,7 +1168,7 @@ async function submitScan(barcode) {
         formData.append('barcode', barcode);
         const res = await fetch('warehouse_stock_opname.php?action=scan', { method: 'POST', body: formData });
         const result = await res.json();
-        if (result.data) renderSnapshot(result.data, preserveBatch);
+        if (result.data) renderSnapshot(result.data);
         if (result.status === 'success') {
             updateScanStatus('success', 'Scan Tersimpan', result.message);
             toastr.success(result.message);
@@ -1381,7 +1351,7 @@ function findSessionItem(batch, labelNo) {
 
 async function resolveSessionItem(batch, labelNo, actionType) {
     if (!latestSnapshot) return;
-    const row = latestSnapshot.session_items.find(item => item.batch === batch && Number(item.label_no) === Number(labelNo) && ['extra', 'extra_unknown_batch'].includes(item.scan_status));
+    const row = findPreviewSessionItem(batch, labelNo, ['extra', 'extra_unknown_batch']);
     if (!row) {
         toastr.error('Item sesi tidak ditemukan.');
         return;
@@ -1400,7 +1370,7 @@ async function resolveSessionItem(batch, labelNo, actionType) {
         return;
     }
     latestSnapshot = result.data;
-    renderSnapshot(result.data, batch);
+    renderSnapshot(result.data);
     toastr.success('Adjustment berhasil disimpan.');
 }
 
@@ -1420,7 +1390,7 @@ async function removeMissingStock(batch, productionId, labelNo) {
         return;
     }
     latestSnapshot = result.data;
-    renderSnapshot(result.data, batch);
+    renderSnapshot(result.data);
     toastr.success('Label berhasil dihapus dari stok.');
 }
 

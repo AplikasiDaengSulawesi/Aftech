@@ -205,8 +205,14 @@ if ($append_id > 0) {
                                             <small class="text-muted">Arahkan ke QR Code Unit</small>
                                         </div>
                                     </div>
-                                    <button class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="resumeScanner()">Resume Scanner</button>
-
+                                    <div class="d-flex gap-2 mt-2">
+    <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="resumeScanner()">
+        <i class="fa fa-redo me-1"></i> Resume Scanner
+    </button>
+    <button class="btn btn-outline-warning btn-sm" id="torchToggleBtn" onclick="toggleTorch()" disabled title="Nyalakan Flash">
+        <i class="fa fa-lightbulb"></i>
+    </button>
+</div>
                                     <div class="d-flex align-items-center my-3">
                                         <hr class="flex-grow-1 my-0">
                                         <small class="text-muted px-2">atau</small>
@@ -393,6 +399,73 @@ if ($append_id > 0) {
                 items: {}
             }
         };
+
+        // =================== LOCAL STORAGE PERSISTENCE ===================
+const CART_STORAGE_KEY = 'shipment_carts_v1';
+const CART_ACTIVE_KEY  = 'shipment_active_cart_v1';
+const CART_COUNTER_KEY = 'shipment_cart_counter_v1';
+
+function serializeCarts(cartsObj) {
+    const out = {};
+    for (const id in cartsObj) {
+        const c = cartsObj[id];
+        const items = {};
+        for (const pid in c.items) {
+            items[pid] = {
+                ...c.items[pid],
+                selected: Array.from(c.items[pid].selected), // Set → array
+            };
+        }
+        out[id] = { ...c, items };
+    }
+    return JSON.stringify(out);
+}
+
+function deserializeCarts(jsonStr) {
+    const raw = JSON.parse(jsonStr);
+    for (const id in raw) {
+        const c = raw[id];
+        for (const pid in c.items) {
+            c.items[pid].selected = new Set(c.items[pid].selected); // array → Set
+        }
+    }
+    return raw;
+}
+
+function saveCartsToStorage() {
+    try {
+        localStorage.setItem(CART_STORAGE_KEY, serializeCarts(carts));
+        localStorage.setItem(CART_ACTIVE_KEY, String(activeCartId));
+        localStorage.setItem(CART_COUNTER_KEY, String(cartCounter));
+    } catch(e) {
+        console.warn('Gagal menyimpan cart ke localStorage:', e);
+    }
+}
+
+function loadCartsFromStorage() {
+    try {
+        const raw    = localStorage.getItem(CART_STORAGE_KEY);
+        const active = localStorage.getItem(CART_ACTIVE_KEY);
+        const counter = localStorage.getItem(CART_COUNTER_KEY);
+        if (!raw) return false;
+        const loaded = deserializeCarts(raw);
+        if (!loaded || Object.keys(loaded).length === 0) return false;
+        carts         = loaded;
+        cartCounter   = counter ? parseInt(counter) : Object.keys(carts).length;
+        activeCartId  = (active && carts[active]) ? active : Object.keys(carts)[0];
+        return true;
+    } catch(e) {
+        console.warn('Gagal memuat cart dari localStorage:', e);
+        return false;
+    }
+}
+
+function clearCartsFromStorage() {
+    localStorage.removeItem(CART_STORAGE_KEY);
+    localStorage.removeItem(CART_ACTIVE_KEY);
+    localStorage.removeItem(CART_COUNTER_KEY);
+}
+// =================================================================
 
         function formatCompactNumber(number) {
             if (number < 1000) {
@@ -858,6 +931,7 @@ if ($append_id > 0) {
                     if(data.status === 'success') {
                         toastr.success('Data Berhasil Dibatalkan');
                         window.loadHistory();
+                        clearCartsFromStorage();
                     } else {
                         toastr.error(data.message || 'Gagal membatalkan pengiriman');
                     }
@@ -925,6 +999,7 @@ if ($append_id > 0) {
             document.getElementById('shipment_date').value = c.shipment_date;
             renderTabs();
             renderActiveCart();
+            saveCartsToStorage();
         }
 
         function renderActiveCart() {
@@ -1004,14 +1079,62 @@ if ($append_id > 0) {
             else doStart(deviceId);
         }
 
-        function doStart(deviceId) {
-            html5QrCode = new Html5Qrcode("reader");
-            let boxSize = window.innerWidth < 600 ? 200 : 250;
-            html5QrCode.start(deviceId, { fps: 15, qrbox: boxSize, aspectRatio: 1.0 }, onScanSuccess)
-            .then(() => { document.getElementById('start-btn-area').style.display = 'none'; updateStatus('info', 'Scanner Ready', 'Arahkan kamera ke QR Barang'); });
-        }
+function doStart(deviceId) {
+    torchEnabled = false;
+    updateTorchUI(false);
+    html5QrCode = new Html5Qrcode("reader");
+    let boxSize = window.innerWidth < 600 ? 200 : 250;
+    html5QrCode.start(deviceId, { fps: 15, qrbox: boxSize, aspectRatio: 1.0 }, onScanSuccess)
+    .then(() => {
+        document.getElementById('start-btn-area').style.display = 'none';
+        updateStatus('info', 'Scanner Ready', 'Arahkan kamera ke QR Barang');
+        // Cek dukungan torch setelah kamera aktif
+        setTimeout(() => updateTorchUI(false), 500);
+    });
+}
 
-        function switchCamera(id) { if(id) startScanner(id); }
+function switchCamera(id) { if(id) startScanner(id); }
+
+function getTorchTrack() {
+    try { return html5QrCode?.getRunningTrack?.() || null; } catch(e) { return null; }
+}
+
+function isTorchSupported() {
+    const track = getTorchTrack();
+    if (!track) return false;
+    return !!(track.getCapabilities?.().torch);
+}
+
+function updateTorchUI(enabled) {
+    const btn = document.getElementById('torchToggleBtn');
+    if (!btn) return;
+    btn.disabled = !isTorchSupported();
+    if (enabled) {
+        btn.classList.replace('btn-outline-warning', 'btn-warning');
+        btn.title = 'Matikan Flash';
+    } else {
+        btn.classList.replace('btn-warning', 'btn-outline-warning');
+        btn.title = 'Nyalakan Flash';
+    }
+}
+
+let torchEnabled = false;
+async function toggleTorch() {
+    if (!html5QrCode) { toastr.error('Aktifkan kamera terlebih dahulu.'); return; }
+    const track = getTorchTrack();
+    if (!track || !isTorchSupported()) { toastr.error('Flash tidak didukung di perangkat ini.'); return; }
+    try {
+        torchEnabled = !torchEnabled;
+        await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+        updateTorchUI(torchEnabled);
+        toastr.success(torchEnabled ? 'Flash dinyalakan.' : 'Flash dimatikan.');
+    } catch(e) {
+        torchEnabled = false;
+        updateTorchUI(false);
+        toastr.error(e?.message || 'Gagal mengubah status flash.');
+    }
+}
+
         function resumeScanner() { isProcessing = false; if (html5QrCode && html5QrCode.getState() === 3) html5QrCode.resume(); updateStatus('info', 'Scanner Ready', `Arahkan kamera ke QR (Mengisi ${carts[activeCartId].name})`); }
 
         async function onScanSuccess(decodedText) {
@@ -1071,6 +1194,7 @@ if ($append_id > 0) {
                 }
             }
             updateTotal();
+            saveCartsToStorage();
         }
 
         function renderBatchGridHTML(pid, batchData) {
@@ -1125,6 +1249,7 @@ if ($append_id > 0) {
                 });
             }
             updateTotal(); updateSelectAllButtonUI(pid); document.getElementById(`count-${pid}`).innerText = batchData.selected.size;
+            saveCartsToStorage();
         }
 
         function toggleSeat(pid, l, el) {
@@ -1132,6 +1257,7 @@ if ($append_id > 0) {
             else { carts[activeCartId].items[pid].selected.add(l); el.classList.add('selected'); }
             document.getElementById(`count-${pid}`).innerText = carts[activeCartId].items[pid].selected.size;
             updateTotal(); updateSelectAllButtonUI(pid);
+            saveCartsToStorage();
         }
 
         function updateUIAfterSelection(p, l) {
@@ -1146,7 +1272,7 @@ if ($append_id > 0) {
             document.getElementById('btn-submit').disabled = (t === 0);
         }
 
-        function clearCart() { carts[activeCartId].items = {}; carts[activeCartId].customer_name = ''; carts[activeCartId].customer_contact = ''; carts[activeCartId].customer_address = ''; carts[activeCartId].shipment_date = '<?php echo date("Y-m-d"); ?>'; switchCart(activeCartId); resumeScanner(); }
+        function clearCart() { carts[activeCartId].items = {}; carts[activeCartId].customer_name = ''; carts[activeCartId].customer_contact = ''; carts[activeCartId].customer_address = ''; carts[activeCartId].shipment_date = '<?php echo date("Y-m-d"); ?>'; switchCart(activeCartId); resumeScanner(); clearCartsFromStorage(); }
 
         async function submitBulkShipment(e) {
             e.preventDefault();
@@ -1264,8 +1390,15 @@ if ($append_id > 0) {
             }
         };
 
-        switchCart(1);
-        window.loadHistory();
+// Load dari storage jika ada, fallback ke cart baru
+if (<?php echo $append_id; ?> === 0 && loadCartsFromStorage()) {
+    renderTabs();
+    renderActiveCart();
+    toastr.info('Data scan sebelumnya berhasil dipulihkan.', '', { timeOut: 3000 });
+} else {
+    switchCart(1);
+}
+window.loadHistory();
         document.querySelector('a[href="shipment_scan.php"]')?.closest('li')?.classList.add('mm-active');
     </script>
 </body>
