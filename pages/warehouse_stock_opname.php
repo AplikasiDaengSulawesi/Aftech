@@ -998,6 +998,82 @@ if ($defaultSessionId === 0 && !empty($openSessions)) {
     </div>
 </div>
 
+<div class="modal fade" id="modalExtendCopies" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:18px;overflow:hidden;">
+            <div class="modal-header border-0 text-white" style="background:#1A237E;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa fa-expand-arrows-alt"></i>
+                    <h5 class="modal-title mb-0">Tambah Kuota Batch</h5>
+                </div>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <span class="badge" style="background:rgba(255,255,255,0.18);font-size:11px;">Hanya Admin</span>
+                    <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+
+            <div class="modal-body p-0">
+                <!-- Info Batch -->
+                <div class="p-3 border-bottom">
+                    <p class="text-muted small mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Info Batch</p>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#f8fafc;">
+                                <div class="text-muted" style="font-size:11px;">Batch</div>
+                                <div class="fw-bold text-primary" id="ecBatch">-</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#f8fafc;">
+                                <div class="text-muted" style="font-size:11px;">Item</div>
+                                <div class="fw-bold text-dark" id="ecItem">-</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#f8fafc;">
+                                <div class="text-muted" style="font-size:11px;">Kuota saat ini</div>
+                                <div class="fw-bold text-dark"><span id="ecCurrentCopies">-</span> label</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#fff3cd;">
+                                <div style="font-size:11px;color:#856404;">Label di luar kuota</div>
+                                <div class="fw-bold" style="color:#856404;">#<span id="ecLabelNo">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Kuota -->
+                <div class="p-3 border-bottom">
+                    <label class="form-label small fw-bold text-black">Kuota Baru (copies)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fa fa-hashtag"></i></span>
+                        <input type="number" id="ecNewCopies" class="form-control form-control-lg"
+                               placeholder="Masukkan jumlah label baru...">
+                        <span class="input-group-text text-muted small" id="ecMinHint">Min: -</span>
+                    </div>
+                    <div class="form-text" id="ecCopiesHelp">Harus lebih besar dari kuota saat ini.</div>
+                </div>
+
+                <!-- Catatan -->
+                <div class="p-3">
+                    <label class="form-label small fw-bold text-black">Alasan Penambahan Kuota</label>
+                    <textarea id="ecNotes" class="form-control" rows="2"
+                              placeholder="Contoh: Penambahan produksi dari shift malam..."></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer border-0 pt-0 px-3 pb-3 gap-2">
+                <button type="button" class="btn btn-light flex-fill" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-primary flex-fill fw-bold" onclick="submitExtendCopies()">
+                    <i class="fa fa-check me-2"></i>Simpan &amp; Terapkan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php include '../includes/footer.php' ?>
 <script>
 let html5QrCode    = null;
@@ -1304,49 +1380,82 @@ function submitManualScan() {
     submitScan(value);
 }
 
-/* ── extend batch copies ─────────────────────────── */
-async function promptExtendCopies(barcodeRaw) {
+let _ecBarcodeRaw = '';
+let _ecMinCopies  = 1;
+
+function promptExtendCopies(barcodeRaw) {
     if (!isAdmin) return;
-    // Parse label no dari barcode untuk beri hints
+
     const parts   = barcodeRaw.split('-');
     const labelNo = parseInt(parts[0], 10) || 0;
     const batch   = parts.slice(1).join('-');
 
-    // Cari current copies dari snapshot jika ada
-    let currentCopies = '?';
+    /* Cari info item dari snapshot */
+    let itemName    = '-';
+    let currentCopies = labelNo; /* fallback: minimal = labelNo */
     if (latestSnapshot?.session_items) {
         const ref = latestSnapshot.session_items.find(i => i.batch === batch);
-        // fallback: tidak selalu tersedia di session_items untuk invalid
+        if (ref?.item) itemName = ref.item;
+    }
+    /* Coba dari batches summary */
+    if (latestSnapshot?.batches) {
+        const brow = latestSnapshot.batches.find(b => b.batch === batch);
+        if (brow) {
+            if (brow.item) itemName = brow.item;
+        }
     }
 
-    const newCopiesStr = window.prompt(
-        `Batch: ${batch}\nLabel di luar kuota: #${labelNo}\n\nMasukkan kuota (copies) baru untuk batch ini:`,
-        String(labelNo)
-    );
-    if (newCopiesStr === null) return;          // dibatalkan
-    const newCopies = parseInt(newCopiesStr, 10);
-    if (!newCopies || newCopies < labelNo) {
-        toastr.error(`Kuota baru harus ≥ ${labelNo}.`);
+    _ecBarcodeRaw = barcodeRaw;
+    _ecMinCopies  = labelNo;
+
+    document.getElementById('ecBatch').textContent        = batch || '-';
+    document.getElementById('ecItem').textContent         = itemName;
+    document.getElementById('ecCurrentCopies').textContent = currentCopies;
+    document.getElementById('ecLabelNo').textContent      = labelNo;
+    document.getElementById('ecMinHint').textContent      = `Min: ${labelNo}`;
+    document.getElementById('ecCopiesHelp').textContent   =
+        `Harus lebih besar dari kuota saat ini dan mencakup label #${labelNo}.`;
+    document.getElementById('ecNewCopies').value          = labelNo;
+    document.getElementById('ecNewCopies').min            = labelNo;
+    document.getElementById('ecNotes').value              = '';
+
+    bootstrap.Modal.getOrCreate(document.getElementById('modalExtendCopies')).show();
+}
+
+async function submitExtendCopies() {
+    const newCopies = parseInt(document.getElementById('ecNewCopies').value, 10);
+    if (!newCopies || newCopies < _ecMinCopies) {
+        toastr.error(`Kuota baru harus ≥ ${_ecMinCopies}.`);
+        document.getElementById('ecNewCopies').focus();
         return;
     }
 
-    const notes = window.prompt('Catatan alasan penambahan kuota (opsional):', '') ?? '';
-
+    const notes    = document.getElementById('ecNotes').value.trim();
     const formData = new FormData();
     formData.append('session_id',  activeSessionId);
-    formData.append('barcode_raw', barcodeRaw);
+    formData.append('barcode_raw', _ecBarcodeRaw);
     formData.append('new_copies',  newCopies);
     formData.append('notes',       notes);
 
-    const res    = await fetch('warehouse_stock_opname.php?action=extend_batch_copies', { method:'POST', body:formData });
-    const result = await res.json();
-    if (result.status !== 'success') {
-        toastr.error(result.message || 'Gagal memperluas kuota batch.');
-        return;
+    const btn = document.querySelector('#modalExtendCopies .btn-primary');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Menyimpan...';
+
+    try {
+        const res    = await fetch('warehouse_stock_opname.php?action=extend_batch_copies', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (result.status !== 'success') {
+            toastr.error(result.message || 'Gagal memperluas kuota batch.');
+            return;
+        }
+        bootstrap.Modal.getInstance(document.getElementById('modalExtendCopies')).hide();
+        latestSnapshot = result.data;
+        renderSnapshot(result.data);
+        toastr.success(result.message || 'Kuota batch berhasil diperbarui.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-check me-2"></i>Simpan & Terapkan';
     }
-    latestSnapshot = result.data;
-    renderSnapshot(result.data);
-    toastr.success(result.message || 'Kuota batch berhasil diperbarui.');
 }
 
 /* ── camera ──────────────────────────────────────── */
