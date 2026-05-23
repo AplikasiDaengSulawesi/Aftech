@@ -484,6 +484,100 @@ if (isset($_GET['action'])) {
             json_response(['status' => 'success']);
         }
 
+        if ($action === 'extend_batch_copies' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!is_admin_user()) {
+        json_response(['status' => 'error', 'message' => 'Hanya admin yang dapat memperluas kuota batch.']);
+    }
+
+    $sessionId  = (int)($_POST['session_id'] ?? 0);
+    $barcodeRaw = trim($_POST['barcode_raw'] ?? '');
+    $newCopies  = (int)($_POST['new_copies'] ?? 0);
+    $notes      = trim($_POST['notes'] ?? '');
+
+    $parsed = normalize_barcode($barcodeRaw);
+    if (!$parsed['ok']) {
+        json_response(['status' => 'error', 'message' => $parsed['message']]);
+    }
+
+    $labelNo = (int)$parsed['label_no'];
+    $batch   = $parsed['batch'];
+
+    $stmtProd = $pdo->prepare(
+        "SELECT id, batch, item, copies FROM production_labels WHERE batch = ? LIMIT 1"
+    );
+    $stmtProd->execute([$batch]);
+    $prod = $stmtProd->fetch(PDO::FETCH_ASSOC);
+
+    if (!$prod) {
+        json_response(['status' => 'error', 'message' => "Batch $batch tidak ditemukan."]);
+    }
+    if ($newCopies <= (int)$prod['copies']) {
+        json_response([
+            'status'  => 'error',
+            'message' => "Kuota baru ($newCopies) harus lebih besar dari kuota saat ini ({$prod['copies']}).",
+        ]);
+    }
+    if ($labelNo > $newCopies) {
+        json_response([
+            'status'  => 'error',
+            'message' => "Label #$labelNo masih di luar kuota baru ($newCopies).",
+        ]);
+    }
+
+    $session = get_session_row($pdo, $sessionId);
+    if (!$session || $session['status'] !== 'open') {
+        json_response(['status' => 'error', 'message' => 'Sesi tidak ditemukan atau sudah ditutup.']);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("UPDATE production_labels SET copies = ? WHERE id = ?")
+            ->execute([$newCopies, (int)$prod['id']]);
+
+        // Hapus entri invalid lama untuk barcode ini di sesi ini
+        $pdo->prepare("
+            DELETE FROM stock_opname_session_items
+            WHERE session_id = ? AND barcode_raw = ? AND scan_status = 'invalid'
+        ")->execute([$sessionId, $barcodeRaw]);
+
+        // Re-scan dengan kuota baru
+        $stmtWh = $pdo->prepare(
+            "SELECT id FROM warehouse_items WHERE production_id = ? AND label_no = ? LIMIT 1"
+        );
+        $stmtWh->execute([(int)$prod['id'], $labelNo]);
+        $wh = $stmtWh->fetch(PDO::FETCH_ASSOC);
+
+        $scanStatus     = $wh ? 'matched' : 'extra';
+        $warehouseItemId = $wh ? (int)$wh['id'] : null;
+
+        save_session_item($pdo, [
+            'session_id'       => $sessionId,
+            'production_id'    => (int)$prod['id'],
+            'warehouse_item_id'=> $warehouseItemId,
+            'batch'            => $batch,
+            'label_no'         => $labelNo,
+            'barcode_raw'      => $barcodeRaw,
+            'scan_status'      => $scanStatus,
+            'scanned_by'       => $_SESSION['full_name'] ?? 'Admin',
+            'notes'            => "[EXTEND COPIES $newCopies] $notes",
+        ]);
+
+        log_activity($pdo, 'OPNAME',
+            "Extend copies batch $batch dari {$prod['copies']} → $newCopies, label #$labelNo diterima ($scanStatus)."
+        );
+
+        $pdo->commit();
+        json_response([
+            'status'  => 'success',
+            'message' => "Kuota batch $batch diperbarui ke $newCopies. Label #$labelNo diterima sebagai $scanStatus.",
+            'data'    => build_session_snapshot($pdo, $sessionId),
+        ]);
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        json_response(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+}
+
         if ($action === 'adjust_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!is_admin_user()) {
                 json_response(['status' => 'error', 'message' => 'Hanya admin yang dapat melakukan penyesuaian.']);
@@ -906,16 +1000,18 @@ if ($defaultSessionId === 0 && !empty($openSessions)) {
 
 <?php include '../includes/footer.php' ?>
 <script>
-let html5QrCode = null;
-let isProcessing = false;
+let html5QrCode    = null;
+let activeStream   = null;   // ← track MediaStream aktif untuk torch
+let isProcessing   = false;
 let activeSessionId = <?= (int)$defaultSessionId ?>;
 let latestSnapshot = null;
 let batchRenderLimit = 15;
-const isAdmin = <?= is_admin_user() ? 'true' : 'false' ?>;
-const cameraSelect = document.getElementById('cameraSelect');
-const torchToggleBtn = document.getElementById('torchToggleBtn');
+const isAdmin      = <?= is_admin_user() ? 'true' : 'false' ?>;
+const cameraSelect    = document.getElementById('cameraSelect');
+const torchToggleBtn  = document.getElementById('torchToggleBtn');
 let torchEnabled = false;
 
+/* ── helper ─────────────────────────────────────── */
 function formatNum(v) {
     return Number(v || 0).toLocaleString('id-ID');
 }
@@ -924,12 +1020,25 @@ function updateScanStatus(type, title, text) {
     const box = document.getElementById('scanStatus');
     box.className = `status-panel ${type}`;
     box.innerHTML = `
-        <div><i class="fa ${type === 'success' ? 'fa-check-circle text-success' : type === 'error' ? 'fa-exclamation-triangle text-danger' : 'fa-qrcode text-primary'} fa-2x"></i></div>
+        <div><i class="fa ${type==='success'?'fa-check-circle text-success':type==='error'?'fa-exclamation-triangle text-danger':'fa-qrcode text-primary'} fa-2x"></i></div>
         <div>
             <div class="font-w700 text-black">${title}</div>
             <small class="text-muted">${text}</small>
-        </div>
-    `;
+        </div>`;
+}
+
+/* ── torch ───────────────────────────────────────── */
+function getActiveTorchTrack() {
+    if (!activeStream) return null;
+    const tracks = activeStream.getVideoTracks();
+    return tracks.length ? tracks[0] : null;
+}
+
+function isTorchSupported() {
+    const track = getActiveTorchTrack();
+    if (!track) return false;
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    return !!caps.torch;
 }
 
 function updateTorchButtonState(supported) {
@@ -938,51 +1047,52 @@ function updateTorchButtonState(supported) {
     torchToggleBtn.innerHTML = `<i class="fa fa-lightbulb me-2"></i>${torchEnabled ? 'Matikan Flash' : 'Aktifkan Flash'}`;
     torchToggleBtn.classList.toggle('btn-warning', supported && torchEnabled);
     torchToggleBtn.classList.toggle('text-white', supported && torchEnabled);
-    torchToggleBtn.classList.toggle('btn-outline-warning', !torchEnabled || !supported);
+    torchToggleBtn.classList.toggle('btn-outline-warning', !(supported && torchEnabled));
 }
 
-function getTorchTrack() {
+async function toggleTorch() {
+    const track = getActiveTorchTrack();
+    if (!track || !isTorchSupported()) {
+        toastr.error('Flash tidak didukung perangkat atau browser ini.');
+        updateTorchButtonState(false);
+        return;
+    }
     try {
-        const track = html5QrCode?.getRunningTrack?.();
-        return track || null;
+        torchEnabled = !torchEnabled;
+        await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+        updateTorchButtonState(true);
+        toastr.success(torchEnabled ? 'Flash diaktifkan.' : 'Flash dimatikan.');
     } catch (err) {
-        return null;
+        torchEnabled = false;
+        updateTorchButtonState(isTorchSupported());
+        toastr.error(err?.message || 'Gagal mengubah status flash.');
     }
 }
 
-function isTorchSupported() {
-    const track = getTorchTrack();
-    if (!track) return false;
-    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-    return !!capabilities.torch;
-}
-
+/* ── snapshot ────────────────────────────────────── */
 async function loadSnapshot(sessionId, preserveDetailBatch = null) {
     if (!sessionId) {
         latestSnapshot = null;
         batchRenderLimit = 15;
-        document.getElementById('batchTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Pilih sesi untuk memulai.</td></tr>';
+        document.getElementById('batchTableBody').innerHTML =
+            '<tr><td colspan="6" class="text-center py-5 text-muted">Pilih sesi untuk memulai.</td></tr>';
         document.getElementById('unknownBatchArea').innerHTML = 'Belum ada batch tidak terdaftar.';
         document.getElementById('issueArea').innerHTML = 'Belum ada isu scan.';
         document.getElementById('sessionBadgeText').innerText = 'Belum ada sesi dipilih';
         document.getElementById('loadMoreBatchesBtn').classList.add('d-none');
         return;
     }
-
-    const res = await fetch(`warehouse_stock_opname.php?action=get_snapshot&session_id=${sessionId}&_nocache=${Date.now()}`);
+    const res    = await fetch(`warehouse_stock_opname.php?action=get_snapshot&session_id=${sessionId}&_nocache=${Date.now()}`);
     const result = await res.json();
-    if (result.status !== 'success') {
-        toastr.error(result.message || 'Gagal memuat sesi');
-        return;
-    }
-    latestSnapshot = result.data;
+    if (result.status !== 'success') { toastr.error(result.message || 'Gagal memuat sesi'); return; }
+    latestSnapshot   = result.data;
     batchRenderLimit = 15;
     renderSnapshot(result.data, preserveDetailBatch);
 }
 
 function renderPreviewChips(labels, type) {
     if (!labels.length) return '<span class="text-muted small">Tidak ada label.</span>';
-    return labels.map(labelNo => `<span class="label-chip ${type}">#${labelNo}</span>`).join('');
+    return labels.map(l => `<span class="label-chip ${type}">#${l}</span>`).join('');
 }
 
 function findPreviewSessionItem(batch, labelNo, allowedStatuses) {
@@ -995,83 +1105,69 @@ function findPreviewSessionItem(batch, labelNo, allowedStatuses) {
 }
 
 function renderBatchLabelPreview(row) {
-   // SESUDAH — matchedHtml
-const matchedHtml = row.matched_labels_count
-    ? `<div class="d-flex flex-wrap gap-1">
-        ${row.matched_labels.map(labelNo => `
-            <span class="label-chip match">#${labelNo}</span>
-        `).join('')}
-      </div>`
-    : '<span class="text-muted small">Tidak ada label.</span>';
+    const matchedHtml = row.matched_labels_count
+        ? `<div class="d-flex flex-wrap gap-1">${row.matched_labels.map(l => `<span class="label-chip match">#${l}</span>`).join('')}</div>`
+        : '<span class="text-muted small">Tidak ada label.</span>';
 
-// SESUDAH — missingHtml
-const missingHtml = row.missing_labels_count
-    ? `<div class="d-flex flex-wrap gap-1">
-        ${row.missing_labels.map(labelNo => `
+    const missingHtml = row.missing_labels_count
+        ? `<div class="d-flex flex-wrap gap-1">${row.missing_labels.map(l => `
             <span class="label-chip missing d-inline-flex align-items-center gap-1">
-                #${labelNo}
-                ${isAdmin ? `<i class="fa fa-trash" style="font-size:10px;cursor:pointer;opacity:0.75;" onclick="removeMissingStock('${row.batch}', ${row.production_id}, ${labelNo})" title="Hapus dari Stok"></i>` : ''}
-            </span>
-        `).join('')}
-      </div>`
-    : '<span class="text-muted small">Tidak ada label.</span>';
+                #${l}
+                ${isAdmin ? `<i class="fa fa-trash" style="font-size:10px;cursor:pointer;opacity:0.75;"
+                    onclick="removeMissingStock('${row.batch}',${row.production_id},${l})" title="Hapus dari Stok"></i>` : ''}
+            </span>`).join('')}</div>`
+        : '<span class="text-muted small">Tidak ada label.</span>';
 
-// SESUDAH — extraHtml
-const extraHtml = row.extra_labels_count
-    ? `<div class="d-flex flex-wrap gap-1">
-        ${row.extra_labels.map(labelNo => `
+    const extraHtml = row.extra_labels_count
+        ? `<div class="d-flex flex-wrap gap-1">${row.extra_labels.map(l => `
             <span class="label-chip extra d-inline-flex align-items-center gap-1">
-                #${labelNo}
+                #${l}
                 ${isAdmin ? `
-                    <i class="fa fa-plus-circle" style="font-size:10px;cursor:pointer;opacity:0.75;" onclick="resolveSessionItem('${row.batch}', ${labelNo}, 'add_to_stock')" title="Masuk Stok"></i>
-                    <i class="fa fa-times-circle" style="font-size:10px;cursor:pointer;opacity:0.75;" onclick="resolveSessionItem('${row.batch}', ${labelNo}, 'mark_damaged')" title="Tandai Rusak"></i>
+                    <i class="fa fa-plus-circle" style="font-size:10px;cursor:pointer;opacity:0.75;"
+                        onclick="resolveSessionItem('${row.batch}',${l},'add_to_stock')" title="Masuk Stok"></i>
+                    <i class="fa fa-times-circle" style="font-size:10px;cursor:pointer;opacity:0.75;"
+                        onclick="resolveSessionItem('${row.batch}',${l},'mark_damaged')" title="Tandai Rusak"></i>
                 ` : ''}
-            </span>
-        `).join('')}
-      </div>`
-    : '<span class="text-muted small">Tidak ada label.</span>';
-    
+            </span>`).join('')}</div>`
+        : '<span class="text-muted small">Tidak ada label.</span>';
+
     return `
-        <tr>
-            <td colspan="6" class="p-0">
-                <div class="batch-label-preview">
-                    <div class="preview-section">
-                        <div class="preview-title">Label Cocok (${formatNum(row.matched_labels_count)})</div>
-                        ${matchedHtml}
-                    </div>
-                    <div class="preview-section">
-                        <div class="preview-title">Label Tidak Ada di Gudang (${formatNum(row.missing_labels_count)})</div>
-                        ${missingHtml}
-                    </div>
-                    <div class="preview-section">
-                        <div class="preview-title">Label Selisih Lebih (${formatNum(row.extra_labels_count)})</div>
-                        ${extraHtml}
-                    </div>
+        <tr><td colspan="6" class="p-0">
+            <div class="batch-label-preview">
+                <div class="preview-section">
+                    <div class="preview-title">Label Cocok (${formatNum(row.matched_labels_count)})</div>
+                    ${matchedHtml}
                 </div>
-            </td>
-        </tr>
-    `;
+                <div class="preview-section">
+                    <div class="preview-title">Label Tidak Ada di Gudang (${formatNum(row.missing_labels_count)})</div>
+                    ${missingHtml}
+                </div>
+                <div class="preview-section">
+                    <div class="preview-title">Label Selisih Lebih (${formatNum(row.extra_labels_count)})</div>
+                    ${extraHtml}
+                </div>
+            </div>
+        </td></tr>`;
 }
 
 function renderSnapshot(data, preserveDetailBatch = null) {
     const session = data.session || {};
     const summary = data.summary || {};
     document.getElementById('systemLabelsCount').innerText = formatNum(summary.system_labels);
-    document.getElementById('systemBatchCount').innerText = formatNum(summary.system_batches);
-    document.getElementById('systemUnitsCount').innerText = formatNum(summary.system_units);
+    document.getElementById('systemBatchCount').innerText  = formatNum(summary.system_batches);
+    document.getElementById('systemUnitsCount').innerText  = formatNum(summary.system_units);
     document.getElementById('scannedLabelsCount').innerText = formatNum(summary.scanned_labels);
-    document.getElementById('extraLabelsCount').innerText = formatNum(summary.extra_labels);
+    document.getElementById('extraLabelsCount').innerText   = formatNum(summary.extra_labels);
     document.getElementById('missingLabelsCount').innerText = formatNum(summary.missing_labels);
-    document.getElementById('sessionBadgeText').innerText = `${session.session_code || '-'} • ${session.status || '-'}`;
+    document.getElementById('sessionBadgeText').innerText   = `${session.session_code||'-'} • ${session.status||'-'}`;
 
     document.getElementById('toplineMetrics').innerHTML = `
-        <span class="mini-badge ${session.status || 'open'}">${(session.status || 'open').toUpperCase()}</span>
+        <span class="mini-badge ${session.status||'open'}">${(session.status||'open').toUpperCase()}</span>
         <span class="mini-badge" style="background:#f1f5f9;color:#334155;">Matched ${formatNum(summary.matched_labels)}</span>
         <span class="mini-badge" style="background:#fef3c7;color:#92400e;">Duplikat ${formatNum(summary.duplicates)}</span>
-        <span class="mini-badge" style="background:#fee2e2;color:#991b1b;">Invalid ${formatNum(summary.invalid)}</span>
-    `;
+        <span class="mini-badge" style="background:#fee2e2;color:#991b1b;">Invalid ${formatNum(summary.invalid)}</span>`;
 
-    const tbody = document.getElementById('batchTableBody');
+    const tbody      = document.getElementById('batchTableBody');
     const loadMoreBtn = document.getElementById('loadMoreBatchesBtn');
     if (!data.batches.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Belum ada data batch pada sesi ini.</td></tr>';
@@ -1085,8 +1181,8 @@ function renderSnapshot(data, preserveDetailBatch = null) {
                     <small class="text-muted">${row.quantity} unit/dus</small>
                 </td>
                 <td>
-                    <div class="font-w700 text-black">${row.item || '-'}</div>
-                    <small class="text-muted">${row.size || '-'} ${row.unit || ''}</small>
+                    <div class="font-w700 text-black">${row.item||'-'}</div>
+                    <small class="text-muted">${row.size||'-'} ${row.unit||''}</small>
                 </td>
                 <td class="text-center">
                     <div class="font-w800 text-black">${formatNum(row.system_labels_count)}</div>
@@ -1097,15 +1193,15 @@ function renderSnapshot(data, preserveDetailBatch = null) {
                     <small class="text-muted">${formatNum(row.scanned_units)} unit</small>
                 </td>
                 <td class="text-center">
-                    <span class="badge ${row.difference_labels_count === 0 ? 'bg-success' : row.difference_labels_count > 0 ? 'bg-danger' : 'bg-warning'} text-white">
-                        ${row.difference_labels_count > 0 ? '+' : ''}${formatNum(row.difference_labels_count)}
+                    <span class="badge ${row.difference_labels_count===0?'bg-success':row.difference_labels_count>0?'bg-danger':'bg-warning'} text-white">
+                        ${row.difference_labels_count>0?'+':''}${formatNum(row.difference_labels_count)}
                     </span>
                     <div class="small text-muted mt-1">Kurang ${formatNum(row.missing_labels_count)} • Lebih ${formatNum(row.extra_labels_count)}</div>
                 </td>
                 <td class="text-center"><span class="text-muted small">Label di bawah</span></td>
             </tr>
-            ${renderBatchLabelPreview(row)}
-        `).join('');
+            ${renderBatchLabelPreview(row)}`
+        ).join('');
 
         if (data.batches.length > batchRenderLimit) {
             loadMoreBtn.classList.remove('d-none');
@@ -1115,37 +1211,51 @@ function renderSnapshot(data, preserveDetailBatch = null) {
         }
     }
 
+    /* unknown batches */
     const unknown = data.unknown_batches || [];
     document.getElementById('unknownBatchArea').innerHTML = unknown.length
         ? `<div class="list-group">${unknown.map(row => `
             <div class="list-group-item">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div>
-                        <div class="font-w700 text-black">#${row.batch || '-'}</div>
-                        <small class="text-muted">Label #${row.label_no || '-'} • ${row.notes || 'Batch tidak terdaftar'}</small>
+                        <div class="font-w700 text-black">#${row.batch||'-'}</div>
+                        <small class="text-muted">Label #${row.label_no||'-'} • ${row.notes||'Batch tidak terdaftar'}</small>
                     </div>
-                    ${isAdmin && row.production_id ? '' : '<span class="label-chip unknown">Review</span>'}
+                    <span class="label-chip unknown">Review</span>
                 </div>
-            </div>
-        `).join('')}</div>`
+            </div>`).join('')}</div>`
         : 'Belum ada batch tidak terdaftar.';
 
-    const issues = [...(data.duplicates || []), ...(data.invalid_rows || [])];
+    /* issues: duplicate + invalid — invalid now shows extend option for admin */
+    const issues = [...(data.duplicates||[]), ...(data.invalid_rows||[])];
     document.getElementById('issueArea').innerHTML = issues.length
-        ? issues.map(row => `
-            <div class="border-bottom py-2">
-                <div class="font-w700 text-black">${row.barcode_raw || '-'} <span class="badge badge-light border ms-1">${row.scan_status}</span></div>
-                <small class="text-muted">${row.notes || 'Perlu dicek ulang.'}</small>
-            </div>
-        `).join('')
+        ? issues.map(row => {
+            const isOutOfQuota = row.scan_status === 'invalid' &&
+                row.notes && row.notes.includes('di luar jangkauan');
+            const extendBtn = (isAdmin && isOutOfQuota && row.barcode_raw)
+                ? `<button class="btn btn-xs btn-outline-primary py-0 px-2 mt-1"
+                        onclick="promptExtendCopies('${row.barcode_raw}')">
+                        <i class="fa fa-plus me-1"></i>Tambah Kuota Batch
+                   </button>`
+                : '';
+            return `
+                <div class="border-bottom py-2">
+                    <div class="font-w700 text-black">${row.barcode_raw||'-'}
+                        <span class="badge badge-light border ms-1">${row.scan_status}</span>
+                    </div>
+                    <small class="text-muted">${row.notes||'Perlu dicek ulang.'}</small>
+                    ${extendBtn}
+                </div>`;
+          }).join('')
         : 'Belum ada isu scan.';
 
-    const quickIssues = [];
-    if (summary.duplicates) quickIssues.push(`${summary.duplicates} scan duplikat`);
-    if (summary.invalid) quickIssues.push(`${summary.invalid} scan invalid`);
-    if (summary.extra_labels) quickIssues.push(`${summary.extra_labels} selisih lebih`);
-    if (summary.missing_labels) quickIssues.push(`${summary.missing_labels} selisih kurang`);
-    document.getElementById('quickIssues').innerHTML = quickIssues.length ? quickIssues.join(' • ') : 'Semua scan bersih.';
+    /* quick issues */
+    const qi = [];
+    if (summary.duplicates)     qi.push(`${summary.duplicates} scan duplikat`);
+    if (summary.invalid)        qi.push(`${summary.invalid} scan invalid`);
+    if (summary.extra_labels)   qi.push(`${summary.extra_labels} selisih lebih`);
+    if (summary.missing_labels) qi.push(`${summary.missing_labels} selisih kurang`);
+    document.getElementById('quickIssues').innerHTML = qi.length ? qi.join(' • ') : 'Semua scan bersih.';
 }
 
 function loadMoreBatches() {
@@ -1154,27 +1264,29 @@ function loadMoreBatches() {
     renderSnapshot(latestSnapshot);
 }
 
+/* ── scan ────────────────────────────────────────── */
 async function submitScan(barcode) {
-    if (!activeSessionId) {
-        toastr.error('Pilih sesi stock opname terlebih dahulu.');
-        return;
-    }
+    if (!activeSessionId) { toastr.error('Pilih sesi stock opname terlebih dahulu.'); return; }
     if (isProcessing) return;
     isProcessing = true;
-
     try {
         const formData = new FormData();
         formData.append('session_id', activeSessionId);
         formData.append('barcode', barcode);
-        const res = await fetch('warehouse_stock_opname.php?action=scan', { method: 'POST', body: formData });
+        const res    = await fetch('warehouse_stock_opname.php?action=scan', { method:'POST', body:formData });
         const result = await res.json();
         if (result.data) renderSnapshot(result.data);
         if (result.status === 'success') {
             updateScanStatus('success', 'Scan Tersimpan', result.message);
             toastr.success(result.message);
         } else {
-            updateScanStatus('error', 'Scan Ditolak', result.message || 'Periksa barcode.');
-            toastr.error(result.message || 'Scan gagal');
+            updateScanStatus('error', 'Scan Ditolak', result.message||'Periksa barcode.');
+            toastr.error(result.message||'Scan gagal');
+            /* Jika ditolak karena di luar kuota dan user adalah admin, tawarkan extend */
+            if (isAdmin && result.scan_status === 'invalid' &&
+                result.message && result.message.includes('luar kuota')) {
+                promptExtendCopies(barcode);
+            }
         }
     } catch (err) {
         updateScanStatus('error', 'Server Error', err.message);
@@ -1192,38 +1304,76 @@ function submitManualScan() {
     submitScan(value);
 }
 
+/* ── extend batch copies ─────────────────────────── */
+async function promptExtendCopies(barcodeRaw) {
+    if (!isAdmin) return;
+    // Parse label no dari barcode untuk beri hints
+    const parts   = barcodeRaw.split('-');
+    const labelNo = parseInt(parts[0], 10) || 0;
+    const batch   = parts.slice(1).join('-');
+
+    // Cari current copies dari snapshot jika ada
+    let currentCopies = '?';
+    if (latestSnapshot?.session_items) {
+        const ref = latestSnapshot.session_items.find(i => i.batch === batch);
+        // fallback: tidak selalu tersedia di session_items untuk invalid
+    }
+
+    const newCopiesStr = window.prompt(
+        `Batch: ${batch}\nLabel di luar kuota: #${labelNo}\n\nMasukkan kuota (copies) baru untuk batch ini:`,
+        String(labelNo)
+    );
+    if (newCopiesStr === null) return;          // dibatalkan
+    const newCopies = parseInt(newCopiesStr, 10);
+    if (!newCopies || newCopies < labelNo) {
+        toastr.error(`Kuota baru harus ≥ ${labelNo}.`);
+        return;
+    }
+
+    const notes = window.prompt('Catatan alasan penambahan kuota (opsional):', '') ?? '';
+
+    const formData = new FormData();
+    formData.append('session_id',  activeSessionId);
+    formData.append('barcode_raw', barcodeRaw);
+    formData.append('new_copies',  newCopies);
+    formData.append('notes',       notes);
+
+    const res    = await fetch('warehouse_stock_opname.php?action=extend_batch_copies', { method:'POST', body:formData });
+    const result = await res.json();
+    if (result.status !== 'success') {
+        toastr.error(result.message || 'Gagal memperluas kuota batch.');
+        return;
+    }
+    latestSnapshot = result.data;
+    renderSnapshot(result.data);
+    toastr.success(result.message || 'Kuota batch berhasil diperbarui.');
+}
+
+/* ── camera ──────────────────────────────────────── */
 async function initCamera() {
-    if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    if (!window.isSecureContext && !['localhost','127.0.0.1'].includes(window.location.hostname)) {
         const msg = 'Browser memblokir kamera pada HTTP. Buka halaman ini lewat HTTPS atau localhost.';
         updateScanStatus('error', 'Kamera Diblokir Browser', msg);
         toastr.error(msg);
         return;
     }
-
     try {
         const devices = await Html5Qrcode.getCameras();
-        if (!devices || !devices.length) {
+        if (!devices?.length) {
             updateScanStatus('error', 'Kamera Tidak Ditemukan', 'Perangkat tidak mengembalikan daftar kamera.');
             toastr.error('Kamera tidak ditemukan.');
             return;
         }
-
         cameraSelect.innerHTML = '';
-        devices.forEach(device => {
-            cameraSelect.appendChild(new Option(device.label || `Camera ${device.id}`, device.id));
-        });
-
-        const backCam = devices.find(device => {
-            const label = (device.label || '').toLowerCase();
-            return label.includes('back') || label.includes('rear') || label.includes('environment');
-        });
-        const selectedCameraId = backCam ? backCam.id : devices[0].id;
-        cameraSelect.value = selectedCameraId;
-        await startScanner(selectedCameraId);
+        devices.forEach(d => cameraSelect.appendChild(new Option(d.label || `Camera ${d.id}`, d.id)));
+        const backCam = devices.find(d => /back|rear|environment/i.test(d.label || ''));
+        const selectedId = backCam ? backCam.id : devices[0].id;
+        cameraSelect.value = selectedId;
+        await startScanner(selectedId);
     } catch (err) {
-        const message = err?.message || 'Gagal mengaktifkan kamera.';
-        updateScanStatus('error', 'Gagal Aktifkan Kamera', message);
-        toastr.error(message);
+        const msg = err?.message || 'Gagal mengaktifkan kamera.';
+        updateScanStatus('error', 'Gagal Aktifkan Kamera', msg);
+        toastr.error(msg);
     }
 }
 
@@ -1233,13 +1383,17 @@ async function startScanner(deviceId) {
         if (html5QrCode) {
             try {
                 const state = html5QrCode.getState();
-                if (state === 2 || state === 3) {
-                    await html5QrCode.stop();
-                } else {
-                    await html5QrCode.clear();
-                }
-            } catch (err) {}
+                if (state === 2 || state === 3) await html5QrCode.stop();
+                else await html5QrCode.clear();
+            } catch (_) {}
         }
+        /* Ambil MediaStream terlebih dahulu agar kita pegang track untuk torch */
+        activeStream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: deviceId }, facingMode: { ideal: 'environment' } }
+        });
+        /* Stop stream sementara — html5QrCode akan buka sendiri */
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
 
         html5QrCode = new Html5Qrcode('reader');
         const boxWidth = window.innerWidth < 576 ? 220 : 280;
@@ -1248,127 +1402,91 @@ async function startScanner(deviceId) {
             { fps: 12, qrbox: { width: boxWidth, height: 140 }, aspectRatio: 1.77 },
             (decodedText) => {
                 if (isProcessing) return;
-                try {
-                    if (html5QrCode && html5QrCode.getState() === 2) html5QrCode.pause(true);
-                } catch (err) {}
+                try { if (html5QrCode.getState() === 2) html5QrCode.pause(true); } catch (_) {}
                 submitScan(decodedText);
             }
         );
+
+        /* Ambil stream yang sedang dipakai html5QrCode melalui elemen video di DOM */
+        const videoEl = document.querySelector('#reader video');
+        if (videoEl && videoEl.srcObject instanceof MediaStream) {
+            activeStream = videoEl.srcObject;
+        }
+
         torchEnabled = false;
         updateTorchButtonState(isTorchSupported());
         updateScanStatus('info', 'Kamera Aktif', 'Arahkan kamera ke barcode label gudang.');
     } catch (err) {
-        const message = err?.message || 'Start kamera gagal.';
+        const msg = err?.message || 'Start kamera gagal.';
         torchEnabled = false;
+        activeStream = null;
         updateTorchButtonState(false);
-        updateScanStatus('error', 'Start Kamera Gagal', message);
-        toastr.error(message);
+        updateScanStatus('error', 'Start Kamera Gagal', msg);
+        toastr.error(msg);
     }
 }
 
-function switchCamera(deviceId) {
-    if (!deviceId) return;
-    startScanner(deviceId);
-}
+function switchCamera(deviceId) { if (deviceId) startScanner(deviceId); }
 
 function resumeScanner() {
     if (!html5QrCode) return;
     try {
         if (html5QrCode.getState() === 3) html5QrCode.resume();
         updateScanStatus('info', 'Scanner Ready', 'Arahkan kamera ke barcode label gudang.');
-    } catch (err) {}
+    } catch (_) {}
 }
 
-async function toggleTorch() {
-    if (!html5QrCode) {
-        toastr.error('Aktifkan kamera terlebih dahulu.');
-        return;
-    }
-
-    const track = getTorchTrack();
-    if (!track || !isTorchSupported()) {
-        updateTorchButtonState(false);
-        toastr.error('Flash tidak didukung di perangkat atau browser ini.');
-        return;
-    }
-
-    try {
-        torchEnabled = !torchEnabled;
-        await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
-        updateTorchButtonState(true);
-        toastr.success(torchEnabled ? 'Flash kamera diaktifkan.' : 'Flash kamera dimatikan.');
-    } catch (err) {
-        torchEnabled = false;
-        updateTorchButtonState(isTorchSupported());
-        toastr.error(err?.message || 'Gagal mengubah status flash.');
-    }
-}
-
+/* ── session actions ─────────────────────────────── */
 async function createSession(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
-    const res = await fetch('warehouse_stock_opname.php?action=create_session', { method: 'POST', body: formData });
+    const res    = await fetch('warehouse_stock_opname.php?action=create_session', { method:'POST', body:formData });
     const result = await res.json();
-    if (result.status !== 'success') {
-        toastr.error(result.message || 'Gagal membuat sesi');
-        return;
-    }
+    if (result.status !== 'success') { toastr.error(result.message||'Gagal membuat sesi'); return; }
     toastr.success('Sesi berhasil dibuat.');
     bootstrap.Modal.getInstance(document.getElementById('modalCreateSession')).hide();
     window.location.reload();
 }
 
 async function changeSessionStatus(targetStatus) {
-    if (!activeSessionId) {
-        toastr.error('Pilih sesi terlebih dahulu.');
-        return;
-    }
+    if (!activeSessionId) { toastr.error('Pilih sesi terlebih dahulu.'); return; }
     const formData = new FormData();
-    formData.append('session_id', activeSessionId);
+    formData.append('session_id',    activeSessionId);
     formData.append('target_status', targetStatus);
-    const res = await fetch('warehouse_stock_opname.php?action=change_session_status', { method: 'POST', body: formData });
+    const res    = await fetch('warehouse_stock_opname.php?action=change_session_status', { method:'POST', body:formData });
     const result = await res.json();
-    if (result.status !== 'success') {
-        toastr.error(result.message || 'Gagal mengubah status sesi.');
-        return;
-    }
+    if (result.status !== 'success') { toastr.error(result.message||'Gagal mengubah status sesi.'); return; }
     toastr.success('Status sesi diperbarui.');
     await loadSnapshot(activeSessionId);
 }
 
 function findSessionItem(batch, labelNo) {
     const pool = latestSnapshot ? [
-        ...(latestSnapshot.unknown_batches || []),
-        ...(latestSnapshot.duplicates || []),
-        ...(latestSnapshot.invalid_rows || []),
+        ...(latestSnapshot.unknown_batches||[]),
+        ...(latestSnapshot.duplicates||[]),
+        ...(latestSnapshot.invalid_rows||[]),
     ] : [];
-    const batchMatch = pool.find(row => row.batch === batch && Number(row.label_no) === Number(labelNo));
-    if (batchMatch) return batchMatch;
-
-    const sessionItems = latestSnapshot?.session_items || [];
-    return sessionItems.find(row => row.batch === batch && Number(row.label_no) === Number(labelNo)) || null;
+    const hit = pool.find(r => r.batch === batch && Number(r.label_no) === Number(labelNo));
+    if (hit) return hit;
+    return (latestSnapshot?.session_items||[])
+        .find(r => r.batch === batch && Number(r.label_no) === Number(labelNo)) || null;
 }
 
 async function resolveSessionItem(batch, labelNo, actionType) {
     if (!latestSnapshot) return;
-    const row = findPreviewSessionItem(batch, labelNo, ['extra', 'extra_unknown_batch']);
-    if (!row) {
-        toastr.error('Item sesi tidak ditemukan.');
-        return;
-    }
-    const notePrompt = actionType === 'mark_damaged' ? 'Alasan tandai rusak' : 'Catatan penyesuaian';
-    const notes = window.prompt(notePrompt, '') ?? '';
+    const row = findPreviewSessionItem(batch, labelNo, ['extra','extra_unknown_batch']);
+    if (!row) { toastr.error('Item sesi tidak ditemukan.'); return; }
+    const notes = window.prompt(
+        actionType === 'mark_damaged' ? 'Alasan tandai rusak' : 'Catatan penyesuaian', ''
+    ) ?? '';
     const formData = new FormData();
-    formData.append('session_id', activeSessionId);
+    formData.append('session_id',     activeSessionId);
     formData.append('session_item_id', row.id);
-    formData.append('action_type', actionType);
-    formData.append('notes', notes);
-    const res = await fetch('warehouse_stock_opname.php?action=adjust_item', { method: 'POST', body: formData });
+    formData.append('action_type',    actionType);
+    formData.append('notes',          notes);
+    const res    = await fetch('warehouse_stock_opname.php?action=adjust_item', { method:'POST', body:formData });
     const result = await res.json();
-    if (result.status !== 'success') {
-        toastr.error(result.message || 'Gagal memproses adjustment.');
-        return;
-    }
+    if (result.status !== 'success') { toastr.error(result.message||'Gagal memproses adjustment.'); return; }
     latestSnapshot = result.data;
     renderSnapshot(result.data);
     toastr.success('Adjustment berhasil disimpan.');
@@ -1377,36 +1495,30 @@ async function resolveSessionItem(batch, labelNo, actionType) {
 async function removeMissingStock(batch, productionId, labelNo) {
     const notes = window.prompt('Alasan hapus dari stok', '') ?? '';
     const formData = new FormData();
-    formData.append('session_id', activeSessionId);
-    formData.append('action_type', 'remove_from_stock');
+    formData.append('session_id',    activeSessionId);
+    formData.append('action_type',   'remove_from_stock');
     formData.append('production_id', productionId);
-    formData.append('batch', batch);
-    formData.append('label_no', labelNo);
-    formData.append('notes', notes);
-    const res = await fetch('warehouse_stock_opname.php?action=adjust_item', { method: 'POST', body: formData });
+    formData.append('batch',         batch);
+    formData.append('label_no',      labelNo);
+    formData.append('notes',         notes);
+    const res    = await fetch('warehouse_stock_opname.php?action=adjust_item', { method:'POST', body:formData });
     const result = await res.json();
-    if (result.status !== 'success') {
-        toastr.error(result.message || 'Gagal menghapus dari stok.');
-        return;
-    }
+    if (result.status !== 'success') { toastr.error(result.message||'Gagal menghapus dari stok.'); return; }
     latestSnapshot = result.data;
     renderSnapshot(result.data);
     toastr.success('Label berhasil dihapus dari stok.');
 }
 
+/* ── init ────────────────────────────────────────── */
 document.getElementById('createSessionForm').addEventListener('submit', createSession);
-document.getElementById('sessionSelect').addEventListener('change', (e) => {
+document.getElementById('sessionSelect').addEventListener('change', e => {
     activeSessionId = Number(e.target.value || 0);
     loadSnapshot(activeSessionId);
 });
-document.getElementById('manualBarcode').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        submitManualScan();
-    }
+document.getElementById('manualBarcode').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submitManualScan(); }
 });
 
-document.querySelector('a[href="warehouse_inventory.php"]')?.closest('li')?.classList.add('mm-active');
 <?php if ($defaultSessionId > 0): ?>
 loadSnapshot(<?= (int)$defaultSessionId ?>);
 <?php endif; ?>
