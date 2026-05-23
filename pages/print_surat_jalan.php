@@ -96,193 +96,186 @@ $tanggal_cetak = date('d-m-Y H:i');
 <head>
     <meta charset="UTF-8">
     <title>Surat Jalan <?php echo htmlspecialchars($header['surat_jalan_no']); ?></title>
-    <style>
-        /* ============================================================
-           Continuous form dot matrix 9.5 x 11 inci — PORTRAIT
-           Lebar kertas = 9.5in, tinggi = 11in (satu lembar)
-           ============================================================ */
-@page {
-    size: 11in 9.5in;
-    margin: 0.3in 0.35in;
-}
+<style>
+    @page {
+        size: 9.5in 5.5in;
+        margin: 0.3in 0.35in;
+    }
 
+    * { box-sizing: border-box; }
 
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: #fff;
+        width: 100%;
+    }
 
-        * { box-sizing: border-box; }
+    body {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 9pt;
+        color: #000;
+        line-height: 1.3;
+    }
 
-        html, body {
-            margin: 0;
-            padding: 0;
-            background: #fff;
-            width: 100%;
-        }
+    .sheet {
+        width: 100%;
+        max-width: 8.8in;
+        margin: 0 auto;
+        padding: 0.1in 0;
+    }
 
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12pt;
-            color: #000;
-            line-height: 1.4;
-        }
+    /* --- KOP --- */
+    .kop-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .kop-table td {
+        vertical-align: top;
+        padding: 0;
+    }
+    .kop-name {
+        font-size: 11pt;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .kop-meta {
+        font-size: 8.5pt;
+    }
 
-.sheet {
-    width: 100%;
-    max-width: 10.3in;    /* 11in - (0.35in × 2) margin */
-    margin: 0 auto;
-    padding: 0.1in 0;
-}
+    /* --- JUDUL DOKUMEN --- */
+    .doc-title {
+        font-size: 13pt;
+        font-weight: 700;
+        text-decoration: underline;
+        letter-spacing: 2px;
+        text-align: center;
+    }
 
-        /* --- KOP --- */
-        .kop-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .kop-table td {
-            vertical-align: top;
-            padding: 0;
-        }
-        .kop-name {
-            font-size: 15pt;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-        .kop-meta {
-            font-size: 11pt;
-        }
+    /* --- META NO SURAT --- */
+    .meta-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 4px;
+    }
+    .meta-table td {
+        padding: 1px 3px;
+        font-size: 9pt;
+        vertical-align: top;
+    }
+    .meta-table .lbl { width: 70px; }
+    .meta-table .sep { width: 10px; text-align: center; }
 
-        /* --- JUDUL DOKUMEN --- */
-        .doc-title {
-            font-size: 17pt;
-            font-weight: 700;
-            text-decoration: underline;
-            letter-spacing: 2px;
-            text-align: center;
-        }
+    /* --- KEPADA --- */
+    .recipient {
+        margin-top: 6px;
+        padding-top: 5px;
+        border-top: 1px dashed #000;
+    }
+    .recipient .row {
+        display: flex;
+        margin-bottom: 1px;
+    }
+    .recipient .lbl { width: 75px; font-size: 9pt; }
+    .recipient .sep { width: 14px; text-align: center; font-size: 9pt; }
+    .recipient .val { font-size: 9pt; }
 
-        /* --- META NO SURAT --- */
-        .meta-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 6px;
-        }
-        .meta-table td {
-            padding: 2px 4px;
-            font-size: 12pt;
-            vertical-align: top;
-        }
-        .meta-table .lbl { width: 70px; }
-        .meta-table .sep { width: 10px; text-align: center; }
+    /* --- TABEL ITEM --- */
+    table.items {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        font-size: 9pt;
+    }
+    table.items th,
+    table.items td {
+        border: 1px solid #000;
+        padding: 3px 5px;
+        vertical-align: middle;
+    }
+    table.items th {
+        font-weight: 700;
+        text-align: center;
+        background: #fff;
+    }
+    table.items td.no   { width: 35px;  text-align: center; }
+    table.items td.qty  { width: 65px;  text-align: right; }
+    table.items td.unit { width: 75px;  text-align: center; }
+    table.items td.isi  { width: 140px; text-align: right; }
+    table.items td.name small { font-size: 8pt; color: #333; }
 
-        /* --- KEPADA --- */
-        .recipient {
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px dashed #000;
-        }
-        .recipient .row {
-            display: flex;
-            margin-bottom: 2px;
-        }
-        .recipient .lbl { width: 75px; font-size: 12pt; }
-        .recipient .sep { width: 14px; text-align: center; font-size: 12pt; }
-        .recipient .val { font-size: 12pt; }
+    /* --- TANGGAL --- */
+    .place-date {
+        text-align: right;
+        margin-top: 8px;
+        font-size: 9pt;
+    }
 
-        /* --- TABEL ITEM --- */
-        table.items {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12px;
-            font-size: 12pt;
-        }
-        table.items th,
-        table.items td {
-            border: 1px solid #000;
-            padding: 5px 7px;
-            vertical-align: middle;
-        }
-        table.items th {
-            font-weight: 700;
-            text-align: center;
-            background: #fff;
-        }
-        table.items td.no   { width: 35px;  text-align: center; }
-        table.items td.qty  { width: 65px;  text-align: right; }
-        table.items td.unit { width: 75px;  text-align: center; }
-        table.items td.isi  { width: 140px; text-align: right; }
-        table.items td.name small { font-size: 10pt; color: #333; }
+    /* --- TTD --- */
+    table.ttd {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    table.ttd td {
+        width: 25%;
+        text-align: center;
+        font-size: 9pt;
+        vertical-align: top;
+        padding: 0 4px;
+    }
+    table.ttd .role      { font-weight: 700; font-size: 10pt; }
+    table.ttd .sign-space { height: 50px; }
+    table.ttd .name-line {
+        border-top: 1px solid #000;
+        padding-top: 2px;
+        display: inline-block;
+        min-width: 90%;
+    }
 
-        /* --- TANGGAL --- */
-        .place-date {
-            text-align: right;
-            margin-top: 14px;
-            font-size: 12pt;
-        }
+    /* --- DISTRIBUSI & FOOTNOTE --- */
+    .distribution {
+        margin-top: 8px;
+        text-align: center;
+        font-size: 8pt;
+        border-top: 1px dashed #000;
+        padding-top: 4px;
+    }
+    .footnote {
+        margin-top: 2px;
+        text-align: right;
+        font-size: 7.5pt;
+        color: #444;
+    }
 
-        /* --- TTD --- */
-        table.ttd {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 28px;
-        }
-        table.ttd td {
-            width: 25%;
-            text-align: center;
-            font-size: 11pt;
-            vertical-align: top;
-            padding: 0 4px;
-        }
-        table.ttd .role      { font-weight: 700; font-size: 12pt; }
-        table.ttd .sign-space { height: 75px; }
-        table.ttd .name-line {
-            border-top: 1px solid #000;
-            padding-top: 2px;
-            display: inline-block;
-            min-width: 90%;
-        }
+    /* --- TOOLBAR (tidak ikut cetak) --- */
+    .toolbar {
+        position: fixed;
+        top: 8px;
+        right: 12px;
+        background: #fff;
+        border: 1px solid #999;
+        padding: 4px 8px;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        z-index: 9999;
+    }
+    .toolbar button {
+        cursor: pointer;
+        padding: 4px 10px;
+        margin-left: 4px;
+        font-size: 12px;
+        border: 1px solid #555;
+        background: #f3f3f3;
+    }
 
-        /* --- DISTRIBUSI & FOOTNOTE --- */
-        .distribution {
-            margin-top: 16px;
-            text-align: center;
-            font-size: 10pt;
-            border-top: 1px dashed #000;
-            padding-top: 6px;
-        }
-        .footnote {
-            margin-top: 4px;
-            text-align: right;
-            font-size: 9pt;
-            color: #444;
-        }
-
-        /* --- TOOLBAR (tidak ikut cetak) --- */
-        .toolbar {
-            position: fixed;
-            top: 8px;
-            right: 12px;
-            background: #fff;
-            border: 1px solid #999;
-            padding: 4px 8px;
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            z-index: 9999;
-        }
-        .toolbar button {
-            cursor: pointer;
-            padding: 4px 10px;
-            margin-left: 4px;
-            font-size: 12px;
-            border: 1px solid #555;
-            background: #f3f3f3;
-        }
-
-        /* --- PRINT OVERRIDES --- */
-        @media print {
-            html, body    { background: #fff; }
-            .sheet        { padding: 0; }
-            .no-print     { display: none !important; }
-            /* Sembunyikan header/footer URL browser — uncheck manual di dialog cetak */
-        }
-    </style>
+    /* --- PRINT OVERRIDES --- */
+    @media print {
+        html, body    { background: #fff; }
+        .sheet        { padding: 0; }
+        .no-print     { display: none !important; }
+    }
+</style>
 </head>
 <body onload="window.print()">
 
@@ -389,7 +382,7 @@ $tanggal_cetak = date('d-m-Y H:i');
 
             <?php
             // Baris kosong minimal 8 baris
-            $minRows = 5;
+            $minRows = 3;
             $pad = max(0, $minRows - count($details));
             for ($i = 0; $i < $pad; $i++): ?>
                 <tr>
