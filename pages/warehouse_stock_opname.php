@@ -971,33 +971,40 @@ if ($defaultSessionId === 0 && !empty($openSessions)) {
         </div>
     </div>
 </div>
-
+<!-- Modal: Buat Sesi -->
 <div class="modal fade" id="modalCreateSession" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:18px;overflow:hidden;">
             <form id="createSessionForm">
-                <div class="modal-header border-0 bg-primary text-white">
-                    <h5 class="modal-title">Buat Sesi Stock Opname</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header border-0 text-white" style="background:#1A237E;">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa fa-plus-circle"></i>
+                        <h5 class="modal-title mb-0">Buat Sesi Stock Opname</h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label small font-w700 text-black">Nama Sesi</label>
+                        <label class="form-label small fw-bold text-black">Nama Sesi</label>
                         <input type="text" name="session_name" class="form-control" placeholder="Contoh: OPNAME GUDANG SHIFT PAGI" required>
                     </div>
                     <div>
-                        <label class="form-label small font-w700 text-black">Catatan</label>
+                        <label class="form-label small fw-bold text-black">Catatan</label>
                         <textarea name="notes" class="form-control" rows="3" placeholder="Opsional"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer border-0">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fa fa-save me-2"></i>Simpan Sesi</button>
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light flex-fill" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary flex-fill fw-bold">
+                        <i class="fa fa-save me-2"></i>Simpan Sesi
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Modal: Extend Copies -->
 <div class="modal fade" id="modalExtendCopies" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius:18px;overflow:hidden;">
@@ -1011,11 +1018,9 @@ if ($defaultSessionId === 0 && !empty($openSessions)) {
                     <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
                 </div>
             </div>
-
             <div class="modal-body p-0">
-                <!-- Info Batch -->
                 <div class="p-3 border-bottom">
-                    <p class="text-muted small mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Info Batch</p>
+                    <p class="text-muted mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Info Batch</p>
                     <div class="row g-2">
                         <div class="col-6">
                             <div class="rounded-3 p-2" style="background:#f8fafc;">
@@ -1043,31 +1048,121 @@ if ($defaultSessionId === 0 && !empty($openSessions)) {
                         </div>
                     </div>
                 </div>
-
-                <!-- Input Kuota -->
                 <div class="p-3 border-bottom">
                     <label class="form-label small fw-bold text-black">Kuota Baru (copies)</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fa fa-hashtag"></i></span>
-                        <input type="number" id="ecNewCopies" class="form-control form-control-lg"
-                               placeholder="Masukkan jumlah label baru...">
+                        <input type="number" id="ecNewCopies" class="form-control form-control-lg" placeholder="Masukkan jumlah label baru...">
                         <span class="input-group-text text-muted small" id="ecMinHint">Min: -</span>
                     </div>
                     <div class="form-text" id="ecCopiesHelp">Harus lebih besar dari kuota saat ini.</div>
                 </div>
-
-                <!-- Catatan -->
                 <div class="p-3">
                     <label class="form-label small fw-bold text-black">Alasan Penambahan Kuota</label>
-                    <textarea id="ecNotes" class="form-control" rows="2"
-                              placeholder="Contoh: Penambahan produksi dari shift malam..."></textarea>
+                    <textarea id="ecNotes" class="form-control" rows="2" placeholder="Contoh: Penambahan produksi dari shift malam..."></textarea>
                 </div>
             </div>
-
             <div class="modal-footer border-0 pt-0 px-3 pb-3 gap-2">
                 <button type="button" class="btn btn-light flex-fill" data-bs-dismiss="modal">Batal</button>
-                <button type="button" class="btn btn-primary flex-fill fw-bold" onclick="submitExtendCopies()">
+                <button type="button" id="ecSubmitBtn" class="btn btn-primary flex-fill fw-bold" onclick="submitExtendCopies()">
                     <i class="fa fa-check me-2"></i>Simpan &amp; Terapkan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Resolve Item (add_to_stock / mark_damaged) -->
+<div class="modal fade" id="modalResolveItem" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:18px;overflow:hidden;">
+            <div class="modal-header border-0 text-white" id="resolveModalHeader" style="background:#0f766e;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa" id="resolveModalIcon"></i>
+                    <h5 class="modal-title mb-0" id="resolveModalTitle">Selesaikan Item</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 border-bottom">
+                    <p class="text-muted mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Detail Label</p>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#f8fafc;">
+                                <div class="text-muted" style="font-size:11px;">Batch</div>
+                                <div class="fw-bold text-primary" id="risBatch">-</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#f8fafc;">
+                                <div class="text-muted" style="font-size:11px;">Label No</div>
+                                <div class="fw-bold text-dark">#<span id="risLabelNo">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2 p-2 rounded-3" id="risActionDesc" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+                        <small class="text-muted" id="risActionText">-</small>
+                    </div>
+                </div>
+                <div class="p-3">
+                    <label class="form-label small fw-bold text-black" id="risNotesLabel">Catatan</label>
+                    <textarea id="risNotes" class="form-control" rows="2" placeholder="Opsional..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 px-3 pb-3 gap-2">
+                <button type="button" class="btn btn-light flex-fill" data-bs-dismiss="modal">Batal</button>
+                <button type="button" id="risSubmitBtn" class="btn flex-fill fw-bold" onclick="submitResolveItem()">
+                    Konfirmasi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Remove Missing Stock -->
+<div class="modal fade" id="modalRemoveStock" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:18px;overflow:hidden;">
+            <div class="modal-header border-0 text-white" style="background:#991b1b;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa fa-trash-alt"></i>
+                    <h5 class="modal-title mb-0">Hapus Label dari Stok</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 border-bottom">
+                    <div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:#fef2f2;border:1px solid #fecaca;">
+                        <i class="fa fa-exclamation-triangle fa-2x text-danger"></i>
+                        <div>
+                            <div class="fw-bold text-danger">Label ini akan dihapus permanen dari stok sistem.</div>
+                            <small class="text-muted">Tindakan ini tidak dapat dibatalkan. Pastikan label memang tidak ada secara fisik.</small>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#f8fafc;">
+                                <div class="text-muted" style="font-size:11px;">Batch</div>
+                                <div class="fw-bold text-primary" id="rmsBatch">-</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="rounded-3 p-2" style="background:#f8fafc;">
+                                <div class="text-muted" style="font-size:11px;">Label No</div>
+                                <div class="fw-bold text-dark">#<span id="rmsLabelNo">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-3">
+                    <label class="form-label small fw-bold text-black">Alasan Penghapusan</label>
+                    <textarea id="rmsNotes" class="form-control" rows="2" placeholder="Contoh: Label tidak ditemukan saat pengecekan fisik..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 px-3 pb-3 gap-2">
+                <button type="button" class="btn btn-light flex-fill" data-bs-dismiss="modal">Batal</button>
+                <button type="button" id="rmsSubmitBtn" class="btn btn-danger flex-fill fw-bold" onclick="submitRemoveStock()">
+                    <i class="fa fa-trash me-2"></i>Hapus dari Stok
                 </button>
             </div>
         </div>
@@ -1076,18 +1171,36 @@ if ($defaultSessionId === 0 && !empty($openSessions)) {
 
 <?php include '../includes/footer.php' ?>
 <script>
-let html5QrCode    = null;
-let activeStream   = null;   // ← track MediaStream aktif untuk torch
-let isProcessing   = false;
+/* ── state ───────────────────────────────────────── */
+let html5QrCode     = null;
+let activeStream    = null;
+let isProcessing    = false;
 let activeSessionId = <?= (int)$defaultSessionId ?>;
-let latestSnapshot = null;
+let latestSnapshot  = null;
 let batchRenderLimit = 15;
-const isAdmin      = <?= is_admin_user() ? 'true' : 'false' ?>;
-const cameraSelect    = document.getElementById('cameraSelect');
-const torchToggleBtn  = document.getElementById('torchToggleBtn');
+const isAdmin       = <?= is_admin_user() ? 'true' : 'false' ?>;
+const cameraSelect   = document.getElementById('cameraSelect');
+const torchToggleBtn = document.getElementById('torchToggleBtn');
 let torchEnabled = false;
 
-/* ── helper ─────────────────────────────────────── */
+/* modal singletons — dibuat sekali setelah DOM ready */
+let _modalExtend  = null;
+let _modalResolve = null;
+let _modalRemove  = null;
+
+/* pending data untuk setiap modal aksi */
+let _ecBarcodeRaw = '';
+let _ecMinCopies  = 1;
+let _risData      = {};   /* { batch, labelNo, actionType, sessionItemId } */
+let _rmsData      = {};   /* { batch, productionId, labelNo } */
+
+document.addEventListener('DOMContentLoaded', () => {
+    _modalExtend  = new bootstrap.Modal(document.getElementById('modalExtendCopies'));
+    _modalResolve = new bootstrap.Modal(document.getElementById('modalResolveItem'));
+    _modalRemove  = new bootstrap.Modal(document.getElementById('modalRemoveStock'));
+});
+
+/* ── helpers ─────────────────────────────────────── */
 function formatNum(v) {
     return Number(v || 0).toLocaleString('id-ID');
 }
@@ -1109,14 +1222,12 @@ function getActiveTorchTrack() {
     const tracks = activeStream.getVideoTracks();
     return tracks.length ? tracks[0] : null;
 }
-
 function isTorchSupported() {
     const track = getActiveTorchTrack();
     if (!track) return false;
     const caps = track.getCapabilities ? track.getCapabilities() : {};
     return !!caps.torch;
 }
-
 function updateTorchButtonState(supported) {
     if (!torchToggleBtn) return;
     torchToggleBtn.disabled = !supported;
@@ -1125,7 +1236,6 @@ function updateTorchButtonState(supported) {
     torchToggleBtn.classList.toggle('text-white', supported && torchEnabled);
     torchToggleBtn.classList.toggle('btn-outline-warning', !(supported && torchEnabled));
 }
-
 async function toggleTorch() {
     const track = getActiveTorchTrack();
     if (!track || !isTorchSupported()) {
@@ -1146,7 +1256,7 @@ async function toggleTorch() {
 }
 
 /* ── snapshot ────────────────────────────────────── */
-async function loadSnapshot(sessionId, preserveDetailBatch = null) {
+async function loadSnapshot(sessionId) {
     if (!sessionId) {
         latestSnapshot = null;
         batchRenderLimit = 15;
@@ -1158,17 +1268,12 @@ async function loadSnapshot(sessionId, preserveDetailBatch = null) {
         document.getElementById('loadMoreBatchesBtn').classList.add('d-none');
         return;
     }
-    const res    = await fetch(`warehouse_stock_opname.php?action=get_snapshot&session_id=${sessionId}&_nocache=${Date.now()}`);
+    const res = await fetch(`warehouse_stock_opname.php?action=get_snapshot&session_id=${sessionId}&_nocache=${Date.now()}`);
     const result = await res.json();
     if (result.status !== 'success') { toastr.error(result.message || 'Gagal memuat sesi'); return; }
     latestSnapshot   = result.data;
     batchRenderLimit = 15;
-    renderSnapshot(result.data, preserveDetailBatch);
-}
-
-function renderPreviewChips(labels, type) {
-    if (!labels.length) return '<span class="text-muted small">Tidak ada label.</span>';
-    return labels.map(l => `<span class="label-chip ${type}">#${l}</span>`).join('');
+    renderSnapshot(result.data);
 }
 
 function findPreviewSessionItem(batch, labelNo, allowedStatuses) {
@@ -1182,56 +1287,54 @@ function findPreviewSessionItem(batch, labelNo, allowedStatuses) {
 
 function renderBatchLabelPreview(row) {
     const matchedHtml = row.matched_labels_count
-        ? `<div class="d-flex flex-wrap gap-1">${row.matched_labels.map(l => `<span class="label-chip match">#${l}</span>`).join('')}</div>`
+        ? `<div class="d-flex flex-wrap gap-1">${row.matched_labels.map(l =>
+            `<span class="label-chip match">#${l}</span>`).join('')}</div>`
         : '<span class="text-muted small">Tidak ada label.</span>';
 
     const missingHtml = row.missing_labels_count
         ? `<div class="d-flex flex-wrap gap-1">${row.missing_labels.map(l => `
-            <span class="label-chip missing d-inline-flex align-items-center gap-1">
-                #${l}
+            <span class="label-chip missing d-inline-flex align-items-center gap-1">#${l}
                 ${isAdmin ? `<i class="fa fa-trash" style="font-size:10px;cursor:pointer;opacity:0.75;"
-                    onclick="removeMissingStock('${row.batch}',${row.production_id},${l})" title="Hapus dari Stok"></i>` : ''}
+                    onclick="openRemoveStock('${row.batch}',${row.production_id},${l})" title="Hapus dari Stok"></i>` : ''}
             </span>`).join('')}</div>`
         : '<span class="text-muted small">Tidak ada label.</span>';
 
     const extraHtml = row.extra_labels_count
         ? `<div class="d-flex flex-wrap gap-1">${row.extra_labels.map(l => `
-            <span class="label-chip extra d-inline-flex align-items-center gap-1">
-                #${l}
+            <span class="label-chip extra d-inline-flex align-items-center gap-1">#${l}
                 ${isAdmin ? `
                     <i class="fa fa-plus-circle" style="font-size:10px;cursor:pointer;opacity:0.75;"
-                        onclick="resolveSessionItem('${row.batch}',${l},'add_to_stock')" title="Masuk Stok"></i>
+                        onclick="openResolveItem('${row.batch}',${l},'add_to_stock')" title="Masuk Stok"></i>
                     <i class="fa fa-times-circle" style="font-size:10px;cursor:pointer;opacity:0.75;"
-                        onclick="resolveSessionItem('${row.batch}',${l},'mark_damaged')" title="Tandai Rusak"></i>
+                        onclick="openResolveItem('${row.batch}',${l},'mark_damaged')" title="Tandai Rusak"></i>
                 ` : ''}
             </span>`).join('')}</div>`
         : '<span class="text-muted small">Tidak ada label.</span>';
 
-    return `
-        <tr><td colspan="6" class="p-0">
-            <div class="batch-label-preview">
-                <div class="preview-section">
-                    <div class="preview-title">Label Cocok (${formatNum(row.matched_labels_count)})</div>
-                    ${matchedHtml}
-                </div>
-                <div class="preview-section">
-                    <div class="preview-title">Label Tidak Ada di Gudang (${formatNum(row.missing_labels_count)})</div>
-                    ${missingHtml}
-                </div>
-                <div class="preview-section">
-                    <div class="preview-title">Label Selisih Lebih (${formatNum(row.extra_labels_count)})</div>
-                    ${extraHtml}
-                </div>
+    return `<tr><td colspan="6" class="p-0">
+        <div class="batch-label-preview">
+            <div class="preview-section">
+                <div class="preview-title">Label Cocok (${formatNum(row.matched_labels_count)})</div>
+                ${matchedHtml}
             </div>
-        </td></tr>`;
+            <div class="preview-section">
+                <div class="preview-title">Label Tidak Ada di Gudang (${formatNum(row.missing_labels_count)})</div>
+                ${missingHtml}
+            </div>
+            <div class="preview-section">
+                <div class="preview-title">Label Selisih Lebih (${formatNum(row.extra_labels_count)})</div>
+                ${extraHtml}
+            </div>
+        </div>
+    </td></tr>`;
 }
 
-function renderSnapshot(data, preserveDetailBatch = null) {
+function renderSnapshot(data) {
     const session = data.session || {};
     const summary = data.summary || {};
-    document.getElementById('systemLabelsCount').innerText = formatNum(summary.system_labels);
-    document.getElementById('systemBatchCount').innerText  = formatNum(summary.system_batches);
-    document.getElementById('systemUnitsCount').innerText  = formatNum(summary.system_units);
+    document.getElementById('systemLabelsCount').innerText  = formatNum(summary.system_labels);
+    document.getElementById('systemBatchCount').innerText   = formatNum(summary.system_batches);
+    document.getElementById('systemUnitsCount').innerText   = formatNum(summary.system_units);
     document.getElementById('scannedLabelsCount').innerText = formatNum(summary.scanned_labels);
     document.getElementById('extraLabelsCount').innerText   = formatNum(summary.extra_labels);
     document.getElementById('missingLabelsCount').innerText = formatNum(summary.missing_labels);
@@ -1243,7 +1346,7 @@ function renderSnapshot(data, preserveDetailBatch = null) {
         <span class="mini-badge" style="background:#fef3c7;color:#92400e;">Duplikat ${formatNum(summary.duplicates)}</span>
         <span class="mini-badge" style="background:#fee2e2;color:#991b1b;">Invalid ${formatNum(summary.invalid)}</span>`;
 
-    const tbody      = document.getElementById('batchTableBody');
+    const tbody       = document.getElementById('batchTableBody');
     const loadMoreBtn = document.getElementById('loadMoreBatchesBtn');
     if (!data.batches.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Belum ada data batch pada sesi ini.</td></tr>';
@@ -1252,22 +1355,10 @@ function renderSnapshot(data, preserveDetailBatch = null) {
         const visibleRows = data.batches.slice(0, batchRenderLimit);
         tbody.innerHTML = visibleRows.map(row => `
             <tr>
-                <td>
-                    <div class="font-w800 text-primary">#${row.batch}</div>
-                    <small class="text-muted">${row.quantity} unit/dus</small>
-                </td>
-                <td>
-                    <div class="font-w700 text-black">${row.item||'-'}</div>
-                    <small class="text-muted">${row.size||'-'} ${row.unit||''}</small>
-                </td>
-                <td class="text-center">
-                    <div class="font-w800 text-black">${formatNum(row.system_labels_count)}</div>
-                    <small class="text-muted">${formatNum(row.system_units)} unit</small>
-                </td>
-                <td class="text-center">
-                    <div class="font-w800 text-black">${formatNum(row.scanned_labels_count)}</div>
-                    <small class="text-muted">${formatNum(row.scanned_units)} unit</small>
-                </td>
+                <td><div class="font-w800 text-primary">#${row.batch}</div><small class="text-muted">${row.quantity} unit/dus</small></td>
+                <td><div class="font-w700 text-black">${row.item||'-'}</div><small class="text-muted">${row.size||'-'} ${row.unit||''}</small></td>
+                <td class="text-center"><div class="font-w800 text-black">${formatNum(row.system_labels_count)}</div><small class="text-muted">${formatNum(row.system_units)} unit</small></td>
+                <td class="text-center"><div class="font-w800 text-black">${formatNum(row.scanned_labels_count)}</div><small class="text-muted">${formatNum(row.scanned_units)} unit</small></td>
                 <td class="text-center">
                     <span class="badge ${row.difference_labels_count===0?'bg-success':row.difference_labels_count>0?'bg-danger':'bg-warning'} text-white">
                         ${row.difference_labels_count>0?'+':''}${formatNum(row.difference_labels_count)}
@@ -1276,8 +1367,7 @@ function renderSnapshot(data, preserveDetailBatch = null) {
                 </td>
                 <td class="text-center"><span class="text-muted small">Label di bawah</span></td>
             </tr>
-            ${renderBatchLabelPreview(row)}`
-        ).join('');
+            ${renderBatchLabelPreview(row)}`).join('');
 
         if (data.batches.length > batchRenderLimit) {
             loadMoreBtn.classList.remove('d-none');
@@ -1287,7 +1377,6 @@ function renderSnapshot(data, preserveDetailBatch = null) {
         }
     }
 
-    /* unknown batches */
     const unknown = data.unknown_batches || [];
     document.getElementById('unknownBatchArea').innerHTML = unknown.length
         ? `<div class="list-group">${unknown.map(row => `
@@ -1302,17 +1391,18 @@ function renderSnapshot(data, preserveDetailBatch = null) {
             </div>`).join('')}</div>`
         : 'Belum ada batch tidak terdaftar.';
 
-    /* issues: duplicate + invalid — invalid now shows extend option for admin */
     const issues = [...(data.duplicates||[]), ...(data.invalid_rows||[])];
     document.getElementById('issueArea').innerHTML = issues.length
         ? issues.map(row => {
             const isOutOfQuota = row.scan_status === 'invalid' &&
-                row.notes && row.notes.includes('di luar jangkauan');
+                (row.notes||'').includes('di luar jangkauan');
             const extendBtn = (isAdmin && isOutOfQuota && row.barcode_raw)
-                ? `<button class="btn btn-xs btn-outline-primary py-0 px-2 mt-1"
-                        onclick="promptExtendCopies('${row.barcode_raw}')">
+                ? `<div class="mt-1">
+                    <button class="btn btn-outline-primary btn-sm py-0 px-2"
+                        onclick="openExtendCopies('${row.barcode_raw}')">
                         <i class="fa fa-plus me-1"></i>Tambah Kuota Batch
-                   </button>`
+                    </button>
+                   </div>`
                 : '';
             return `
                 <div class="border-bottom py-2">
@@ -1325,7 +1415,6 @@ function renderSnapshot(data, preserveDetailBatch = null) {
           }).join('')
         : 'Belum ada isu scan.';
 
-    /* quick issues */
     const qi = [];
     if (summary.duplicates)     qi.push(`${summary.duplicates} scan duplikat`);
     if (summary.invalid)        qi.push(`${summary.invalid} scan invalid`);
@@ -1346,10 +1435,10 @@ async function submitScan(barcode) {
     if (isProcessing) return;
     isProcessing = true;
     try {
-        const formData = new FormData();
-        formData.append('session_id', activeSessionId);
-        formData.append('barcode', barcode);
-        const res    = await fetch('warehouse_stock_opname.php?action=scan', { method:'POST', body:formData });
+        const fd = new FormData();
+        fd.append('session_id', activeSessionId);
+        fd.append('barcode', barcode);
+        const res    = await fetch('warehouse_stock_opname.php?action=scan', { method:'POST', body:fd });
         const result = await res.json();
         if (result.data) renderSnapshot(result.data);
         if (result.status === 'success') {
@@ -1358,10 +1447,10 @@ async function submitScan(barcode) {
         } else {
             updateScanStatus('error', 'Scan Ditolak', result.message||'Periksa barcode.');
             toastr.error(result.message||'Scan gagal');
-            /* Jika ditolak karena di luar kuota dan user adalah admin, tawarkan extend */
+            /* Tawarkan extend hanya setelah renderSnapshot selesai */
             if (isAdmin && result.scan_status === 'invalid' &&
-                result.message && result.message.includes('luar kuota')) {
-                promptExtendCopies(barcode);
+                (result.message||'').includes('luar kuota')) {
+                setTimeout(() => openExtendCopies(barcode), 300);
             }
         }
     } catch (err) {
@@ -1376,50 +1465,48 @@ async function submitScan(barcode) {
 
 function submitManualScan() {
     const value = document.getElementById('manualBarcode').value.trim();
-    if (!value) return;
-    submitScan(value);
+    if (value) submitScan(value);
 }
 
-let _ecBarcodeRaw = '';
-let _ecMinCopies  = 1;
-
-function promptExtendCopies(barcodeRaw) {
-    if (!isAdmin) return;
+/* ── modal: extend copies ────────────────────────── */
+function openExtendCopies(barcodeRaw) {
+    if (!isAdmin || !_modalExtend) return;
 
     const parts   = barcodeRaw.split('-');
     const labelNo = parseInt(parts[0], 10) || 0;
     const batch   = parts.slice(1).join('-');
 
-    /* Cari info item dari snapshot */
-    let itemName    = '-';
-    let currentCopies = labelNo; /* fallback: minimal = labelNo */
+    let itemName      = '-';
+    let currentCopies = labelNo;
+
     if (latestSnapshot?.session_items) {
         const ref = latestSnapshot.session_items.find(i => i.batch === batch);
         if (ref?.item) itemName = ref.item;
+        if (ref?.copies) currentCopies = ref.copies;
     }
-    /* Coba dari batches summary */
     if (latestSnapshot?.batches) {
         const brow = latestSnapshot.batches.find(b => b.batch === batch);
-        if (brow) {
-            if (brow.item) itemName = brow.item;
-        }
+        if (brow?.item) itemName = brow.item;
     }
 
     _ecBarcodeRaw = barcodeRaw;
     _ecMinCopies  = labelNo;
 
-    document.getElementById('ecBatch').textContent        = batch || '-';
-    document.getElementById('ecItem').textContent         = itemName;
+    document.getElementById('ecBatch').textContent         = batch || '-';
+    document.getElementById('ecItem').textContent          = itemName;
     document.getElementById('ecCurrentCopies').textContent = currentCopies;
-    document.getElementById('ecLabelNo').textContent      = labelNo;
-    document.getElementById('ecMinHint').textContent      = `Min: ${labelNo}`;
-    document.getElementById('ecCopiesHelp').textContent   =
+    document.getElementById('ecLabelNo').textContent       = labelNo;
+    document.getElementById('ecMinHint').textContent       = `Min: ${labelNo}`;
+    document.getElementById('ecCopiesHelp').textContent    =
         `Harus lebih besar dari kuota saat ini dan mencakup label #${labelNo}.`;
-    document.getElementById('ecNewCopies').value          = labelNo;
-    document.getElementById('ecNewCopies').min            = labelNo;
-    document.getElementById('ecNotes').value              = '';
+    document.getElementById('ecNewCopies').value           = labelNo;
+    document.getElementById('ecNewCopies').min             = labelNo;
+    document.getElementById('ecNotes').value               = '';
+    document.getElementById('ecSubmitBtn').disabled        = false;
+    document.getElementById('ecSubmitBtn').innerHTML       =
+        '<i class="fa fa-check me-2"></i>Simpan &amp; Terapkan';
 
-    bootstrap.Modal.getOrCreate(document.getElementById('modalExtendCopies')).show();
+    _modalExtend.show();
 }
 
 async function submitExtendCopies() {
@@ -1429,32 +1516,159 @@ async function submitExtendCopies() {
         document.getElementById('ecNewCopies').focus();
         return;
     }
+    const notes = document.getElementById('ecNotes').value.trim();
+    const fd = new FormData();
+    fd.append('session_id',  activeSessionId);
+    fd.append('barcode_raw', _ecBarcodeRaw);
+    fd.append('new_copies',  newCopies);
+    fd.append('notes',       notes);
 
-    const notes    = document.getElementById('ecNotes').value.trim();
-    const formData = new FormData();
-    formData.append('session_id',  activeSessionId);
-    formData.append('barcode_raw', _ecBarcodeRaw);
-    formData.append('new_copies',  newCopies);
-    formData.append('notes',       notes);
-
-    const btn = document.querySelector('#modalExtendCopies .btn-primary');
+    const btn = document.getElementById('ecSubmitBtn');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Menyimpan...';
 
     try {
-        const res    = await fetch('warehouse_stock_opname.php?action=extend_batch_copies', { method: 'POST', body: formData });
+        const res    = await fetch('warehouse_stock_opname.php?action=extend_batch_copies', { method:'POST', body:fd });
         const result = await res.json();
         if (result.status !== 'success') {
             toastr.error(result.message || 'Gagal memperluas kuota batch.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-check me-2"></i>Simpan &amp; Terapkan';
             return;
         }
-        bootstrap.Modal.getInstance(document.getElementById('modalExtendCopies')).hide();
+        _modalExtend.hide();
         latestSnapshot = result.data;
         renderSnapshot(result.data);
         toastr.success(result.message || 'Kuota batch berhasil diperbarui.');
-    } finally {
+    } catch (err) {
+        toastr.error('Koneksi terputus.');
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-check me-2"></i>Simpan & Terapkan';
+        btn.innerHTML = '<i class="fa fa-check me-2"></i>Simpan &amp; Terapkan';
+    }
+}
+
+/* ── modal: resolve item (add / damaged) ─────────── */
+function openResolveItem(batch, labelNo, actionType) {
+    if (!isAdmin || !_modalResolve) return;
+
+    const row = findPreviewSessionItem(batch, labelNo, ['extra','extra_unknown_batch']);
+    if (!row) { toastr.error('Item sesi tidak ditemukan.'); return; }
+
+    _risData = { batch, labelNo, actionType, sessionItemId: row.id };
+
+    const isAdd     = actionType === 'add_to_stock';
+    const headerEl  = document.getElementById('resolveModalHeader');
+    headerEl.style.background = isAdd ? '#0f766e' : '#92400e';
+    document.getElementById('resolveModalIcon').className =
+        `fa ${isAdd ? 'fa-plus-circle' : 'fa-times-circle'}`;
+    document.getElementById('resolveModalTitle').textContent =
+        isAdd ? 'Tambahkan ke Stok' : 'Tandai Rusak';
+
+    document.getElementById('risBatch').textContent   = batch;
+    document.getElementById('risLabelNo').textContent = labelNo;
+
+    const descEl = document.getElementById('risActionDesc');
+    const textEl = document.getElementById('risActionText');
+    if (isAdd) {
+        descEl.style.background = '#f0fdf4';
+        descEl.style.border     = '1px solid #bbf7d0';
+        textEl.textContent      = 'Label ini akan ditambahkan ke stok gudang sistem sebagai label aktif.';
+    } else {
+        descEl.style.background = '#fff7ed';
+        descEl.style.border     = '1px solid #fed7aa';
+        textEl.textContent      = 'Label ini akan dicatat sebagai rusak dan dikeluarkan dari stok aktif.';
+    }
+    document.getElementById('risNotesLabel').textContent =
+        isAdd ? 'Catatan (opsional)' : 'Alasan kerusakan';
+    document.getElementById('risNotes').placeholder =
+        isAdd ? 'Catatan tambahan...' : 'Contoh: Kardus penyok, label sobek...';
+    document.getElementById('risNotes').value = '';
+
+    const submitBtn = document.getElementById('risSubmitBtn');
+    submitBtn.className = `btn flex-fill fw-bold ${isAdd ? 'btn-success' : 'btn-warning'}`;
+    submitBtn.innerHTML = `<i class="fa ${isAdd ? 'fa-plus' : 'fa-exclamation-triangle'} me-2"></i>
+        ${isAdd ? 'Tambah ke Stok' : 'Tandai Rusak'}`;
+    submitBtn.disabled = false;
+
+    _modalResolve.show();
+}
+
+async function submitResolveItem() {
+    const { batch, labelNo, actionType, sessionItemId } = _risData;
+    const notes = document.getElementById('risNotes').value.trim();
+    const fd = new FormData();
+    fd.append('session_id',      activeSessionId);
+    fd.append('session_item_id', sessionItemId);
+    fd.append('action_type',     actionType);
+    fd.append('notes',           notes);
+
+    const btn = document.getElementById('risSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Menyimpan...';
+
+    try {
+        const res    = await fetch('warehouse_stock_opname.php?action=adjust_item', { method:'POST', body:fd });
+        const result = await res.json();
+        if (result.status !== 'success') {
+            toastr.error(result.message || 'Gagal memproses adjustment.');
+            btn.disabled = false;
+            return;
+        }
+        _modalResolve.hide();
+        latestSnapshot = result.data;
+        renderSnapshot(result.data);
+        toastr.success('Adjustment berhasil disimpan.');
+    } catch (err) {
+        toastr.error('Koneksi terputus.');
+        btn.disabled = false;
+    }
+}
+
+/* ── modal: remove missing stock ─────────────────── */
+function openRemoveStock(batch, productionId, labelNo) {
+    if (!isAdmin || !_modalRemove) return;
+    _rmsData = { batch, productionId, labelNo };
+    document.getElementById('rmsBatch').textContent   = batch;
+    document.getElementById('rmsLabelNo').textContent = labelNo;
+    document.getElementById('rmsNotes').value         = '';
+    document.getElementById('rmsSubmitBtn').disabled  = false;
+    document.getElementById('rmsSubmitBtn').innerHTML =
+        '<i class="fa fa-trash me-2"></i>Hapus dari Stok';
+    _modalRemove.show();
+}
+
+async function submitRemoveStock() {
+    const { batch, productionId, labelNo } = _rmsData;
+    const notes = document.getElementById('rmsNotes').value.trim();
+    const fd = new FormData();
+    fd.append('session_id',    activeSessionId);
+    fd.append('action_type',   'remove_from_stock');
+    fd.append('production_id', productionId);
+    fd.append('batch',         batch);
+    fd.append('label_no',      labelNo);
+    fd.append('notes',         notes);
+
+    const btn = document.getElementById('rmsSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Menghapus...';
+
+    try {
+        const res    = await fetch('warehouse_stock_opname.php?action=adjust_item', { method:'POST', body:fd });
+        const result = await res.json();
+        if (result.status !== 'success') {
+            toastr.error(result.message || 'Gagal menghapus dari stok.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-trash me-2"></i>Hapus dari Stok';
+            return;
+        }
+        _modalRemove.hide();
+        latestSnapshot = result.data;
+        renderSnapshot(result.data);
+        toastr.success('Label berhasil dihapus dari stok.');
+    } catch (err) {
+        toastr.error('Koneksi terputus.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-trash me-2"></i>Hapus dari Stok';
     }
 }
 
@@ -1475,7 +1689,7 @@ async function initCamera() {
         }
         cameraSelect.innerHTML = '';
         devices.forEach(d => cameraSelect.appendChild(new Option(d.label || `Camera ${d.id}`, d.id)));
-        const backCam = devices.find(d => /back|rear|environment/i.test(d.label || ''));
+        const backCam    = devices.find(d => /back|rear|environment/i.test(d.label || ''));
         const selectedId = backCam ? backCam.id : devices[0].id;
         cameraSelect.value = selectedId;
         await startScanner(selectedId);
@@ -1496,14 +1710,6 @@ async function startScanner(deviceId) {
                 else await html5QrCode.clear();
             } catch (_) {}
         }
-        /* Ambil MediaStream terlebih dahulu agar kita pegang track untuk torch */
-        activeStream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { exact: deviceId }, facingMode: { ideal: 'environment' } }
-        });
-        /* Stop stream sementara — html5QrCode akan buka sendiri */
-        activeStream.getTracks().forEach(t => t.stop());
-        activeStream = null;
-
         html5QrCode = new Html5Qrcode('reader');
         const boxWidth = window.innerWidth < 576 ? 220 : 280;
         await html5QrCode.start(
@@ -1515,20 +1721,18 @@ async function startScanner(deviceId) {
                 submitScan(decodedText);
             }
         );
-
-        /* Ambil stream yang sedang dipakai html5QrCode melalui elemen video di DOM */
+        /* Ambil stream dari video element yang sudah aktif */
         const videoEl = document.querySelector('#reader video');
-        if (videoEl && videoEl.srcObject instanceof MediaStream) {
+        if (videoEl?.srcObject instanceof MediaStream) {
             activeStream = videoEl.srcObject;
         }
-
         torchEnabled = false;
         updateTorchButtonState(isTorchSupported());
         updateScanStatus('info', 'Kamera Aktif', 'Arahkan kamera ke barcode label gudang.');
     } catch (err) {
         const msg = err?.message || 'Start kamera gagal.';
-        torchEnabled = false;
-        activeStream = null;
+        torchEnabled  = false;
+        activeStream  = null;
         updateTorchButtonState(false);
         updateScanStatus('error', 'Start Kamera Gagal', msg);
         toastr.error(msg);
@@ -1545,11 +1749,11 @@ function resumeScanner() {
     } catch (_) {}
 }
 
-/* ── session actions ─────────────────────────────── */
+/* ── session ─────────────────────────────────────── */
 async function createSession(event) {
     event.preventDefault();
-    const formData = new FormData(event.target);
-    const res    = await fetch('warehouse_stock_opname.php?action=create_session', { method:'POST', body:formData });
+    const fd = new FormData(event.target);
+    const res    = await fetch('warehouse_stock_opname.php?action=create_session', { method:'POST', body:fd });
     const result = await res.json();
     if (result.status !== 'success') { toastr.error(result.message||'Gagal membuat sesi'); return; }
     toastr.success('Sesi berhasil dibuat.');
@@ -1559,63 +1763,14 @@ async function createSession(event) {
 
 async function changeSessionStatus(targetStatus) {
     if (!activeSessionId) { toastr.error('Pilih sesi terlebih dahulu.'); return; }
-    const formData = new FormData();
-    formData.append('session_id',    activeSessionId);
-    formData.append('target_status', targetStatus);
-    const res    = await fetch('warehouse_stock_opname.php?action=change_session_status', { method:'POST', body:formData });
+    const fd = new FormData();
+    fd.append('session_id',    activeSessionId);
+    fd.append('target_status', targetStatus);
+    const res    = await fetch('warehouse_stock_opname.php?action=change_session_status', { method:'POST', body:fd });
     const result = await res.json();
     if (result.status !== 'success') { toastr.error(result.message||'Gagal mengubah status sesi.'); return; }
     toastr.success('Status sesi diperbarui.');
     await loadSnapshot(activeSessionId);
-}
-
-function findSessionItem(batch, labelNo) {
-    const pool = latestSnapshot ? [
-        ...(latestSnapshot.unknown_batches||[]),
-        ...(latestSnapshot.duplicates||[]),
-        ...(latestSnapshot.invalid_rows||[]),
-    ] : [];
-    const hit = pool.find(r => r.batch === batch && Number(r.label_no) === Number(labelNo));
-    if (hit) return hit;
-    return (latestSnapshot?.session_items||[])
-        .find(r => r.batch === batch && Number(r.label_no) === Number(labelNo)) || null;
-}
-
-async function resolveSessionItem(batch, labelNo, actionType) {
-    if (!latestSnapshot) return;
-    const row = findPreviewSessionItem(batch, labelNo, ['extra','extra_unknown_batch']);
-    if (!row) { toastr.error('Item sesi tidak ditemukan.'); return; }
-    const notes = window.prompt(
-        actionType === 'mark_damaged' ? 'Alasan tandai rusak' : 'Catatan penyesuaian', ''
-    ) ?? '';
-    const formData = new FormData();
-    formData.append('session_id',     activeSessionId);
-    formData.append('session_item_id', row.id);
-    formData.append('action_type',    actionType);
-    formData.append('notes',          notes);
-    const res    = await fetch('warehouse_stock_opname.php?action=adjust_item', { method:'POST', body:formData });
-    const result = await res.json();
-    if (result.status !== 'success') { toastr.error(result.message||'Gagal memproses adjustment.'); return; }
-    latestSnapshot = result.data;
-    renderSnapshot(result.data);
-    toastr.success('Adjustment berhasil disimpan.');
-}
-
-async function removeMissingStock(batch, productionId, labelNo) {
-    const notes = window.prompt('Alasan hapus dari stok', '') ?? '';
-    const formData = new FormData();
-    formData.append('session_id',    activeSessionId);
-    formData.append('action_type',   'remove_from_stock');
-    formData.append('production_id', productionId);
-    formData.append('batch',         batch);
-    formData.append('label_no',      labelNo);
-    formData.append('notes',         notes);
-    const res    = await fetch('warehouse_stock_opname.php?action=adjust_item', { method:'POST', body:formData });
-    const result = await res.json();
-    if (result.status !== 'success') { toastr.error(result.message||'Gagal menghapus dari stok.'); return; }
-    latestSnapshot = result.data;
-    renderSnapshot(result.data);
-    toastr.success('Label berhasil dihapus dari stok.');
 }
 
 /* ── init ────────────────────────────────────────── */
