@@ -19,10 +19,8 @@ $company = [
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if (!$id) die("ID Pengiriman tidak valid.");
 
-// Bulan romawi untuk format nomor
 $ROMAN = [1=>'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 
-// Lazy-allocate surat_jalan_no dalam satu transaksi (idempoten saat cetak ulang)
 $pdo->beginTransaction();
 try {
     $stmt = $pdo->prepare("SELECT * FROM outbound_shipments WHERE id = ? FOR UPDATE");
@@ -56,7 +54,6 @@ try {
         $upd = $pdo->prepare("UPDATE outbound_shipments SET surat_jalan_no = ? WHERE id = ?");
         $upd->execute([$newNo, $id]);
 
-        // Audit trail — catat penerbitan nomor surat jalan
         $userName = $_SESSION['full_name'] ?? 'Sistem';
         $detail   = "$userName menerbitkan Surat Jalan $newNo untuk " . $header['customer_name'];
         $logStmt  = $pdo->prepare("INSERT INTO activity_logs (action, details) VALUES ('CETAK', ?)");
@@ -71,9 +68,6 @@ try {
     die("Gagal menyiapkan surat jalan: " . htmlspecialchars($e->getMessage()));
 }
 
-// Detail item digabung per (item + size + unit + mesin).
-// Beberapa batch produksi yang menghasilkan barang sama di mesin sama akan dijumlahkan,
-// meskipun beda tanggal produksi atau penerbitan label.
 $stmtDet = $pdo->prepare("
     SELECT p.item, p.size, p.unit, p.machine,
            SUM(b.label_qty) AS label_qty,
@@ -103,82 +97,141 @@ $tanggal_cetak = date('d-m-Y H:i');
     <meta charset="UTF-8">
     <title>Surat Jalan <?php echo htmlspecialchars($header['surat_jalan_no']); ?></title>
     <style>
-        /* Continuous form 9.5 x 11 inci untuk dot matrix — LANDSCAPE.
-           Lebar kertas saat dipasang horizontal = 11in, tinggi = 9.5in.
-           Hindari warna & shading: karbon kuning hanya nge-print outline hitam. */
-        @page { size: 11in 9.5in; margin: 0.4in 0.45in; }
+        /* ============================================================
+           Continuous form dot matrix 9.5 x 11 inci — PORTRAIT
+           Lebar kertas = 9.5in, tinggi = 11in (satu lembar)
+           ============================================================ */
+@page {
+    size: 11in 9.5in;
+    margin: 0.3in 0.35in;
+}
 
-        html, body { margin: 0; padding: 0; background: #fff; }
+
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            width: 100%;
+        }
+
         body {
             font-family: 'Courier New', Courier, monospace;
-            font-size: 11pt;
+            font-size: 12pt;
             color: #000;
-            line-height: 1.35;
+            line-height: 1.4;
         }
-        .sheet {
-            width: 10.1in;      /* 11 - margin kiri-kanan */
-            margin: 0 auto;
-            padding: 0.2in 0;
+
+.sheet {
+    width: 100%;
+    max-width: 10.3in;    /* 11in - (0.35in × 2) margin */
+    margin: 0 auto;
+    padding: 0.1in 0;
+}
+
+        /* --- KOP --- */
+        .kop-table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .kop-table { width: 100%; border-collapse: collapse; }
-        .kop-table td { vertical-align: top; padding: 0; }
-        .kop-name { font-size: 14pt; font-weight: 700; letter-spacing: 0.5px; }
-        .kop-meta { font-size: 10.5pt; }
+        .kop-table td {
+            vertical-align: top;
+            padding: 0;
+        }
+        .kop-name {
+            font-size: 15pt;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .kop-meta {
+            font-size: 11pt;
+        }
+
+        /* --- JUDUL DOKUMEN --- */
         .doc-title {
-            font-size: 16pt;
+            font-size: 17pt;
             font-weight: 700;
             text-decoration: underline;
             letter-spacing: 2px;
             text-align: center;
         }
-        .meta-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-        .meta-table td { padding: 1px 4px; font-size: 11pt; vertical-align: top; }
-        .meta-table .lbl { width: 80px; }
-        .meta-table .sep { width: 8px; text-align: center; }
 
+        /* --- META NO SURAT --- */
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
+        .meta-table td {
+            padding: 2px 4px;
+            font-size: 12pt;
+            vertical-align: top;
+        }
+        .meta-table .lbl { width: 70px; }
+        .meta-table .sep { width: 10px; text-align: center; }
+
+        /* --- KEPADA --- */
         .recipient {
             margin-top: 10px;
             padding-top: 8px;
             border-top: 1px dashed #000;
         }
-        .recipient .row { display: flex; }
-        .recipient .lbl { width: 70px; }
-        .recipient .sep { width: 12px; text-align: center; }
+        .recipient .row {
+            display: flex;
+            margin-bottom: 2px;
+        }
+        .recipient .lbl { width: 75px; font-size: 12pt; }
+        .recipient .sep { width: 14px; text-align: center; font-size: 12pt; }
+        .recipient .val { font-size: 12pt; }
 
+        /* --- TABEL ITEM --- */
         table.items {
             width: 100%;
             border-collapse: collapse;
             margin-top: 12px;
-            font-size: 11pt;
+            font-size: 12pt;
         }
-        table.items th, table.items td {
+        table.items th,
+        table.items td {
             border: 1px solid #000;
-            padding: 4px 6px;
-            vertical-align: top;
+            padding: 5px 7px;
+            vertical-align: middle;
         }
         table.items th {
             font-weight: 700;
             text-align: center;
             background: #fff;
         }
-        table.items td.no    { width: 30px;  text-align: center; }
-        table.items td.qty   { width: 60px;  text-align: right; }
-        table.items td.unit  { width: 70px;  text-align: center; }
-        table.items td.isi   { width: 130px; text-align: right; }
-        table.items td.name small { font-size: 9.5pt; color: #333; }
+        table.items td.no   { width: 35px;  text-align: center; }
+        table.items td.qty  { width: 65px;  text-align: right; }
+        table.items td.unit { width: 75px;  text-align: center; }
+        table.items td.isi  { width: 140px; text-align: right; }
+        table.items td.name small { font-size: 10pt; color: #333; }
 
-        .place-date { text-align: right; margin-top: 14px; }
+        /* --- TANGGAL --- */
+        .place-date {
+            text-align: right;
+            margin-top: 14px;
+            font-size: 12pt;
+        }
 
-        table.ttd { width: 100%; border-collapse: collapse; margin-top: 30px; }
+        /* --- TTD --- */
+        table.ttd {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 28px;
+        }
         table.ttd td {
             width: 25%;
             text-align: center;
-            font-size: 10.5pt;
+            font-size: 11pt;
             vertical-align: top;
             padding: 0 4px;
         }
-        table.ttd .role { font-weight: 700; }
-        table.ttd .sign-space { height: 60px; }
+        table.ttd .role      { font-weight: 700; font-size: 12pt; }
+        table.ttd .sign-space { height: 75px; }
         table.ttd .name-line {
             border-top: 1px solid #000;
             padding-top: 2px;
@@ -186,55 +239,74 @@ $tanggal_cetak = date('d-m-Y H:i');
             min-width: 90%;
         }
 
+        /* --- DISTRIBUSI & FOOTNOTE --- */
         .distribution {
-            margin-top: 18px;
+            margin-top: 16px;
             text-align: center;
-            font-size: 9.5pt;
+            font-size: 10pt;
             border-top: 1px dashed #000;
             padding-top: 6px;
         }
         .footnote {
             margin-top: 4px;
             text-align: right;
-            font-size: 8.5pt;
+            font-size: 9pt;
             color: #444;
         }
 
-        @media print {
-            html, body { background: #fff; }
-            .sheet { padding: 0; }
-            .no-print { display: none !important; }
-        }
+        /* --- TOOLBAR (tidak ikut cetak) --- */
         .toolbar {
-            position: fixed; top: 8px; right: 12px;
-            background: #fff; border: 1px solid #999; padding: 4px 8px;
-            font-family: Arial, sans-serif; font-size: 12px;
+            position: fixed;
+            top: 8px;
+            right: 12px;
+            background: #fff;
+            border: 1px solid #999;
+            padding: 4px 8px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            z-index: 9999;
         }
         .toolbar button {
-            cursor: pointer; padding: 4px 10px; margin-left: 4px;
-            font-size: 12px; border: 1px solid #555; background: #f3f3f3;
+            cursor: pointer;
+            padding: 4px 10px;
+            margin-left: 4px;
+            font-size: 12px;
+            border: 1px solid #555;
+            background: #f3f3f3;
+        }
+
+        /* --- PRINT OVERRIDES --- */
+        @media print {
+            html, body    { background: #fff; }
+            .sheet        { padding: 0; }
+            .no-print     { display: none !important; }
+            /* Sembunyikan header/footer URL browser — uncheck manual di dialog cetak */
         }
     </style>
 </head>
 <body onload="window.print()">
 
 <div class="toolbar no-print">
+    <span style="font-family:Arial;font-size:11px;color:#c00;">
+        ⚠ Pastikan <b>uncheck</b> "Header dan footer" di dialog cetak
+    </span>
     <button onclick="window.print()">🖨 Cetak Ulang</button>
     <button onclick="window.close()">✕ Tutup</button>
 </div>
 
 <div class="sheet">
-    <!-- KOP & TITLE -->
+
+    <!-- ====== KOP & JUDUL ====== -->
     <table class="kop-table">
         <tr>
-            <td style="width: 58%;">
+            <td style="width: 55%;">
                 <div class="kop-name"><?php echo htmlspecialchars($company['name']); ?></div>
                 <div class="kop-meta"><?php echo htmlspecialchars($company['address']); ?></div>
                 <div class="kop-meta"><?php echo htmlspecialchars($company['city']); ?></div>
                 <div class="kop-meta">Phone : <?php echo htmlspecialchars($company['phone']); ?></div>
                 <div class="kop-meta">Email : <?php echo htmlspecialchars($company['email']); ?></div>
             </td>
-            <td style="width: 42%;">
+            <td style="width: 45%;">
                 <div class="doc-title">SURAT JALAN</div>
                 <table class="meta-table">
                     <tr>
@@ -257,34 +329,34 @@ $tanggal_cetak = date('d-m-Y H:i');
         </tr>
     </table>
 
-    <!-- KEPADA -->
+    <!-- ====== KEPADA ====== -->
     <div class="recipient">
         <div class="row">
             <div class="lbl">Kepada</div>
             <div class="sep">:</div>
-            <div><strong><?php echo htmlspecialchars($header['customer_name']); ?></strong></div>
+            <div class="val"><strong><?php echo htmlspecialchars($header['customer_name']); ?></strong></div>
         </div>
         <div class="row">
             <div class="lbl">Alamat</div>
             <div class="sep">:</div>
-            <div><?php echo nl2br(htmlspecialchars($header['customer_address'] ?? '-')); ?></div>
+            <div class="val"><?php echo nl2br(htmlspecialchars($header['customer_address'] ?? '-')); ?></div>
         </div>
         <div class="row">
             <div class="lbl">Telp/Hp</div>
             <div class="sep">:</div>
-            <div><?php echo htmlspecialchars($header['customer_contact'] ?? '-'); ?></div>
+            <div class="val"><?php echo htmlspecialchars($header['customer_contact'] ?? '-'); ?></div>
         </div>
     </div>
 
-    <!-- TABEL ITEM -->
+    <!-- ====== TABEL ITEM ====== -->
     <table class="items">
         <thead>
             <tr>
-                <th style="width: 30px;">No</th>
+                <th style="width:35px;">No</th>
                 <th>Nama Barang</th>
-                <th style="width: 60px;">Qty</th>
-                <th style="width: 70px;">Item</th>
-                <th style="width: 130px;">Jumlah Isi<br><small>(Satuan)</small></th>
+                <th style="width:65px;">Qty</th>
+                <th style="width:75px;">Item</th>
+                <th style="width:140px;">Jumlah Isi<br><small>(Satuan)</small></th>
             </tr>
         </thead>
         <tbody>
@@ -316,11 +388,10 @@ $tanggal_cetak = date('d-m-Y H:i');
             <?php endforeach; ?>
 
             <?php
-            // Padding baris kosong supaya tabel rapi (minimal 5 baris terlihat)
+            // Baris kosong minimal 8 baris
             $minRows = 5;
             $pad = max(0, $minRows - count($details));
-            for ($i = 0; $i < $pad; $i++):
-            ?>
+            for ($i = 0; $i < $pad; $i++): ?>
                 <tr>
                     <td class="no">&nbsp;</td>
                     <td class="name">&nbsp;</td>
@@ -332,10 +403,10 @@ $tanggal_cetak = date('d-m-Y H:i');
         </tbody>
     </table>
 
-    <!-- PLACE & DATE -->
+    <!-- ====== TANGGAL ====== -->
     <div class="place-date">Makassar, <?php echo $tanggal_kirim; ?></div>
 
-    <!-- TTD 4 KOLOM -->
+    <!-- ====== TANDA TANGAN ====== -->
     <table class="ttd">
         <tr>
             <td class="role">Customer</td>
@@ -357,12 +428,13 @@ $tanggal_cetak = date('d-m-Y H:i');
         </tr>
     </table>
 
-    <!-- DISTRIBUSI RANGKAP -->
+    <!-- ====== DISTRIBUSI ====== -->
     <div class="distribution">
         Putih : Customer &nbsp;·&nbsp; Merah : Security &nbsp;·&nbsp; Kuning : Gudang
     </div>
     <div class="footnote">Dicetak: <?php echo $tanggal_cetak; ?> WITA</div>
-</div>
+
+</div><!-- /.sheet -->
 
 </body>
 </html>
