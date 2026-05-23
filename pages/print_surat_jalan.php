@@ -99,7 +99,7 @@ $tanggal_cetak = date('d-m-Y H:i');
 <style>
     @page {
         size: 9.5in 5.5in;
-        margin: 0.3in 0.35in;
+        margin: 0.1in 0.6in
     }
 
     * { box-sizing: border-box; }
@@ -120,7 +120,7 @@ $tanggal_cetak = date('d-m-Y H:i');
 
     .sheet {
         width: 100%;
-        max-width: 8.8in;
+        max-width: 8.0in;      /* dari 8.8in — lebih sempit untuk hindari area lubang */
         margin: 0 auto;
         padding: 0.1in 0;
     }
