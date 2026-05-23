@@ -1079,8 +1079,14 @@ function clearCartsFromStorage() {
             else doStart(deviceId);
         }
 
+// Ganti seluruh blok ini:
+// doStart, getTorchTrack, isTorchSupported, updateTorchUI, toggleTorch
+
+let activeStream = null;  // ← tambah variabel ini di dekat torchEnabled
+
 function doStart(deviceId) {
     torchEnabled = false;
+    activeStream = null;
     updateTorchUI(false);
     html5QrCode = new Html5Qrcode("reader");
     let boxSize = window.innerWidth < 600 ? 200 : 250;
@@ -1088,32 +1094,53 @@ function doStart(deviceId) {
     .then(() => {
         document.getElementById('start-btn-area').style.display = 'none';
         updateStatus('info', 'Scanner Ready', 'Arahkan kamera ke QR Barang');
-        // Cek dukungan torch setelah kamera aktif
-        setTimeout(() => updateTorchUI(false), 500);
+
+        /* Ambil stream aktif dari video element yang dibuat html5QrCode */
+        setTimeout(() => {
+            const videoEl = document.querySelector('#reader video');
+            if (videoEl?.srcObject instanceof MediaStream) {
+                activeStream = videoEl.srcObject;
+            }
+            updateTorchUI(false);
+        }, 800);
     });
 }
 
-function switchCamera(id) { if(id) startScanner(id); }
+function switchCamera(id) {
+    if (!id) return;
+    activeStream = null;
+    if (html5QrCode) {
+        html5QrCode.stop().then(() => doStart(id)).catch(() => doStart(id));
+    } else {
+        doStart(id);
+    }
+}
 
-function getTorchTrack() {
-    try { return html5QrCode?.getRunningTrack?.() || null; } catch(e) { return null; }
+function getActiveTorchTrack() {
+    if (!activeStream) return null;
+    const tracks = activeStream.getVideoTracks();
+    return tracks.length ? tracks[0] : null;
 }
 
 function isTorchSupported() {
-    const track = getTorchTrack();
+    const track = getActiveTorchTrack();
     if (!track) return false;
-    return !!(track.getCapabilities?.().torch);
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    return !!caps.torch;
 }
 
 function updateTorchUI(enabled) {
     const btn = document.getElementById('torchToggleBtn');
     if (!btn) return;
-    btn.disabled = !isTorchSupported();
-    if (enabled) {
-        btn.classList.replace('btn-outline-warning', 'btn-warning');
+    const supported = isTorchSupported();
+    btn.disabled = !supported;
+    if (enabled && supported) {
+        btn.classList.remove('btn-outline-warning');
+        btn.classList.add('btn-warning');
         btn.title = 'Matikan Flash';
     } else {
-        btn.classList.replace('btn-warning', 'btn-outline-warning');
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-outline-warning');
         btn.title = 'Nyalakan Flash';
     }
 }
@@ -1121,14 +1148,18 @@ function updateTorchUI(enabled) {
 let torchEnabled = false;
 async function toggleTorch() {
     if (!html5QrCode) { toastr.error('Aktifkan kamera terlebih dahulu.'); return; }
-    const track = getTorchTrack();
-    if (!track || !isTorchSupported()) { toastr.error('Flash tidak didukung di perangkat ini.'); return; }
+    const track = getActiveTorchTrack();
+    if (!track || !isTorchSupported()) {
+        toastr.error('Flash tidak didukung di perangkat ini.');
+        updateTorchUI(false);
+        return;
+    }
     try {
         torchEnabled = !torchEnabled;
         await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
         updateTorchUI(torchEnabled);
         toastr.success(torchEnabled ? 'Flash dinyalakan.' : 'Flash dimatikan.');
-    } catch(e) {
+    } catch (e) {
         torchEnabled = false;
         updateTorchUI(false);
         toastr.error(e?.message || 'Gagal mengubah status flash.');
