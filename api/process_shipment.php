@@ -1,6 +1,7 @@
 <?php
 session_start();
 include 'config.php';
+require_once __DIR__ . '/../includes/shipment_reverse_helper.php';
 verify_api_access();
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -76,6 +77,24 @@ if ($action === 'get_batch_data') {
         ]
     ]);
 } 
+elseif ($action === 'reverse_scan') {
+    $qr_input = isset($_GET['qr']) ? (string)$_GET['qr'] : '';
+
+    try {
+        $helper = new ShipmentReverseHelper($conn);
+        $payload = $helper->reverseScan($qr_input, $user);
+
+        echo json_encode([
+            'status' => 'success',
+            'data' => $payload
+        ]);
+    } catch (Throwable $e) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ]);
+    }
+}
 elseif ($action === 'search_batches') {
     // Cari batch dengan stok tersedia (untuk input manual tanpa barcode)
     $q = isset($_GET['q']) ? $conn->real_escape_string(trim($_GET['q'])) : '';

@@ -218,6 +218,13 @@ if ($append_id > 0) {
                                         <small class="text-muted px-2">atau</small>
                                         <hr class="flex-grow-1 my-0">
                                     </div>
+                                    <div class="form-check form-switch mt-2 mb-3">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="reverse-mode-toggle">
+                                        <label class="form-check-label small font-w600 text-black" for="reverse-mode-toggle">
+                                            Reverse Gudang Lama
+                                        </label>
+                                        <div class="small text-muted mt-1">Khusus barcode produksi sebelum 25 Mei 2026.</div>
+                                    </div>
                                     <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="openManualModal()">
                                         <i class="fa fa-keyboard me-2"></i> Input Manual (Tanpa Barcode)
                                     </button>
@@ -385,6 +392,7 @@ if ($append_id > 0) {
         const cameraSelect = document.getElementById('camera-select');
         const cartContainer = document.getElementById('cart-container');
         const tabsContainer = document.getElementById('cart-tabs-container');
+        const reverseModeToggle = document.getElementById('reverse-mode-toggle');
         
         // --- MULTI-CART STATE ---
         let cartCounter = 1;
@@ -1166,7 +1174,48 @@ async function toggleTorch() {
     }
 }
 
-        function resumeScanner() { isProcessing = false; if (html5QrCode && html5QrCode.getState() === 3) html5QrCode.resume(); updateStatus('info', 'Scanner Ready', `Arahkan kamera ke QR (Mengisi ${carts[activeCartId].name})`); }
+        function isReverseModeActive() {
+            return !!(reverseModeToggle && reverseModeToggle.checked);
+        }
+
+        function getScanAction() {
+            return isReverseModeActive() ? 'reverse_scan' : 'get_batch_data';
+        }
+
+        function getScanReadyMessage() {
+            const modeText = isReverseModeActive() ? 'Mode Reverse Gudang aktif.' : 'Mode Scan Normal aktif.';
+            return `${modeText} Arahkan kamera ke QR (Mengisi ${carts[activeCartId].name})`;
+        }
+
+        function getSuccessStatusForResult(resultData) {
+            if (!resultData || !resultData.reverse_status) {
+                return {
+                    title: 'UNIT DITAMBAHKAN',
+                    message: `Paket ditambahkan ke ${carts[activeCartId].name}`
+                };
+            }
+
+            if (resultData.reverse_status === 'created_batch') {
+                return {
+                    title: 'REVERSE BERHASIL',
+                    message: `Batch lama dibuat dan label masuk ke ${carts[activeCartId].name}`
+                };
+            }
+
+            if (resultData.reverse_status === 'created_label') {
+                return {
+                    title: 'LABEL DITAMBAHKAN',
+                    message: `Label lama ditambahkan ke batch existing dan masuk ke ${carts[activeCartId].name}`
+                };
+            }
+
+            return {
+                title: 'LABEL DIKENALI',
+                message: `Label existing dimuat ke ${carts[activeCartId].name}`
+            };
+        }
+
+        function resumeScanner() { isProcessing = false; if (html5QrCode && html5QrCode.getState() === 3) html5QrCode.resume(); updateStatus('info', 'Scanner Ready', getScanReadyMessage()); }
 
         async function onScanSuccess(decodedText) {
             if (isProcessing) return; 
@@ -1190,13 +1239,14 @@ async function toggleTorch() {
                 }
             }
             isProcessing = true;
-            updateStatus('info', 'Memeriksa...', 'Mencari data unit...');
+            updateStatus('info', 'Memeriksa...', isReverseModeActive() ? 'Mode reverse aktif. Memeriksa batch lama...' : 'Mencari data unit...');
             try {
-                const res = await fetch(`../api/process_shipment.php?action=get_batch_data&qr=${encodeURIComponent(decodedText)}`);
+                const res = await fetch(`../api/process_shipment.php?action=${getScanAction()}&qr=${encodeURIComponent(decodedText)}`);
                 const result = await res.json();
                 if(result.status === 'success') {
                     new Audio('../assets/sounds/success.wav').play().catch(e => {});
-                    updateStatus('success', 'UNIT DITAMBAHKAN', `Paket ditambahkan ke ${carts[activeCartId].name}`);
+                    const statusCopy = getSuccessStatusForResult(result.data);
+                    updateStatus('success', statusCopy.title, statusCopy.message);
                     addToCart(result.data);
                     setTimeout(resumeScanner, 800);
                 } else {
@@ -1216,7 +1266,11 @@ async function toggleTorch() {
                 carts[activeCartId].items[pid] = { batch: data.batch, item: data.item, size: data.size, copies: data.copies, input_method: incomingInputMethod, in_warehouse: data.in_warehouse, already_shipped: data.already_shipped, selected: new Set() };
                 renderBatchGridHTML(pid, carts[activeCartId].items[pid]);
             } else {
+                carts[activeCartId].items[pid].copies = data.copies;
+                carts[activeCartId].items[pid].in_warehouse = data.in_warehouse;
+                carts[activeCartId].items[pid].already_shipped = data.already_shipped;
                 carts[activeCartId].items[pid].input_method = mergeItemInputMethods(carts[activeCartId].items[pid].input_method, incomingInputMethod);
+                renderActiveCart();
             }
             if (carts[activeCartId].items[pid].in_warehouse.includes(labelScanned) && !carts[activeCartId].items[pid].already_shipped.includes(labelScanned)) {
                 if (!carts[activeCartId].items[pid].selected.has(labelScanned)) {
@@ -1428,6 +1482,14 @@ if (<?php echo $append_id; ?> === 0 && loadCartsFromStorage()) {
     toastr.info('Data scan sebelumnya berhasil dipulihkan.', '', { timeOut: 3000 });
 } else {
     switchCart(1);
+}
+if (reverseModeToggle) {
+    reverseModeToggle.addEventListener('change', () => {
+        const msg = reverseModeToggle.checked
+            ? 'Mode reverse aktif. Barcode gudang lama sebelum 25 Mei 2026 bisa direkonstruksi.'
+            : 'Mode scan normal aktif.';
+        updateStatus('info', 'Scanner Ready', `${msg} Mengisi ${carts[activeCartId].name}`);
+    });
 }
 window.loadHistory();
         document.querySelector('a[href="shipment_scan.php"]')?.closest('li')?.classList.add('mm-active');
