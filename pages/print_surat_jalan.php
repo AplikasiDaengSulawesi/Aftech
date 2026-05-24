@@ -98,7 +98,7 @@ $tanggal_cetak = date('d-m-Y H:i');
     <title>Surat Jalan <?php echo htmlspecialchars($header['surat_jalan_no']); ?></title>
 <style>
     @page {
-        size: 9.5in 5.5in;
+        size: 8.5in 5.5in;
         margin: 0.3in 0.1in
     }
 
@@ -119,7 +119,8 @@ $tanggal_cetak = date('d-m-Y H:i');
     }
 
     .sheet {
-        width: 7.8in;      /* dari 8.8in — lebih sempit untuk hindari area lubang */
+        width: 100%;
+        max-width: 7.8in;      /* dari 8.8in — lebih sempit untuk hindari area lubang */
         margin: 0 auto;
         padding: 0.1in 0;
     }
