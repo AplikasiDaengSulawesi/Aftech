@@ -444,6 +444,34 @@ if ($action == 'save') {
     } else {
         $response = ['status' => 'error', 'message' => $conn->error];
     }
+} elseif ($action == 'clear_active_stock') {
+    // Kosongkan semua stok gudang yang aktif (TIDAK mengganggu yang sudah terkirim di distributor_shipments)
+    $conn->begin_transaction();
+    try {
+        $sql = "DELETE w FROM warehouse_items w 
+                LEFT JOIN distributor_shipments d ON w.production_id = d.production_id AND w.label_no = d.label_no
+                WHERE d.id IS NULL";
+        $conn->query($sql);
+        
+        $deleted = $conn->affected_rows;
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('REPLACE', 'Melakukan pembersihan (Replace) pada $deleted stok aktif gudang')");
+        $conn->commit();
+        $response = ['status' => 'success', 'deleted' => $deleted];
+    } catch (Exception $e) {
+        $conn->rollback();
+        $response = ['status' => 'error', 'message' => $e->getMessage()];
+    }
+} elseif ($action == 'save_base_stock') {
+    $base_stock = (int)$_POST['base_stock'];
+    $sql = "INSERT INTO app_settings (setting_key, setting_value) VALUES ('warehouse_base_stock', '$base_stock') 
+            ON DUPLICATE KEY UPDATE setting_value='$base_stock'";
+    
+    if ($conn->query($sql)) {
+        $conn->query("INSERT INTO activity_logs (action, details) VALUES ('EDIT', 'Admin mengatur Sisa Gudang Manual (Virtual) menjadi $base_stock')");
+        $response = ['status' => 'success', 'base_stock' => $base_stock];
+    } else {
+        $response = ['status' => 'error', 'message' => $conn->error];
+    }
 } elseif ($action == 'delete') {
     $id = (int)$_POST['id'];
     $type = $_GET['type'] ?? '';

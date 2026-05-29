@@ -40,6 +40,8 @@ API key didapat dari endpoint `check_access` setelah device disetujui admin. Mek
 | 8 | GET | `get_reports-mobile.php` | ✅ | Laporan produksi (filter tanggal/item) |
 | 9 | POST | `save_log-mobile.php` | ✅ | Tulis entri ke activity_logs |
 | 10 | GET | `get_labels_report-mobile.php` | ✅ | Laporan label per-batch dengan array `labels` + status |
+| 11 | GET | `get_print_queue-mobile.php` | ✅ | Ambil daftar antrian label yang harus dicetak |
+| 12 | POST | `update_print_queue-mobile.php` | ✅ | Update status antrian cetak menjadi sudah dicetak (`printed`) |
 
 ---
 
@@ -426,6 +428,48 @@ Laporan per-batch + **daftar label (array)** dengan status tiap label. Cocok unt
 **Invariant:** `issued = active + shipped + cancelled + pending`. `is_consistent=false` menandakan ketidaksinkronan antar tabel.
 
 **Efisiensi:** 1 query header + 3 query (warehouse, shipped, cancelled) dengan `IN (...)` — tidak N+1 per batch.
+
+---
+
+## 11. `GET /api/mobile/get_print_queue-mobile.php`
+
+Mengambil daftar antrian cetak label yang belum dicetak (berstatus `pending`). Aplikasi Mobile memanggil ini untuk menarik data yang perlu di-render dan dikirim ke printer.
+
+**Response sukses:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 1,
+      "production_id": 120,
+      "batch": "080326-01C-SED-1000-RAMA-100PCS",
+      "label_no": 11,
+      "qr_code": "11-080326-01C-SED-1000-RAMA-100PCS",
+      "created_at": "2026-03-08 14:30:00"
+    }
+  ]
+}
+```
+
+---
+
+## 12. `POST /api/mobile/update_print_queue-mobile.php`
+
+Memperbarui status antrian cetak dari `pending` menjadi `printed` setelah aplikasi mobile berhasil mencetak label.
+
+**Request body (JSON):**
+Kirimkan array dari ID antrian (`queue_ids`) yang sudah selesai dicetak.
+```json
+{
+  "queue_ids": [1, 2, 3]
+}
+```
+
+**Response sukses:**
+```json
+{ "status": "success", "message": "Status antrian berhasil diupdate" }
+```
 
 ---
 

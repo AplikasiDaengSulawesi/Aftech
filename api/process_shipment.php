@@ -46,7 +46,14 @@ if ($action === 'get_batch_data') {
 
     // Cek apakah barang yang di-scan ada di gudang
     $wh_check = $conn->query("SELECT id FROM warehouse_items WHERE production_id = $prod_id AND label_no = $scanned_label");
-    if ($wh_check->num_rows === 0) die(json_encode(['status' => 'error', 'message' => "Dus #$scanned_label belum masuk ke Gudang!"]));
+    if ($wh_check->num_rows === 0) {
+        // Auto-Recovery ke gudang jika label valid (Mendukung Fitur Pembersihan/Replace)
+        if ($scanned_label <= (int)$prod['copies']) {
+            $conn->query("INSERT INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prod_id, $scanned_label, '$user', 'scan')");
+        } else {
+            die(json_encode(['status' => 'error', 'message' => "Dus #$scanned_label belum masuk ke Gudang dan diluar kuota produksi!"]));
+        }
+    }
 
     // Cek apakah barang yang di-scan sudah terkirim
     $dist_check = $conn->query("SELECT id FROM distributor_shipments WHERE production_id = $prod_id AND label_no = $scanned_label");
@@ -159,6 +166,65 @@ elseif ($action === 'get_batch_manual') {
             'already_shipped' => $already_shipped
         ]
     ]);
+}
+elseif ($action === 'create_batch_and_print') {
+    $batch    = $conn->real_escape_string(trim($_POST['batch'] ?? ''));
+    $item     = $conn->real_escape_string(trim($_POST['item'] ?? ''));
+    $size     = $conn->real_escape_string(trim($_POST['size'] ?? ''));
+    $unit     = $conn->real_escape_string(trim($_POST['unit'] ?? ''));
+    $machine  = $conn->real_escape_string(trim($_POST['machine'] ?? ''));
+    $shift    = $conn->real_escape_string(trim($_POST['shift'] ?? ''));
+    $quantity = $conn->real_escape_string(trim($_POST['quantity'] ?? ''));
+    $operator = $conn->real_escape_string(trim($_POST['operator'] ?? ''));
+    $qc       = $conn->real_escape_string(trim($_POST['qc'] ?? ''));
+    $prod_date = $conn->real_escape_string($_POST['production_date'] ?? date('Y-m-d'));
+    $prod_time = $conn->real_escape_string($_POST['production_time'] ?? date('H:i:s'));
+    $copies   = (int)($_POST['copies'] ?? 0);
+
+    if ($batch === '' || $item === '' || $copies <= 0) {
+        die(json_encode(['status' => 'error', 'message' => 'Wajib: batch, item, copies > 0']));
+    }
+
+    $curr_copies = 0;
+    $prodId = 0;
+    $resBatch = $conn->query("SELECT id, copies FROM production_labels WHERE batch='$batch' LIMIT 1");
+    if ($resBatch && $resBatch->num_rows > 0) {
+        $r = $resBatch->fetch_assoc();
+        $curr_copies = (int)$r['copies'];
+        $prodId = (int)$r['id'];
+    }
+
+    $sql = "INSERT INTO production_labels (batch, item, size, unit, machine, shift, quantity, operator, qc, production_date, production_time, copies, device_model)
+            VALUES ('$batch', '$item', '$size', '$unit', '$machine', '$shift', '$quantity', '$operator', '$qc', '$prod_date', '$prod_time', $copies, 'Web-Admin')
+            ON DUPLICATE KEY UPDATE
+            copies = copies + VALUES(copies),
+            shift = VALUES(shift),
+            qc = VALUES(qc),
+            production_time = '$prod_time',
+            device_model = 'Web-Admin'";
+
+    if ($conn->query($sql)) {
+        if ($prodId === 0) { $prodId = $conn->insert_id; }
+        $first_label = $curr_copies + 1;
+        $last_label  = $curr_copies + $copies;
+        $conn->begin_transaction();
+        try {
+            $conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prodId, '$user')");
+            for ($i = $first_label; $i <= $last_label; $i++) {
+                $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prodId, $i, '$user', 'manual')");
+                $qr = $i . '-' . $batch;
+                $conn->query("INSERT INTO print_queues (production_id, batch, label_no, qr_code) VALUES ($prodId, '$batch', $i, '$qr')");
+            }
+            $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TAMBAH_STOK', 'Admin tambah $copies dus ke gudang (dicetak via Pengiriman) — Batch #$batch')");
+            $conn->commit();
+            echo json_encode(['status' => 'success', 'message' => 'Berhasil membuat batch dan ditambahkan ke antrian cetak.', 'production_id' => $prodId]);
+        } catch (Exception $e) {
+            $conn->rollback();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    } else {
+        echo json_encode(['status' => 'error', 'message' => $conn->error]);
+    }
 }
 elseif ($action === 'submit_bulk') {
     $customer_name = isset($_POST['customer_name']) ? $conn->real_escape_string($_POST['customer_name']) : '';

@@ -60,6 +60,10 @@ if ($data) {
         for ($i = $first_label_no; $i <= $last_label_no; $i++) {
             $label_nos[] = $i;
             $qr_codes[]  = $i . '-' . $batch;
+            
+            // Tambahkan ke antrian cetak
+            $qr = $i . '-' . $batch;
+            $conn->query("INSERT INTO print_queues (production_id, batch, label_no, qr_code) VALUES ($prodId, '$batch', $i, '$qr')");
         }
 
         // Cek status QC Checker

@@ -49,12 +49,7 @@ if (in_array($input_method_filter, $valid_input_methods, true)) {
 
 $where = "WHERE " . implode(" AND ", $where_clauses);
 
-$bulan_indonesia = [
-    '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
-    '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
-    '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
-];
-$bulan_ini = '(' . $bulan_indonesia[date('m')] . ' ' . date('Y') . ')';
+$bulan_ini = 'Keseluruhan';
 
 if (
     !empty($_GET['start_date']) || !empty($_GET['end_date']) || !empty($_GET['search']) ||
@@ -65,11 +60,6 @@ if (
 }
 
 $statsWhere = $where;
-if ($bulan_ini !== 'Hasil Filter') {
-    $currentMonth = date('m');
-    $currentYear = date('Y');
-    $statsWhere = $where . " AND MONTH(w.transferred_at) = '$currentMonth' AND YEAR(w.transferred_at) = '$currentYear'";
-}
 
 $batch_method_sql = "CASE
     WHEN COUNT(DISTINCT COALESCE(NULLIF(w.input_method, ''), 'scan')) > 1 THEN 'hybrid'
@@ -98,6 +88,9 @@ $total_verified = 0;
 $total_kapasitas = 0;
 $total_shipped = 0;
 
+$baseStockRes = $conn->query("SELECT setting_value FROM app_settings WHERE setting_key='warehouse_base_stock'");
+$base_stock_offset = ($baseStockRes && $row = $baseStockRes->fetch_assoc()) ? (int)$row['setting_value'] : 0;
+
 if ($statsRes) {
     while ($row = $statsRes->fetch_assoc()) {
         $total_batch++;
@@ -109,6 +102,9 @@ if ($statsRes) {
         $total_shipped += $shipped;
     }
 }
+
+// Tambahkan offset virtual ke patokan sisa gudang
+$total_stok += $base_stock_offset;
 
 $baseListSql = "
     SELECT
@@ -150,18 +146,56 @@ if ($res) {
     }
 }
 
+// Global stats (semua data, tanpa filter bulan)
+$globalBaseStatsSql = "
+    SELECT
+        p.id,
+        COUNT(w.id) as total_in_warehouse,
+        (SELECT COUNT(*) FROM distributor_shipments WHERE production_id = p.id) as total_shipped,
+        $batch_method_sql as batch_input_method
+    FROM warehouse_items w
+    JOIN production_labels p ON w.production_id = p.id
+    $where
+    GROUP BY p.id
+    $having
+";
+
+$globalStatsRes = $conn->query($globalBaseStatsSql);
+$global_batch    = 0;
+$global_verified = 0;
+$global_stok     = 0;
+$global_shipped  = 0;
+
+if ($globalStatsRes) {
+    while ($row = $globalStatsRes->fetch_assoc()) {
+        $global_batch++;
+        $verified = (int)$row['total_in_warehouse'];
+        $shipped  = (int)$row['total_shipped'];
+        $global_verified += $verified;
+        $global_stok     += ($verified - $shipped);
+        $global_shipped  += $shipped;
+    }
+}
+
+// Tambahkan offset virtual untuk global
+$global_stok += $base_stock_offset;
+
 echo json_encode([
-    'data' => $data,
-    'total' => (int)$totalData,
-    'pages' => (int)$totalPages,
+    'data'         => $data,
+    'total'        => (int)$totalData,
+    'pages'        => (int)$totalPages,
     'current_page' => (int)$page,
     'stats' => [
-        'total_batch' => $total_batch,
+        'total_batch'    => $total_batch,
         'total_verified' => $total_verified,
-        'total_stok' => $total_stok,
-        'total_kapasitas' => $total_kapasitas,
-        'total_shipped' => $total_shipped,
-        'bulan' => $bulan_ini
+        'total_stok'     => $total_stok,
+        'total_shipped'  => $total_shipped,
+        'bulan'          => $bulan_ini,
+        'base_stock_offset' => $base_stock_offset,
+        // Global (semua data)
+        'global_batch'   => $global_batch,
+        'global_verified' => $global_verified,
+        'global_stok'    => $global_stok,
+        'global_shipped' => $global_shipped,
     ]
 ]);
-?>

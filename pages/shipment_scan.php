@@ -11,6 +11,24 @@ if ($append_id > 0) {
     $stmt->execute([$append_id]);
     $append_data = $stmt->fetch(PDO::FETCH_ASSOC);
 }
+
+$m_machines = $pdo->query("SELECT name FROM master_machines ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$m_shifts = $pdo->query("SELECT name FROM master_shifts ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+$items_query = $pdo->query("
+    SELECT i.id, i.name, u.name as unit_name, m.name as default_machine 
+    FROM master_items i 
+    LEFT JOIN master_units u ON i.unit_id = u.id 
+    LEFT JOIN master_machines m ON i.default_machine_id = m.id
+    ORDER BY i.name ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$hierarchy_data = [];
+foreach($items_query as $it) {
+    $sizes = $pdo->prepare("SELECT size_value FROM master_sizes WHERE item_id = ? ORDER BY CAST(size_value AS UNSIGNED) ASC");
+    $sizes->execute([$it['id']]);
+    $hierarchy_data[$it['name']] = ['unit' => $it['unit_name'], 'default_machine' => $it['default_machine'], 'sizes' => $sizes->fetchAll(PDO::FETCH_COLUMN)];
+}
 ?>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
@@ -225,9 +243,10 @@ if ($append_id > 0) {
                                         </label>
                                         <div class="small text-muted mt-1">Khusus barcode produksi sebelum 25 Mei 2026.</div>
                                     </div>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="openManualModal()">
-                                        <i class="fa fa-keyboard me-2"></i> Input Manual (Tanpa Barcode)
-                                    </button>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm w-50" onclick="openManualModal()"><i class="fa fa-keyboard me-1"></i> Input Manual</button>
+                                        <button type="button" class="btn btn-outline-success btn-sm w-50" onclick="openCreateBatchModal()"><i class="fa fa-print me-1"></i> Buat & Cetak</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -379,6 +398,62 @@ if ($append_id > 0) {
                     <div class="modal-body p-4" id="viewDetailContent">
                         <!-- Content loaded via AJAX -->
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- MODAL BUAT & CETAK BATCH BARU -->
+        <div class="modal fade" id="modalCreateBatch" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header bg-success text-white border-0" style="border-radius: 20px 20px 0 0;">
+                        <h5 class="modal-title text-white font-w700"><i class="fa fa-plus-circle me-2"></i>Buat Batch Baru & Antrikan Cetak</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form id="formCreateBatch">
+                        <div class="modal-body p-4">
+                            <div class="alert alert-info border-0 small mb-3" style="border-radius: 10px;">
+                                <i class="fa fa-info-circle me-1"></i> Stok yang ditambahkan akan otomatis masuk ke antrian cetak dan siap ditambahkan ke keranjang pengiriman.
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Item <span class="text-danger">*</span></label>
+                                    <select class="form-control" name="item" id="cb_item" required>
+                                        <option value="">-- Pilih Item --</option>
+                                        <?php foreach($hierarchy_data as $itm => $dat): ?><option value="<?php echo htmlspecialchars($itm); ?>"><?php echo htmlspecialchars($itm); ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-3"><label class="form-label small font-w700">Size <span class="text-danger">*</span></label><select class="form-control" name="size" id="cb_size" required><option value="">-- Pilih Size --</option></select></div>
+                                <div class="col-md-3"><label class="form-label small font-w700">Unit</label><input type="text" class="form-control" name="unit" id="cb_unit" readonly placeholder="auto"></div>
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Mesin <span class="text-danger">*</span></label>
+                                    <select class="form-control" name="machine" id="cb_machine" required>
+                                        <option value="">-- Pilih Mesin --</option>
+                                        <?php foreach($m_machines as $mc): ?><option value="<?php echo htmlspecialchars($mc['name']); ?>"><?php echo htmlspecialchars($mc['name']); ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Shift <span class="text-danger">*</span></label>
+                                    <select class="form-control" name="shift" id="cb_shift" required>
+                                        <option value="">-- Pilih Shift --</option>
+                                        <?php foreach($m_shifts as $sh): ?><option value="<?php echo htmlspecialchars($sh['name']); ?>"><?php echo htmlspecialchars($sh['name']); ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6"><label class="form-label small font-w700">Operator</label><input type="text" class="form-control" name="operator" id="cb_operator" placeholder="Nama operator"></div>
+                                <div class="col-md-6"><label class="form-label small font-w700">QC</label><input type="text" class="form-control" name="qc" id="cb_qc" placeholder="Nama QC"></div>
+                                <div class="col-md-4"><label class="form-label small font-w700">Tanggal Produksi</label><input type="date" class="form-control" name="production_date" id="cb_date" value="<?php echo date('Y-m-d'); ?>"></div>
+                                <div class="col-md-4"><label class="form-label small font-w700">Jam Produksi</label><input type="time" class="form-control" name="production_time" id="cb_time" value="<?php echo date('H:i'); ?>"></div>
+                                <div class="col-md-4"><label class="form-label small font-w700">Qty per Dus <span class="text-danger">*</span></label><input type="text" class="form-control" name="quantity" id="cb_quantity" placeholder="Contoh: 1000" required></div>
+                                <div class="col-md-6"><label class="form-label small font-w700">Jumlah Dus (Copies) <span class="text-danger">*</span></label><input type="number" class="form-control" name="copies" id="cb_copies" min="1" value="1" required></div>
+                                <div class="col-md-6">
+                                    <label class="form-label small font-w700">Kode Batch <span class="text-danger">*</span></label>
+                                    <div class="input-group"><input type="text" class="form-control" name="batch" id="cb_batch" placeholder="Mis. 180426-01A-SED-1000-ADMIN-100PCS" required><button type="button" class="btn btn-light border" onclick="autoGenerateBatchCreate()" title="Auto-generate"><i class="fa fa-magic"></i></button></div>
+                                    <small class="text-muted">Format: <code>ddmmyy-mesinShift-item-qty-operator-sizeUnit</code></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0"><button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-success btn-sm shadow" id="btnSubmitCreateBatch"><i class="fa fa-save me-1"></i> Simpan & Antrikan Cetak</button></div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -1474,6 +1549,43 @@ async function toggleTorch() {
                 toastr.error('Gagal memuat batch');
             }
         };
+
+        const hierarchyData = <?php echo json_encode($hierarchy_data); ?>;
+        window.openCreateBatchModal = function() {
+            document.getElementById('formCreateBatch').reset();
+            document.getElementById('cb_date').value = new Date().toISOString().slice(0,10);
+            const now = new Date(); document.getElementById('cb_time').value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            new bootstrap.Modal(document.getElementById('modalCreateBatch')).show();
+        };
+        document.getElementById('cb_item')?.addEventListener('change', function() {
+            const item = this.value; const sizeSel = document.getElementById('cb_size'); const unitInp = document.getElementById('cb_unit'); const machineSel = document.getElementById('cb_machine');
+            sizeSel.innerHTML = '<option value="">-- Pilih Size --</option>'; unitInp.value = '';
+            if (item && hierarchyData[item]) {
+                unitInp.value = hierarchyData[item].unit || '';
+                (hierarchyData[item].sizes || []).forEach(s => { sizeSel.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`); });
+                const defMachine = hierarchyData[item].default_machine;
+                if (defMachine) {
+                    const opt = Array.from(machineSel.options).find(o => o.value === defMachine);
+                    if (opt) { machineSel.value = defMachine; machineSel.classList.add('is-valid'); setTimeout(() => machineSel.classList.remove('is-valid'), 1500); }
+                }
+            }
+        });
+        window.autoGenerateBatchCreate = function() {
+            const item = document.getElementById('cb_item').value; const size = document.getElementById('cb_size').value; const unit = document.getElementById('cb_unit').value;
+            const machine = document.getElementById('cb_machine').value; const shift = document.getElementById('cb_shift').value; const operator = document.getElementById('cb_operator').value || 'ADMIN';
+            const quantity = document.getElementById('cb_quantity').value; const dateVal = document.getElementById('cb_date').value;
+            if (!item || !size || !machine || !shift || !quantity || !dateVal) { toastr.warning('Lengkapi item, size, mesin, shift, qty, tanggal dulu'); return; }
+            const d = new Date(dateVal); const dd = String(d.getDate()).padStart(2,'0'); const mm = String(d.getMonth()+1).padStart(2,'0'); const yy = String(d.getFullYear()).slice(-2);
+            const shiftCode = (machine.match(/\d+/) || ['01'])[0] + (shift.match(/[A-Z]$/i) || ['A'])[0].toUpperCase(); const itemPrefix = item.substring(0,3).toUpperCase();
+            const opCode = operator.substring(0, 4).toUpperCase().replace(/\s+/g,'');
+            document.getElementById('cb_batch').value = `${dd}${mm}${yy}-${shiftCode}-${itemPrefix}-${quantity}-${opCode}-${size}${unit}`;
+        };
+        document.getElementById('formCreateBatch')?.addEventListener('submit', async function(e) {
+            e.preventDefault(); const btn = document.getElementById('btnSubmitCreateBatch'); btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> Menyimpan...';
+            try { const r = await fetch('../api/process_shipment.php?action=create_batch_and_print', { method: 'POST', body: new FormData(this) }); const res = await r.json();
+            if (res.status === 'success') { toastr.success(res.message); bootstrap.Modal.getInstance(document.getElementById('modalCreateBatch')).hide(); pickManualBatch(res.production_id); } else toastr.error(res.message || 'Gagal menyimpan'); }
+            catch (err) { toastr.error('Koneksi error: ' + err.message); } finally { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save me-1"></i> Simpan & Antrikan Cetak'; }
+        });
 
 // Load dari storage jika ada, fallback ke cart baru
 if (<?php echo $append_id; ?> === 0 && loadCartsFromStorage()) {

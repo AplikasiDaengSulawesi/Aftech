@@ -152,7 +152,7 @@ foreach($items_query as $it) {
                                         <p class="mb-1 text-white font-w600">Total Batch</p>
                                         <h3 class="text-white mb-0" id="kpi-batch">0</h3>
                                         <small class="d-block mb-1">Batch di Gudang</small>
-                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
+                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Keseluruhan</span>
                                     </div>
                                 </div>
                             </div>
@@ -167,7 +167,7 @@ foreach($items_query as $it) {
                                         <p class="mb-1 text-white font-w600">Total Dus Masuk</p>
                                         <h3 class="text-white mb-0" id="kpi-qty">0</h3>
                                         <small class="d-block mb-1">Diterima di Gudang</small>
-                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
+                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Keseluruhan</span>
                                     </div>
                                 </div>
                             </div>
@@ -182,14 +182,14 @@ foreach($items_query as $it) {
                                         <p class="mb-1 text-white font-w600">Telah Terkirim</p>
                                         <h3 class="text-white mb-0" id="kpi-shipped">0</h3>
                                         <small class="d-block mb-1">Dus Keluar</small>
-                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
+                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Keseluruhan</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-6 col-sm-6">
-                        <div class="widget-stat card bg-success shadow-sm card-kpi">
+                    <div class="col-xl-3 col-lg-6 col-sm-6" ondblclick="openBaseStockModal()" style="cursor: pointer;" title="Klik 2x untuk set manual jumlah Sisa di Gudang">
+                        <div class="widget-stat card bg-success shadow-sm card-kpi" style="transition: transform 0.2s;">
                             <div class="card-body p-4">
                                 <div class="media">
                                     <span class="me-3"><i class="fa fa-check-circle"></i></span>
@@ -197,7 +197,7 @@ foreach($items_query as $it) {
                                         <p class="mb-1 text-white font-w600">Sisa di Gudang</p>
                                         <h3 class="text-white mb-0" id="kpi-verified">0</h3>
                                         <small class="d-block mb-1">Total Dus Tersedia</small>
-                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Bulan Ini</span>
+                                        <span class="kpi-title-month"><i class="fa fa-calendar-alt me-1"></i> Keseluruhan</span>
                                     </div>
                                 </div>
                             </div>
@@ -235,6 +235,9 @@ foreach($items_query as $it) {
                                         </a>
                                         <button type="button" class="btn btn-primary btn-xs shadow-sm font-w600" data-bs-toggle="modal" data-bs-target="#modalAddStock">
                                             <i class="fas fa-plus-circle me-1"></i> Tambah Stok
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-xs shadow-sm font-w600" onclick="clearActiveStock()">
+                                            <i class="fas fa-trash-restore me-1"></i> Bersihkan Stok (Replace)
                                         </button>
                                         <div class="dropdown">
                                             <button class="btn btn-light btn-xs shadow-sm dropdown-toggle font-w600 w-100" type="button" data-bs-toggle="dropdown">
@@ -612,15 +615,45 @@ foreach($items_query as $it) {
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
                     <div class="modal-header bg-primary text-white border-0" style="border-radius: 20px 20px 0 0;">
                         <h5 class="modal-title text-white font-w700"><i class="fa fa-th-large me-2"></i>Peta Dus Gudang</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <div>
+                            <button type="button" class="btn btn-light btn-sm text-primary me-2 font-w700 shadow-sm" id="btnDownloadBarcode"><i class="fa fa-qrcode me-1"></i> Download Barcode</button>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
                     </div>
                     <div class="modal-body p-4">
                         <div class="d-flex justify-content-between mb-2">
                             <div><h5 class="text-black mb-0" id="v-item"></h5><p class="small text-primary mb-0" id="v-batch"></p></div>
                         </div>
-                        <p class="text-muted small mb-3">Peta visual unit dus yang sudah masuk ke gudang (Warna Indigo).</p>
+                        <p class="text-muted small mb-3">Peta visual unit dus yang sudah masuk ke gudang (Warna Indigo). Klik pada kotak dus untuk memilih barcode spesifik yang ingin di-download.</p>
                         <div class="cinema-grid-warehouse" id="v-grid"></div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL SET BASE STOCK MANUAL -->
+        <div class="modal fade" id="modalSetBaseStock" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header bg-success text-white border-0" style="border-radius: 20px 20px 0 0;">
+                        <h5 class="modal-title text-white font-w700"><i class="fa fa-edit me-2"></i>Set Sisa Gudang</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form id="formSetBaseStock">
+                        <div class="modal-body p-4">
+                            <p class="small text-muted mb-3">Tentukan jumlah Sisa di Gudang terkini. Angka ini akan menjadi patokan awal dan tidak mempengaruhi data stok fisik (history batch) pada tabel di bawah.</p>
+                            <div class="mb-3">
+                                <label class="form-label small font-w700">Jumlah Patokan Stok</label>
+                                <input type="number" class="form-control border-success" id="bs_amount" name="base_stock" min="0" required>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button>
+                            <button type="submit" class="btn btn-success btn-sm shadow" id="btnSubmitBaseStock">
+                                <i class="fa fa-save me-1"></i> Simpan
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -683,6 +716,8 @@ foreach($items_query as $it) {
 
                 // Update KPI Stats if available
                                                 if (response.stats) {
+                    window.currentBaseStock = response.stats.base_stock_offset || 0;
+
                                                     document.getElementById('kpi-batch').innerText = formatCompactNumber(response.stats.total_batch);
                                                     document.getElementById('kpi-batch').title = response.stats.total_batch.toLocaleString('id-ID');
 
@@ -696,7 +731,7 @@ foreach($items_query as $it) {
                                                     document.getElementById('kpi-verified').title = response.stats.total_stok.toLocaleString('id-ID');
 
                                                     if(response.stats.bulan) {
-                                                        document.querySelectorAll('.kpi-title-month').forEach(el => el.innerText = response.stats.bulan);
+                                                        document.querySelectorAll('.kpi-title-month').forEach(el => el.innerHTML = `<i class="fa fa-calendar-alt me-1"></i> ${response.stats.bulan}`);
                                                     }
                                                 }
 
@@ -858,6 +893,19 @@ foreach($items_query as $it) {
             document.getElementById('v-batch').innerText = "Batch ID: " + row.batch;
             const grid = document.getElementById('v-grid');
             grid.innerHTML = '<div class="text-center w-100 py-4">Memuat peta...</div>';
+            
+            let selectedLabels = new Set();
+            const btnDownload = document.getElementById('btnDownloadBarcode');
+            btnDownload.innerHTML = '<i class="fa fa-qrcode me-1"></i> Download Semua Barcode';
+            
+            btnDownload.onclick = function() {
+                let url = `print_barcodes.php?id=${row.production_id}`;
+                if (selectedLabels.size > 0) {
+                    url += `&labels=${Array.from(selectedLabels).join(',')}`;
+                }
+                window.open(url, '_blank');
+            };
+            
             new bootstrap.Modal(modalEl).show();
             try {
                 const res = await fetch(`../api/get_warehouse_details.php?prod_id=${row.production_id}`);
@@ -866,11 +914,41 @@ foreach($items_query as $it) {
                 for (let i = 1; i <= row.copies; i++) {
                     const seat = document.createElement('div');
                     seat.innerText = i; seat.className = 'seat-warehouse';
-                    if (list.includes(i)) seat.classList.add('in-stock');
-                    // Tidak ada event listener klik/hover, sehingga murni View-Only
+                    if (list.includes(i)) {
+                        seat.classList.add('in-stock');
+                        seat.title = `Dus #${i}`;
+                        seat.onclick = function() {
+                            if (selectedLabels.has(i)) { selectedLabels.delete(i); seat.classList.remove('selected'); }
+                            else { selectedLabels.add(i); seat.classList.add('selected'); }
+                            btnDownload.innerHTML = selectedLabels.size > 0 ? `<i class="fa fa-qrcode me-1"></i> Download ${selectedLabels.size} Barcode` : '<i class="fa fa-qrcode me-1"></i> Download Semua Barcode';
+                        };
+                    }
                     grid.appendChild(seat);
                 }
             } catch (e) { grid.innerHTML = '<div class="text-danger w-100 text-center">Gagal memuat peta.</div>'; }
+        }
+
+        window.clearActiveStock = function() {
+            Swal.fire({
+                title: 'Bersihkan Seluruh Stok Aktif?',
+                text: "Tindakan ini akan mengosongkan semua stok gudang yang belum dikirim. Label yang sudah terkirim akan tetap aman.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#D50000',
+                confirmButtonText: 'Ya, Bersihkan (Replace)',
+                cancelButtonText: 'Batal'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    const r = await fetch(`../api/manage_settings.php?action=clear_active_stock`, { method: 'POST' });
+                    const response = await r.json();
+                    if(response.status === 'success') { 
+                        toastr.success(`Berhasil membersihkan ${response.deleted} stok aktif`); 
+                        fetchWarehouseStock(1); 
+                    } else {
+                        toastr.error(response.message || 'Gagal menghapus data');
+                    }
+                }
+            });
         }
 
         window.clearBatch = function(id, batch) {
@@ -1023,6 +1101,32 @@ foreach($items_query as $it) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa fa-save me-1"></i> Simpan & Masuk Gudang';
             }
+        });
+
+        // ================= SET BASE STOCK MANUAL =================
+        window.currentBaseStock = 0;
+        window.openBaseStockModal = function() {
+            document.getElementById('bs_amount').value = window.currentBaseStock;
+            new bootstrap.Modal(document.getElementById('modalSetBaseStock')).show();
+        };
+
+        document.getElementById('formSetBaseStock').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSubmitBaseStock');
+            btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> Menyimpan...';
+            try {
+                const fd = new FormData(this);
+                const r = await fetch('../api/manage_settings.php?action=save_base_stock', { method: 'POST', body: fd });
+                const res = await r.json();
+                if (res.status === 'success') {
+                    toastr.success('Patokan stok manual berhasil diperbarui.');
+                    bootstrap.Modal.getInstance(document.getElementById('modalSetBaseStock')).hide();
+                    fetchWarehouseStock(1);
+                } else {
+                    toastr.error(res.message || 'Gagal menyimpan');
+                }
+            } catch(e) { toastr.error('Koneksi error'); }
+            finally { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save me-1"></i> Simpan'; }
         });
 
         // ================= RIWAYAT PEMBATALAN LABEL =================
