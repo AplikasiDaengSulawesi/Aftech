@@ -10,10 +10,10 @@ date_default_timezone_set('Asia/Makassar');
 // === KOP PERUSAHAAN (ubah di sini bila berubah) ===
 $company = [
     'name'    => 'PT AFTECH MAKASSAR INDONESIA',
-    'address' => 'Jl. Ir. Sutami Kav. SS-23 B Kawasan Industri Makassar',
+    'address' => 'Jl. Kima 8 Kav. SS-23 B Kawasan Industri Makassar',
     'city'    => 'Makassar - Sul. Sel',
-    'phone'   => '(0411) 518 419 / 087234652266',
-    'email'   => 'ibaftech@gmail.com',
+    'phone'   => '(0411) 518 419 / 082344662266',
+    'email'   => 'iloaftech@gmail.com',
 ];
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
