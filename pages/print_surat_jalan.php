@@ -60,7 +60,7 @@ $tanggal_cetak = date('d-m-Y H:i');
     <title>Surat Jalan <?php echo htmlspecialchars($header['surat_jalan_no']); ?></title>
 <style>
     @page {
-        size: 8.5in 5.5in;
+        size: 5.5in 8.3in;
         margin: 0.3in 0.1in
     }
 
