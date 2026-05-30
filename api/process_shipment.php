@@ -215,6 +215,16 @@ elseif ($action === 'create_batch_and_print') {
                 $qr = $i . '-' . $batch;
                 $conn->query("INSERT INTO print_queues (production_id, batch, label_no, qr_code) VALUES ($prodId, '$batch', $i, '$qr')");
             }
+
+            // Kurangi offset base stock maya untuk produksi lama agar perhitungan sisa gudang seimbang
+            if ($prod_date < '2026-05-30') {
+                $conn->query("
+                    INSERT INTO app_settings (setting_key, setting_value) 
+                    VALUES ('warehouse_base_stock', '-$copies') 
+                    ON DUPLICATE KEY UPDATE setting_value = CAST(setting_value AS SIGNED) - $copies
+                ");
+            }
+
             $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TAMBAH_STOK', 'Admin tambah $copies dus ke gudang (dicetak via Pengiriman) — Batch #$batch')");
             $conn->commit();
             echo json_encode(['status' => 'success', 'message' => 'Berhasil membuat batch dan ditambahkan ke antrian cetak.', 'production_id' => $prodId]);

@@ -22,7 +22,7 @@ assertSameValue('100', $parsedBatch['size_value']);
 assertSameValue('ML', $parsedBatch['unit_code']);
 
 assertSameValue('2026-03-08', $helper->parseProductionDate('080326'));
-assertThrowsValue(fn() => $helper->assertReverseAllowedDate('2026-05-25'), 'tanggal cutoff harus ditolak');
+assertThrowsValue(fn() => $helper->assertReverseAllowedDate('2026-05-30'), 'tanggal cutoff harus ditolak');
 assertThrowsValue(fn() => $helper->parseBatch('BATCH-SALAH'), 'format batch salah harus ditolak');
 assertTrueValue(true, 'smoke reverse parser harus lulus');
 

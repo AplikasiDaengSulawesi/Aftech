@@ -236,13 +236,6 @@ foreach($items_query as $it) {
                                         <small class="text-muted px-2">atau</small>
                                         <hr class="flex-grow-1 my-0">
                                     </div>
-                                    <div class="form-check form-switch mt-2 mb-3">
-                                        <input class="form-check-input" type="checkbox" role="switch" id="reverse-mode-toggle">
-                                        <label class="form-check-label small font-w600 text-black" for="reverse-mode-toggle">
-                                            Reverse Gudang Lama
-                                        </label>
-                                        <div class="small text-muted mt-1">Khusus barcode produksi sebelum 25 Mei 2026.</div>
-                                    </div>
                                     <div class="d-flex gap-2">
                                         <button type="button" class="btn btn-outline-secondary btn-sm w-50" onclick="openManualModal()"><i class="fa fa-keyboard me-1"></i> Input Manual</button>
                                         <button type="button" class="btn btn-outline-success btn-sm w-50" onclick="openCreateBatchModal()"><i class="fa fa-print me-1"></i> Buat & Cetak</button>
@@ -467,7 +460,6 @@ foreach($items_query as $it) {
         const cameraSelect = document.getElementById('camera-select');
         const cartContainer = document.getElementById('cart-container');
         const tabsContainer = document.getElementById('cart-tabs-container');
-        const reverseModeToggle = document.getElementById('reverse-mode-toggle');
         
         // --- MULTI-CART STATE ---
         let cartCounter = 1;
@@ -1249,17 +1241,8 @@ async function toggleTorch() {
     }
 }
 
-        function isReverseModeActive() {
-            return !!(reverseModeToggle && reverseModeToggle.checked);
-        }
-
-        function getScanAction() {
-            return isReverseModeActive() ? 'reverse_scan' : 'get_batch_data';
-        }
-
         function getScanReadyMessage() {
-            const modeText = isReverseModeActive() ? 'Mode Reverse Gudang aktif.' : 'Mode Scan Normal aktif.';
-            return `${modeText} Arahkan kamera ke QR (Mengisi ${carts[activeCartId].name})`;
+            return `Arahkan kamera ke QR (Mengisi ${carts[activeCartId].name})`;
         }
 
         function getSuccessStatusForResult(resultData) {
@@ -1295,10 +1278,24 @@ async function toggleTorch() {
         async function onScanSuccess(decodedText) {
             if (isProcessing) return; 
             if (html5QrCode && html5QrCode.isScanning) html5QrCode.pause(true);
+            let isReverse = false;
             const dashIndex = decodedText.indexOf('-');
             if (dashIndex > 0) {
                 const labelNo = parseInt(decodedText.substring(0, dashIndex));
                 const batchStr = decodedText.substring(dashIndex + 1);
+                
+                // Auto-aktifkan reverse mode jika tanggal produksi < 30 Mei 2026
+                let datePart = batchStr.substring(0, 6);
+                if (/^\d{6}$/.test(datePart)) {
+                    let day   = datePart.substring(0, 2);
+                    let month = datePart.substring(2, 4);
+                    let year  = "20" + datePart.substring(4, 6);
+                    let prodDateStr = `${year}-${month}-${day}`;
+                    if (prodDateStr < '2026-05-30') {
+                        isReverse = true;
+                    }
+                }
+
                 let foundInCartName = null;
                 for (const cid in carts) {
                     for (const pid in carts[cid].items) {
@@ -1314,9 +1311,10 @@ async function toggleTorch() {
                 }
             }
             isProcessing = true;
-            updateStatus('info', 'Memeriksa...', isReverseModeActive() ? 'Mode reverse aktif. Memeriksa batch lama...' : 'Mencari data unit...');
+            updateStatus('info', 'Memeriksa...', isReverse ? 'Mode reverse otomatis aktif. Memeriksa batch lama...' : 'Mencari data unit...');
             try {
-                const res = await fetch(`../api/process_shipment.php?action=${getScanAction()}&qr=${encodeURIComponent(decodedText)}`);
+                const action = isReverse ? 'reverse_scan' : 'get_batch_data';
+                const res = await fetch(`../api/process_shipment.php?action=${action}&qr=${encodeURIComponent(decodedText)}`);
                 const result = await res.json();
                 if(result.status === 'success') {
                     new Audio('../assets/sounds/success.wav').play().catch(e => {});
@@ -1357,28 +1355,72 @@ async function toggleTorch() {
             saveCartsToStorage();
         }
 
+        function updateManualQty(pid, qtyStr) {
+            let qty = parseInt(qtyStr);
+            if (isNaN(qty) || qty < 0) qty = 0;
+            const batchData = carts[activeCartId].items[pid];
+            const availableLabels = batchData.in_warehouse.filter(x => !batchData.already_shipped.includes(x)).sort((a, b) => a - b);
+            const availableCount = availableLabels.length;
+            if (qty > availableCount) qty = availableCount;
+            
+            const inputEl = document.getElementById(`manual-qty-${pid}`);
+            if (inputEl && parseInt(inputEl.value) > availableCount) {
+                inputEl.value = availableCount;
+            } else if (inputEl && parseInt(inputEl.value) < 0) {
+                inputEl.value = 0;
+            }
+
+            batchData.selected.clear();
+            for (let i = 0; i < qty; i++) {
+                batchData.selected.add(availableLabels[i]);
+            }
+            const countEl = document.getElementById(`count-${pid}`);
+            if (countEl) countEl.innerText = batchData.selected.size;
+            updateTotal();
+            saveCartsToStorage();
+        }
+
         function renderBatchGridHTML(pid, batchData) {
             const div = document.createElement('div');
             div.className = 'batch-card'; div.id = `batch-card-${pid}`;
-            const availableCount = batchData.in_warehouse.filter(x => !batchData.already_shipped.includes(x)).length;
-            div.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><div><h5 class="text-primary mb-0">#${batchData.batch}</h5><small class="text-black font-w600">${batchData.item} (${batchData.size})</small></div><div class="d-flex align-items-center gap-2"><button type="button" class="btn btn-outline-primary btn-sm" id="btn-selectall-${pid}" onclick="selectAllInBatch(${pid})"><i class="fa fa-check-double me-1"></i> Pilih Semua (${availableCount})</button><div class="text-primary font-w800" style="font-size: 14px;"><span id="count-${pid}">${batchData.selected.size}</span> Dipilih</div></div></div><div class="cinema-grid-bulk" id="grid-${pid}"></div>`;
-            cartContainer.appendChild(div);
-            const gridEl = document.getElementById(`grid-${pid}`);
-            for (let i = 1; i <= batchData.copies; i++) {
-                const seat = document.createElement('div');
-                seat.innerText = i; seat.id = `seat-${pid}-${i}`; seat.className = 'seat-bulk';
-                if (batchData.already_shipped.includes(i)) { seat.classList.add('shipped'); seat.title = 'Sudah Dikirim'; }
-                else if (batchData.in_warehouse.includes(i)) {
-                    seat.classList.add('available'); if (batchData.selected.has(i)) seat.classList.add('selected');
-                    const start = () => { isDragging = true; toggleSeat(pid, i, seat); };
-                    const move = () => { if(isDragging) toggleSeat(pid, i, seat); };
-                    seat.addEventListener('mousedown', start); seat.addEventListener('mouseenter', move);
-                    seat.addEventListener('touchstart', (e) => { e.preventDefault(); start(); });
-                } else seat.title = 'Belum di Gudang';
-                gridEl.appendChild(seat);
+            const availableLabels = batchData.in_warehouse.filter(x => !batchData.already_shipped.includes(x)).sort((a, b) => a - b);
+            const availableCount = availableLabels.length;
+            
+            if (batchData.input_method === 'manual') {
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div><h5 class="text-primary mb-0">#${batchData.batch}</h5><small class="text-black font-w600">${batchData.item} (${batchData.size})</small></div>
+                        <div class="text-primary font-w800" style="font-size: 14px;"><span id="count-${pid}">${batchData.selected.size}</span> Dipilih</div>
+                    </div>
+                    <div class="mt-2 p-3 bg-light rounded border">
+                        <label class="form-label font-w600 text-black small">Masukkan Jumlah Dus yang Dikirim (Maks: ${availableCount})</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control border-primary" id="manual-qty-${pid}" min="0" max="${availableCount}" value="${batchData.selected.size}" oninput="updateManualQty(${pid}, this.value)">
+                            <button type="button" class="btn btn-primary" onclick="updateManualQty(${pid}, document.getElementById('manual-qty-${pid}').value)">Set Qty</button>
+                        </div>
+                    </div>
+                `;
+                cartContainer.appendChild(div);
+            } else {
+                div.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><div><h5 class="text-primary mb-0">#${batchData.batch}</h5><small class="text-black font-w600">${batchData.item} (${batchData.size})</small></div><div class="d-flex align-items-center gap-2"><button type="button" class="btn btn-outline-primary btn-sm" id="btn-selectall-${pid}" onclick="selectAllInBatch(${pid})"><i class="fa fa-check-double me-1"></i> Pilih Semua (${availableCount})</button><div class="text-primary font-w800" style="font-size: 14px;"><span id="count-${pid}">${batchData.selected.size}</span> Dipilih</div></div></div><div class="cinema-grid-bulk" id="grid-${pid}"></div>`;
+                cartContainer.appendChild(div);
+                const gridEl = document.getElementById(`grid-${pid}`);
+                for (let i = 1; i <= batchData.copies; i++) {
+                    const seat = document.createElement('div');
+                    seat.innerText = i; seat.id = `seat-${pid}-${i}`; seat.className = 'seat-bulk';
+                    if (batchData.already_shipped.includes(i)) { seat.classList.add('shipped'); seat.title = 'Sudah Dikirim'; }
+                    else if (batchData.in_warehouse.includes(i)) {
+                        seat.classList.add('available'); if (batchData.selected.has(i)) seat.classList.add('selected');
+                        const start = () => { isDragging = true; toggleSeat(pid, i, seat); };
+                        const move = () => { if(isDragging) toggleSeat(pid, i, seat); };
+                        seat.addEventListener('mousedown', start); seat.addEventListener('mouseenter', move);
+                        seat.addEventListener('touchstart', (e) => { e.preventDefault(); start(); });
+                    } else seat.title = 'Belum di Gudang';
+                    gridEl.appendChild(seat);
+                }
+                window.addEventListener('mouseup', () => isDragging = false); window.addEventListener('touchend', () => isDragging = false);
+                updateSelectAllButtonUI(pid);
             }
-            window.addEventListener('mouseup', () => isDragging = false); window.addEventListener('touchend', () => isDragging = false);
-            updateSelectAllButtonUI(pid);
         }
 
         function updateSelectAllButtonUI(pid) {
@@ -1594,14 +1636,6 @@ if (<?php echo $append_id; ?> === 0 && loadCartsFromStorage()) {
     toastr.info('Data scan sebelumnya berhasil dipulihkan.', '', { timeOut: 3000 });
 } else {
     switchCart(1);
-}
-if (reverseModeToggle) {
-    reverseModeToggle.addEventListener('change', () => {
-        const msg = reverseModeToggle.checked
-            ? 'Mode reverse aktif. Barcode gudang lama sebelum 25 Mei 2026 bisa direkonstruksi.'
-            : 'Mode scan normal aktif.';
-        updateStatus('info', 'Scanner Ready', `${msg} Mengisi ${carts[activeCartId].name}`);
-    });
 }
 window.loadHistory();
         document.querySelector('a[href="shipment_scan.php"]')?.closest('li')?.classList.add('mm-active');

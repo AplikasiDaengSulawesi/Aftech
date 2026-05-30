@@ -3,7 +3,7 @@
 class ShipmentReverseHelper
 {
     private mysqli $conn;
-    private string $cutoffDate = '2026-05-25';
+    private string $cutoffDate = '2026-05-30';
 
     public function __construct(mysqli $conn)
     {
@@ -38,7 +38,7 @@ class ShipmentReverseHelper
     public function parseBatch(string $batch): array
     {
         $batch = trim($batch);
-        if (!preg_match('/^(\d{6})-([0-9]{1,2})([A-Z])-([A-Z]{3})-([0-9]+)-([A-Z]{4})-([0-9]+)([A-Z]+)$/', $batch, $m)) {
+        if (!preg_match('/^(\d{6})-([0-9]{1,2})([A-Z])-([A-Z]+)-([0-9]+)-([A-Z]+)-([0-9]+)([A-Z]+)$/', $batch, $m)) {
             throw new RuntimeException('Format batch reverse tidak valid');
         }
 
@@ -68,7 +68,7 @@ class ShipmentReverseHelper
     public function assertReverseAllowedDate(string $productionDate): void
     {
         if ($productionDate >= $this->cutoffDate) {
-            throw new RuntimeException('Mode reverse hanya berlaku untuk produksi sebelum 2026-05-25');
+            throw new RuntimeException('Mode reverse hanya berlaku untuk produksi sebelum 2026-05-30');
         }
     }
 
@@ -221,7 +221,10 @@ class ShipmentReverseHelper
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         if (!$row) {
-            throw new RuntimeException("Kode operator/QC {$operatorQcCode} tidak ditemukan dari histori produksi");
+            return [
+                'operator' => $operatorQcCode,
+                'qc' => $operatorQcCode,
+            ];
         }
 
         return [
@@ -364,6 +367,15 @@ class ShipmentReverseHelper
         ");
         $stmt->bind_param('iis', $productionId, $labelNo, $user);
         $stmt->execute();
+
+        // Kurangi offset base stock maya, karena barang reverse ini diambil dari tumpukan
+        // fisik lama yang belum tercatat. Sehingga saat barangnya selesai dikirim,
+        // stok total di Dasbor akan benar-benar terhitung berkurang (minus).
+        $this->conn->query("
+            INSERT INTO app_settings (setting_key, setting_value) 
+            VALUES ('warehouse_base_stock', '-1') 
+            ON DUPLICATE KEY UPDATE setting_value = CAST(setting_value AS SIGNED) - 1
+        ");
     }
 
     private function warehouseLabelExists(int $productionId, int $labelNo): bool

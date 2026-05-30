@@ -350,6 +350,16 @@ if ($action == 'save') {
                 for ($i = $first_label; $i <= $last_label; $i++) {
                     $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prodId, $i, '$admin_name', 'manual')");
                 }
+
+                // Kurangi offset base stock maya untuk produksi lama agar perhitungan sisa gudang seimbang
+                if ($prod_date < '2026-05-30') {
+                    $conn->query("
+                        INSERT INTO app_settings (setting_key, setting_value) 
+                        VALUES ('warehouse_base_stock', '-$copies') 
+                        ON DUPLICATE KEY UPDATE setting_value = CAST(setting_value AS SIGNED) - $copies
+                    ");
+                }
+
                 $conn->query("INSERT INTO activity_logs (action, details) VALUES ('TAMBAH_STOK', 'Admin tambah $copies dus ke gudang — Batch #$batch (label $first_label..$last_label)')");
                 $conn->commit();
                 $response = [
