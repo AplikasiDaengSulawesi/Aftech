@@ -530,10 +530,7 @@ foreach($items_query as $it) {
         window.columnStates = { 'col-time': true, 'col-customer': true, 'col-items': true, 'col-total': true, 'col-officer': true };
 
         function formatCompactNumber(number) {
-            number = parseInt(number || 0);
-            if (number < 1000) return number.toLocaleString('id-ID');
-            if (number < 1000000) return (number / 1000).toFixed(1).replace(/\.0$/, '') + ' Rb';
-            return (number / 1000000).toFixed(1).replace(/\.0$/, '') + ' Jt';
+            return Number(number || 0).toLocaleString('id-ID');
         }
 
         window.fetchShipments = async function(page = 1) {

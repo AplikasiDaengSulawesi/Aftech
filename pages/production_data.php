@@ -285,10 +285,7 @@ $qc_checker_enabled = ($stmt_qc->fetchColumn() === '1');
         $('#f_daterange').on('cancel.daterangepicker', function(ev, picker) { $(this).val(''); $('#f_start').val(''); $('#f_end').val(''); fetchProduction(1); });
 
         function formatCompactNumber(number) {
-            if (number < 1000) return number.toLocaleString('id-ID');
-            else if (number >= 1000 && number < 1000000) return (number / 1000).toFixed(1).replace(/\.0$/, '') + ' Rb';
-            else if (number >= 1000000) return (number / 1000000).toFixed(1).replace(/\.0$/, '') + ' Jt';
-            return number.toLocaleString('id-ID');
+            return Number(number || 0).toLocaleString('id-ID');
         }
 
         window.fetchProduction = async function(page = 1) {

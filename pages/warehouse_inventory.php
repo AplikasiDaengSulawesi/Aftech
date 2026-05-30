@@ -685,18 +685,7 @@ foreach($items_query as $it) {
         $('#f_daterange').on('cancel.daterangepicker', function(ev, picker) { $(this).val(''); $('#f_start').val(''); $('#f_end').val(''); fetchWarehouseStock(); });
 
         function formatCompactNumber(number) {
-            if (number < 1000) {
-                return number.toLocaleString('id-ID');
-            } else if (number >= 1000 && number < 1000000) {
-                return (number / 1000).toFixed(1).replace(/\.0$/, '') + ' Ribu';
-            } else if (number >= 1000000 && number < 1000000000) {
-                return (number / 1000000).toFixed(1).replace(/\.0$/, '') + ' Juta';
-            } else if (number >= 1000000000 && number < 1000000000000) {
-                return (number / 1000000000).toFixed(1).replace(/\.0$/, '') + ' Milyar';
-            } else if (number >= 1000000000000) {
-                return (number / 1000000000000).toFixed(1).replace(/\.0$/, '') + ' Triliun';
-            }
-            return number.toLocaleString('id-ID');
+            return Number(number || 0).toLocaleString('id-ID');
         }
 
         window.fetchWarehouseStock = async function(page = 1) {

@@ -303,18 +303,7 @@
         }
 
         function formatCompactNumber(number) {
-            if (number < 1000) {
-                return number.toLocaleString('id-ID');
-            } else if (number >= 1000 && number < 1000000) {
-                return (number / 1000).toFixed(1).replace(/\.0$/, '') + ' Ribu';
-            } else if (number >= 1000000 && number < 1000000000) {
-                return (number / 1000000).toFixed(1).replace(/\.0$/, '') + ' Juta';
-            } else if (number >= 1000000000 && number < 1000000000000) {
-                return (number / 1000000000).toFixed(1).replace(/\.0$/, '') + ' Milyar';
-            } else if (number >= 1000000000000) {
-                return (number / 1000000000000).toFixed(1).replace(/\.0$/, '') + ' Triliun';
-            }
-            return number.toLocaleString('id-ID');
+            return Number(number || 0).toLocaleString('id-ID');
         }
 
         async function updateDashboard() {
