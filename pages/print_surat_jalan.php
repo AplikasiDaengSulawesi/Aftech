@@ -1,7 +1,6 @@
 <?php
 // Cetak Surat Jalan format continuous form 9.5x11 inci (dot matrix).
-// Nomor surat jalan dialokasikan sekali (lazy) lalu disimpan di outbound_shipments.surat_jalan_no.
-// Format nomor: NNN/SJ-AM/{bulan_romawi}/{tahun}, counter reset tiap bulan menurut shipment_date.
+// Nomor surat jalan diambil dari database outbound_shipments.surat_jalan_no.
 
 session_start();
 require_once '../includes/db.php';
@@ -19,52 +18,15 @@ $company = [
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if (!$id) die("ID Pengiriman tidak valid.");
 
-$ROMAN = [1=>'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-
-$pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare("SELECT * FROM outbound_shipments WHERE id = ? FOR UPDATE");
+    $stmt = $pdo->prepare("SELECT * FROM outbound_shipments WHERE id = ?");
     $stmt->execute([$id]);
     $header = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$header) {
-        $pdo->rollBack();
         die("Data pengiriman tidak ditemukan.");
     }
-
-    if (empty($header['surat_jalan_no'])) {
-        $month = (int)date('n', strtotime($header['shipment_date']));
-        $year  = (int)date('Y', strtotime($header['shipment_date']));
-
-        $seqStmt = $pdo->prepare("
-            SELECT COALESCE(
-                MAX(CAST(SUBSTRING_INDEX(surat_jalan_no, '/', 1) AS UNSIGNED)),
-                0
-            ) + 1 AS next_seq
-            FROM outbound_shipments
-            WHERE surat_jalan_no IS NOT NULL
-              AND MONTH(shipment_date) = ?
-              AND YEAR(shipment_date)  = ?
-        ");
-        $seqStmt->execute([$month, $year]);
-        $nextSeq = (int)$seqStmt->fetchColumn();
-
-        $newNo = sprintf('%03d/SJ-AM/%s/%d', $nextSeq, $ROMAN[$month], $year);
-
-        $upd = $pdo->prepare("UPDATE outbound_shipments SET surat_jalan_no = ? WHERE id = ?");
-        $upd->execute([$newNo, $id]);
-
-        $userName = $_SESSION['full_name'] ?? 'Sistem';
-        $detail   = "$userName menerbitkan Surat Jalan $newNo untuk " . $header['customer_name'];
-        $logStmt  = $pdo->prepare("INSERT INTO activity_logs (action, details) VALUES ('CETAK', ?)");
-        $logStmt->execute([$detail]);
-
-        $header['surat_jalan_no'] = $newNo;
-    }
-
-    $pdo->commit();
 } catch (Throwable $e) {
-    $pdo->rollBack();
     die("Gagal menyiapkan surat jalan: " . htmlspecialchars($e->getMessage()));
 }
 
@@ -305,7 +267,7 @@ $tanggal_cetak = date('d-m-Y H:i');
                     <tr>
                         <td class="lbl">No</td>
                         <td class="sep">:</td>
-                        <td><strong><?php echo htmlspecialchars($header['surat_jalan_no']); ?></strong></td>
+                        <td><strong><?php echo htmlspecialchars($header['surat_jalan_no'] ?? '-'); ?></strong></td>
                     </tr>
                     <tr>
                         <td class="lbl">No SP</td>

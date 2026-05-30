@@ -303,11 +303,33 @@ elseif ($action === 'submit_bulk') {
         $final_input_method = $conn->real_escape_string(merge_shipment_input_methods($existing_method, $input_method));
         $conn->query("UPDATE outbound_shipments SET total_qty = total_qty + $total_qty, total_actual_qty = total_actual_qty + $total_actual_qty, input_method = '$final_input_method' WHERE id = $shipment_id");
     } else {
-    $final_input_method = $conn->real_escape_string($input_method);
-    $conn->query("INSERT INTO outbound_shipments (customer_name, customer_contact, customer_address, shipment_date, total_qty, shipped_by, total_actual_qty, input_method)
-                  VALUES ('$customer_name', '$customer_contact', '$customer_address', '$shipment_date', $total_qty, '$user', $total_actual_qty, '$final_input_method')");
+        $final_input_method = $conn->real_escape_string($input_method);
+        
+        // GENERATE SURAT JALAN NO
+        $month = (int)date('n', strtotime($shipment_date));
+        $year  = (int)date('Y', strtotime($shipment_date));
+        $ROMAN = [1=>'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+        
+        $seqStmt = $conn->prepare("
+            SELECT COALESCE(
+                MAX(CAST(SUBSTRING_INDEX(surat_jalan_no, '/', 1) AS UNSIGNED)),
+                0
+            ) + 1 AS next_seq
+            FROM outbound_shipments
+            WHERE surat_jalan_no IS NOT NULL
+              AND MONTH(shipment_date) = ?
+              AND YEAR(shipment_date)  = ?
+        ");
+        $seqStmt->bind_param("ii", $month, $year);
+        $seqStmt->execute();
+        $nextSeq = (int)$seqStmt->get_result()->fetch_assoc()['next_seq'];
+        $surat_jalan_no = sprintf('%03d/SJ-AM/%s/%d', $nextSeq, $ROMAN[$month], $year);
+        $surat_jalan_no_escaped = $conn->real_escape_string($surat_jalan_no);
+
+        $conn->query("INSERT INTO outbound_shipments (customer_name, customer_contact, customer_address, shipment_date, total_qty, shipped_by, total_actual_qty, input_method, surat_jalan_no)
+                      VALUES ('$customer_name', '$customer_contact', '$customer_address', '$shipment_date', $total_qty, '$user', $total_actual_qty, '$final_input_method', '$surat_jalan_no_escaped')");
         $shipment_id = $conn->insert_id;
-        }
+    }
 
     // 3. Insert atau Update Detail per Batch
         foreach ($batch_summaries as $b) {
@@ -344,7 +366,7 @@ elseif ($action === 'submit_bulk') {
         }
 
         // Log Aktivitas
-        $stmtHeader = $conn->query("SELECT customer_name, shipped_at, shipment_date, total_qty FROM outbound_shipments WHERE id=$shipment_id");
+        $stmtHeader = $conn->query("SELECT customer_name, shipped_at, shipment_date, total_qty, surat_jalan_no FROM outbound_shipments WHERE id=$shipment_id");
         if ($stmtHeader && $headerData = $stmtHeader->fetch_assoc()) {
             $stmtSeq = $conn->prepare("SELECT COUNT(id) as seq FROM outbound_shipments WHERE shipment_date = ? AND id <= ?");
             $stmtSeq->bind_param("si", $headerData['shipment_date'], $shipment_id);
@@ -356,11 +378,12 @@ elseif ($action === 'submit_bulk') {
             $initials = (count($name_parts) >= 2) ? strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[1], 0, 1)) : strtoupper(substr(trim($headerData['customer_name']), 0, 2));
             $total_paket_all = $headerData['total_qty'];
             $no_resi = $seq . '-' . $datetime_str . '-' . $total_paket_all . '-' . $initials;
+            $surat_jalan_info = !empty($headerData['surat_jalan_no']) ? " (Surat Jalan: {$headerData['surat_jalan_no']})" : "";
             
             if ($append_to > 0) {
                 $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Tambah susulan $total_qty dus ke No. Resi #$no_resi')");
             } else {
-                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Kirim $total_qty dus ke {$headerData['customer_name']} (No. Resi #$no_resi)')");
+                $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Kirim $total_qty dus ke {$headerData['customer_name']} (No. Resi #$no_resi)$surat_jalan_info')");
             }
         } else {
             if ($append_to > 0) {
