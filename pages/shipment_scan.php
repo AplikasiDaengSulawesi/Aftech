@@ -542,6 +542,29 @@ function clearCartsFromStorage() {
 }
 // =================================================================
 
+        window.downloadSuratJalan = function(id) {
+            Swal.fire({ title: 'Menyiapkan PDF...', text: 'Mohon tunggu sebentar', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const iframeId = 'iframe_print_' + id;
+            let iframe = document.getElementById(iframeId);
+            if(iframe) iframe.remove();
+            iframe = document.createElement('iframe');
+            iframe.id = iframeId;
+            iframe.style.position = 'absolute';
+            iframe.style.width = '8.5in';
+            iframe.style.height = '5.5in';
+            iframe.style.left = '-9999px';
+            iframe.style.top = '-9999px';
+            iframe.src = 'print_surat_jalan.php?id=' + id + '&auto=1';
+            document.body.appendChild(iframe);
+        };
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'pdf_downloaded') {
+                Swal.close();
+                toastr.success('PDF Surat Jalan berhasil diunduh');
+                setTimeout(() => { const iframe = document.getElementById('iframe_print_' + event.data.id); if(iframe) iframe.remove(); }, 2000);
+            }
+        });
+
         function formatCompactNumber(number) {
             return Number(number || 0).toLocaleString('id-ID');
         }
@@ -750,7 +773,7 @@ function clearCartsFromStorage() {
                 <div class="batch-detail-grid">${batchesHTML}</div>
 
                 <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 pt-3 border-top">
-                    <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation(); window.open('print_surat_jalan.php?id=${shipmentId}', '_blank')"><i class="fa fa-print me-1"></i> Cetak Surat Jalan (Dot Matrix)</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation(); downloadSuratJalan(${shipmentId})"><i class="fa fa-print me-1"></i> Cetak Surat Jalan (Dot Matrix)</button>
                 </div>
             `;
         }
@@ -894,7 +917,7 @@ function clearCartsFromStorage() {
                     <div class="action-list">
                         <button onclick="Swal.close(); viewShipmentDetail(${id}, '${name.replace(/'/g, "\\'")}')" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Dus</button>
                         <button onclick="Swal.close(); window.location.href='shipment_scan.php?append_id=${id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Dus Susulan</button>
-                        <button onclick="Swal.close(); window.open('print_surat_jalan.php?id=${id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan (Dot Matrix)</button>
+                        <button onclick="Swal.close(); downloadSuratJalan(${id})" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan (Dot Matrix)</button>
                         <button onclick="Swal.close(); window.open('print_invoice.php?id=${id}', '_blank')" class="action-item"><i class="fa fa-file-pdf icon-print"></i> Cetak Nota A4 (Digital)</button>
                         <button onclick="Swal.close(); deleteShipment(${id})" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
@@ -1506,7 +1529,7 @@ async function toggleTorch() {
                         denyButtonText: 'Nota A4 (Digital)',
                         cancelButtonText: 'Nanti Saja'
                     }).then((r) => {
-                        if (r.isConfirmed) window.open(`print_surat_jalan.php?id=${d.shipment_id}`, '_blank');
+                        if (r.isConfirmed) downloadSuratJalan(d.shipment_id);
                         else if (r.isDenied) window.open(`print_invoice.php?id=${d.shipment_id}`, '_blank');
                     });
                     <?php endif; ?>

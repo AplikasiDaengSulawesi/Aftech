@@ -529,6 +529,29 @@ foreach($items_query as $it) {
         window.latestData = [];
         window.columnStates = { 'col-time': true, 'col-customer': true, 'col-items': true, 'col-total': true, 'col-officer': true };
 
+        window.downloadSuratJalan = function(id) {
+            Swal.fire({ title: 'Menyiapkan PDF...', text: 'Mohon tunggu sebentar', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const iframeId = 'iframe_print_' + id;
+            let iframe = document.getElementById(iframeId);
+            if(iframe) iframe.remove();
+            iframe = document.createElement('iframe');
+            iframe.id = iframeId;
+            iframe.style.position = 'absolute';
+            iframe.style.width = '8.5in';
+            iframe.style.height = '5.5in';
+            iframe.style.left = '-9999px';
+            iframe.style.top = '-9999px';
+            iframe.src = 'print_surat_jalan.php?id=' + id + '&auto=1';
+            document.body.appendChild(iframe);
+        };
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'pdf_downloaded') {
+                Swal.close();
+                toastr.success('PDF Surat Jalan berhasil diunduh');
+                setTimeout(() => { const iframe = document.getElementById('iframe_print_' + event.data.id); if(iframe) iframe.remove(); }, 2000);
+            }
+        });
+
         function formatCompactNumber(number) {
             return Number(number || 0).toLocaleString('id-ID');
         }
@@ -646,7 +669,7 @@ foreach($items_query as $it) {
                     <div class="action-list">
                         <button onclick="Swal.close(); viewShipmentDetail(${index})" class="action-item"><i class="fa fa-eye icon-view"></i> Lihat Rincian Dus</button>
                         <button onclick="Swal.close(); window.location.href='shipment_scan.php?append_id=${row.id}'" class="action-item"><i class="fa fa-plus icon-append"></i> Tambah Dus Susulan</button>
-                        <button onclick="Swal.close(); window.open('print_surat_jalan.php?id=${row.id}', '_blank')" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan (Dot Matrix)</button>
+                        <button onclick="Swal.close(); downloadSuratJalan(${row.id})" class="action-item"><i class="fa fa-print icon-print"></i> Cetak Surat Jalan (Dot Matrix)</button>
                         <button onclick="Swal.close(); deleteShipment(${row.id}, '${row.customer_name}')" class="action-item text-danger"><i class="fa fa-trash icon-delete"></i> Batalkan Pengiriman</button>
                     </div>
                 `,

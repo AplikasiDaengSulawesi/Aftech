@@ -16,6 +16,7 @@ $company = [
 ];
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$auto = isset($_GET['auto']) ? (int)$_GET['auto'] : 0;
 if (!$id) die("ID Pengiriman tidak valid.");
 
 try {
@@ -237,15 +238,40 @@ $tanggal_cetak = date('d-m-Y H:i');
         .sheet        { padding: 0; }
         .no-print     { display: none !important; }
     }
+    <?php if ($auto): ?>
+    .toolbar { display: none !important; }
+    <?php endif; ?>
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    function downloadPDF() {
+        const btn = document.getElementById('btn-download');
+        if(btn) { btn.innerHTML = '⏳ Memproses...'; btn.disabled = true; }
+
+        const element = document.querySelector('.sheet');
+        const opt = {
+            margin:       0.1,
+            filename:     'Surat_Jalan_<?php echo preg_replace("/[^A-Za-z0-9\-]/", "_", $header['surat_jalan_no'] ?? $id); ?>.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'in', format: [8.5, 5.5], orientation: 'landscape' }
+        };
+        
+        html2pdf().set(opt).from(element).save().then(() => {
+            if(btn) { btn.innerHTML = '⬇ Download PDF'; btn.disabled = false; }
+            <?php if ($auto): ?>
+            if (window.parent) {
+                window.parent.postMessage({action: 'pdf_downloaded', id: <?php echo $id; ?>}, '*');
+            }
+            <?php endif; ?>
+        });
+    }
+</script>
 </head>
-<body onload="window.print()">
+<body onload="downloadPDF()">
 
 <div class="toolbar no-print">
-    <span style="font-family:Arial;font-size:11px;color:#c00;">
-        ⚠ Pastikan <b>uncheck</b> "Header dan footer" di dialog cetak
-    </span>
-    <button onclick="window.print()">🖨 Cetak Ulang</button>
+    <button id="btn-download" onclick="downloadPDF()">⬇ Download PDF</button>
     <button onclick="window.close()">✕ Tutup</button>
 </div>
 
