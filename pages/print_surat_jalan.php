@@ -84,7 +84,7 @@ html, body {
 
 body {
     font-family: 'Calibri', 'Carlito', sans-serif;
-    font-size: 10pt;
+    font-size: 12pt;
     line-height: 1.65;
     color: #000;
 }
@@ -106,17 +106,17 @@ body {
 .kop-table td { vertical-align: top; padding: 0 2px; }
 
 .kop-name {
-    font-size: 12pt;
+    font-size: 14pt;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     line-height: 1.4;
 }
-.kop-meta { font-size: 9pt; line-height: 1.55; }
+.kop-meta { font-size: 11pt; line-height: 1.55; }
 
 /* ---- JUDUL ---- */
 .doc-title {
-    font-size: 14pt;
+    font-size: 16pt;
     font-weight: 700;
     text-decoration: underline;
     text-align: center;
@@ -126,7 +126,7 @@ body {
 
 /* ---- META NOMOR ---- */
 .meta-table { width: 100%; border-collapse: collapse; margin-top: 3px; }
-.meta-table td { padding: 0 2px; font-size: 9.5pt; line-height: 1.6; vertical-align: top; }
+.meta-table td { padding: 0 2px; font-size: 11pt; line-height: 1.6; vertical-align: top; }
 .meta-table .lbl { width: 60px; }
 .meta-table .sep { width: 12px; text-align: center; }
 
@@ -138,16 +138,16 @@ body {
     padding: 2px 0;
 }
 .recipient .row { display: flex; line-height: 1.6; }
-.recipient .lbl { width: 72px; font-size: 9.5pt; font-weight: 700; }
-.recipient .sep { width: 14px; text-align: center; font-size: 9.5pt; }
-.recipient .val { font-size: 9.5pt; }
+.recipient .lbl { width: 72px; font-size: 11pt; font-weight: 700; }
+.recipient .sep { width: 14px; text-align: center; font-size: 11pt; }
+.recipient .val { font-size: 11pt; }
 
 /* ---- TABEL ITEM ---- */
 table.items {
     width: 100%;
     border-collapse: collapse;
     margin-top: 4px;
-    font-size: 9.5pt;
+    font-size: 11pt;
 }
 table.items th,
 table.items td {
@@ -165,22 +165,22 @@ table.items td.unit { width: 68px;  text-align: center; }
 table.items td.isi  { width: 126px; text-align: right;  }
 
 /* small tag di nama barang — tetap hitam, bukan abu */
-table.items td.name small { font-size: 8.5pt; color: #000; }
+table.items td.name small { font-size: 10pt; color: #000; }
 
 /* ---- TANGGAL ---- */
-.place-date { text-align: right; margin-top: 5px; font-size: 9.5pt; }
+.place-date { text-align: right; margin-top: 5px; font-size: 11pt; }
 
 /* ---- TANDA TANGAN ---- */
 table.ttd { width: 100%; border-collapse: collapse; margin-top: 6px; }
 table.ttd td {
     width: 25%;
     text-align: center;
-    font-size: 9.5pt;
+    font-size: 11pt;
     vertical-align: top;
     padding: 0 3px;
     line-height: 1.5;
 }
-table.ttd .role { font-weight: 700; font-size: 10pt; text-decoration: underline; }
+table.ttd .role { font-weight: 700; font-size: 12pt; text-decoration: underline; }
 table.ttd .sign-space { height: 42px; }
 table.ttd .name-line {
     border-top: 1px solid #000;
@@ -193,7 +193,7 @@ table.ttd .name-line {
 .distribution {
     margin-top: 5px;
     text-align: center;
-    font-size: 8.5pt;
+    font-size: 10pt;
     border-top: 1px solid #000;
     padding-top: 3px;
     line-height: 1.5;
@@ -204,7 +204,7 @@ table.ttd .name-line {
 .footnote {
     margin-top: 1px;
     text-align: right;
-    font-size: 8pt;
+    font-size: 9.5pt;
     line-height: 1.4;
     color: #000;
 }
