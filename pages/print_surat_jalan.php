@@ -60,13 +60,7 @@ $tanggal_cetak = date('d-m-Y H:i');
 /* ================================================================
    DOT MATRIX OPTIMIZED — Epson LX / FX series
    Form   : Continuous 8.5 x 5.5 in landscape (half-sheet)
-   Prinsip:
-     1. Font monospace murni — Courier New, ukuran lebih besar
-     2. Tidak ada warna selain #000 / background #fff
-     3. Tidak ada bayangan, opacity, filter, gradient
-     4. Border 2px solid #000 agar tembus karbon
-     5. Line-height 1.65 agar karbon terbaca
-     6. Ukuran halaman tidak diubah
+   Semua ukuran font dikurangi 1pt dari versi sebelumnya.
 ================================================================ */
 
 @page {
@@ -84,7 +78,7 @@ html, body {
 
 body {
     font-family: 'Calibri', 'Carlito', sans-serif;
-    font-size: 12pt;
+    font-size: 11pt;        /* was 12pt */
     line-height: 1.65;
     color: #000;
 }
@@ -106,17 +100,17 @@ body {
 .kop-table td { vertical-align: top; padding: 0 2px; }
 
 .kop-name {
-    font-size: 14pt;
+    font-size: 13pt;        /* was 14pt */
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     line-height: 1.4;
 }
-.kop-meta { font-size: 11pt; line-height: 1.55; }
+.kop-meta { font-size: 10pt; line-height: 1.55; }  /* was 11pt */
 
 /* ---- JUDUL ---- */
 .doc-title {
-    font-size: 16pt;
+    font-size: 15pt;        /* was 16pt */
     font-weight: 700;
     text-decoration: underline;
     text-align: center;
@@ -126,7 +120,7 @@ body {
 
 /* ---- META NOMOR ---- */
 .meta-table { width: 100%; border-collapse: collapse; margin-top: 3px; }
-.meta-table td { padding: 0 2px; font-size: 11pt; line-height: 1.6; vertical-align: top; }
+.meta-table td { padding: 0 2px; font-size: 10pt; line-height: 1.6; vertical-align: top; }  /* was 11pt */
 .meta-table .lbl { width: 60px; }
 .meta-table .sep { width: 12px; text-align: center; }
 
@@ -138,16 +132,16 @@ body {
     padding: 2px 0;
 }
 .recipient .row { display: flex; line-height: 1.6; }
-.recipient .lbl { width: 72px; font-size: 11pt; font-weight: 700; }
-.recipient .sep { width: 14px; text-align: center; font-size: 11pt; }
-.recipient .val { font-size: 11pt; }
+.recipient .lbl { width: 72px; font-size: 10pt; font-weight: 700; }  /* was 11pt */
+.recipient .sep { width: 14px; text-align: center; font-size: 10pt; }  /* was 11pt */
+.recipient .val { font-size: 10pt; }  /* was 11pt */
 
 /* ---- TABEL ITEM ---- */
 table.items {
     width: 100%;
     border-collapse: collapse;
     margin-top: 4px;
-    font-size: 11pt;
+    font-size: 10pt;        /* was 11pt */
 }
 table.items th,
 table.items td {
@@ -165,22 +159,22 @@ table.items td.unit { width: 68px;  text-align: center; }
 table.items td.isi  { width: 126px; text-align: right;  }
 
 /* small tag di nama barang — tetap hitam, bukan abu */
-table.items td.name small { font-size: 10pt; color: #000; }
+table.items td.name small { font-size: 9pt; color: #000; }  /* was 10pt */
 
 /* ---- TANGGAL ---- */
-.place-date { text-align: right; margin-top: 5px; font-size: 11pt; }
+.place-date { text-align: right; margin-top: 5px; font-size: 10pt; }  /* was 11pt */
 
 /* ---- TANDA TANGAN ---- */
 table.ttd { width: 100%; border-collapse: collapse; margin-top: 6px; }
 table.ttd td {
     width: 25%;
     text-align: center;
-    font-size: 11pt;
+    font-size: 10pt;        /* was 11pt */
     vertical-align: top;
     padding: 0 3px;
     line-height: 1.5;
 }
-table.ttd .role { font-weight: 700; font-size: 12pt; text-decoration: underline; }
+table.ttd .role { font-weight: 700; font-size: 11pt; text-decoration: underline; }  /* was 12pt */
 table.ttd .sign-space { height: 42px; }
 table.ttd .name-line {
     border-top: 1px solid #000;
@@ -193,7 +187,7 @@ table.ttd .name-line {
 .distribution {
     margin-top: 5px;
     text-align: center;
-    font-size: 10pt;
+    font-size: 9pt;         /* was 10pt */
     border-top: 1px solid #000;
     padding-top: 3px;
     line-height: 1.5;
@@ -204,7 +198,7 @@ table.ttd .name-line {
 .footnote {
     margin-top: 1px;
     text-align: right;
-    font-size: 9.5pt;
+    font-size: 8.5pt;       /* was 9.5pt */
     line-height: 1.4;
     color: #000;
 }
@@ -241,36 +235,11 @@ table.ttd .name-line {
 .toolbar { display: none !important; }
 <?php endif; ?>
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script>
-function downloadPDF() {
-    var btn = document.getElementById('btn-download');
-    if (btn) { btn.innerHTML = 'Memproses...'; btn.disabled = true; }
-
-    var element = document.querySelector('.sheet');
-    var opt = {
-        margin:      0.1,
-        filename:    'Surat_Jalan_<?php echo preg_replace("/[^A-Za-z0-9\-]/","_",$header['surat_jalan_no'] ?? $id); ?>.pdf',
-        image:       { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF:       { unit: 'in', format: [8.5, 5.5], orientation: 'landscape' }
-    };
-
-    html2pdf().set(opt).from(element).save().then(function() {
-        if (btn) { btn.innerHTML = 'Download PDF'; btn.disabled = false; }
-        <?php if ($auto): ?>
-        if (window.parent) {
-            window.parent.postMessage({action:'pdf_downloaded', id:<?php echo $id; ?>}, '*');
-        }
-        <?php endif; ?>
-    });
-}
-</script>
 </head>
-<body onload="downloadPDF()">
+<body onload="window.print()">
 
 <div class="toolbar no-print">
-    <button id="btn-download" onclick="downloadPDF()">Download PDF</button>
+    <button id="btn-download" onclick="window.print()">Cetak Surat Jalan</button>
     <button onclick="window.close()">Tutup</button>
 </div>
 

@@ -530,27 +530,8 @@ foreach($items_query as $it) {
         window.columnStates = { 'col-time': true, 'col-customer': true, 'col-items': true, 'col-total': true, 'col-officer': true };
 
         window.downloadSuratJalan = function(id) {
-            Swal.fire({ title: 'Menyiapkan PDF...', text: 'Mohon tunggu sebentar', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-            const iframeId = 'iframe_print_' + id;
-            let iframe = document.getElementById(iframeId);
-            if(iframe) iframe.remove();
-            iframe = document.createElement('iframe');
-            iframe.id = iframeId;
-            iframe.style.position = 'absolute';
-            iframe.style.width = '8.5in';
-            iframe.style.height = '5.5in';
-            iframe.style.left = '-9999px';
-            iframe.style.top = '-9999px';
-            iframe.src = 'print_surat_jalan.php?id=' + id + '&auto=1';
-            document.body.appendChild(iframe);
+            window.open('print_surat_jalan.php?id=' + id, '_blank');
         };
-        window.addEventListener('message', function(event) {
-            if (event.data && event.data.action === 'pdf_downloaded') {
-                Swal.close();
-                toastr.success('PDF Surat Jalan berhasil diunduh');
-                setTimeout(() => { const iframe = document.getElementById('iframe_print_' + event.data.id); if(iframe) iframe.remove(); }, 2000);
-            }
-        });
 
         function formatCompactNumber(number) {
             return Number(number || 0).toLocaleString('id-ID');
