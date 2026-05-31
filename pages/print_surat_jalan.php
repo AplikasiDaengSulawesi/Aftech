@@ -64,7 +64,7 @@ $tanggal_cetak = date('d-m-Y H:i');
 ================================================================ */
 
 @page {
-    size: 8.5in 5.5in landscape;
+    size: 8.5in 5.5in;
     /* Top 0.5in  |  Right 1.5in  |  Bottom 0.2in  |  Left 0.25in */
     margin: 0.5in 1.5in 0.2in 0.25in;
 }
