@@ -64,8 +64,9 @@ $tanggal_cetak = date('d-m-Y H:i');
 ================================================================ */
 
 @page {
-    size: 8.5in 5.5in;
-    margin: 0.3in 0.25in 0.2in 0.25in;
+    size: 8.5in 5.5in landscape;
+    /* Top 0.5in  |  Right 1.5in  |  Bottom 0.2in  |  Left 0.25in */
+    margin: 0.5in 1.5in 0.2in 0.25in;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -78,7 +79,7 @@ html, body {
 
 body {
     font-family: 'Calibri', 'Carlito', sans-serif;
-    font-size: 11pt;        /* was 12pt */
+    font-size: 10pt;        /* was 12pt */
     line-height: 1.65;
     color: #000;
 }
@@ -86,7 +87,7 @@ body {
 .sheet {
     width: 100%;
     max-width: 7.9in;
-    margin: 0 auto;
+    margin: 0 auto 0 0; /* rata kiri — margin kanan otomatis, kiri 0 */
 }
 
 /* ---- KOP ---- */
@@ -100,17 +101,17 @@ body {
 .kop-table td { vertical-align: top; padding: 0 2px; }
 
 .kop-name {
-    font-size: 13pt;        /* was 14pt */
+    font-size: 12pt;        /* was 14pt */
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     line-height: 1.4;
 }
-.kop-meta { font-size: 10pt; line-height: 1.55; }  /* was 11pt */
+.kop-meta { font-size: 9pt; line-height: 1.55; }  /* was 11pt */
 
 /* ---- JUDUL ---- */
 .doc-title {
-    font-size: 15pt;        /* was 16pt */
+    font-size: 14pt;        /* was 16pt */
     font-weight: 700;
     text-decoration: underline;
     text-align: center;
@@ -120,7 +121,7 @@ body {
 
 /* ---- META NOMOR ---- */
 .meta-table { width: 100%; border-collapse: collapse; margin-top: 3px; }
-.meta-table td { padding: 0 2px; font-size: 10pt; line-height: 1.6; vertical-align: top; }  /* was 11pt */
+.meta-table td { padding: 0 2px; font-size: 9pt; line-height: 1.6; vertical-align: top; }  /* was 11pt */
 .meta-table .lbl { width: 60px; }
 .meta-table .sep { width: 12px; text-align: center; }
 
@@ -132,16 +133,16 @@ body {
     padding: 2px 0;
 }
 .recipient .row { display: flex; line-height: 1.6; }
-.recipient .lbl { width: 72px; font-size: 10pt; font-weight: 700; }  /* was 11pt */
-.recipient .sep { width: 14px; text-align: center; font-size: 10pt; }  /* was 11pt */
-.recipient .val { font-size: 10pt; }  /* was 11pt */
+.recipient .lbl { width: 72px; font-size: 9pt; font-weight: 700; }  /* was 11pt */
+.recipient .sep { width: 14px; text-align: center; font-size: 9pt; }  /* was 11pt */
+.recipient .val { font-size: 9pt; }  /* was 11pt */
 
 /* ---- TABEL ITEM ---- */
 table.items {
     width: 100%;
     border-collapse: collapse;
     margin-top: 4px;
-    font-size: 10pt;        /* was 11pt */
+    font-size: 9pt;        /* was 11pt */
 }
 table.items th,
 table.items td {
@@ -159,22 +160,22 @@ table.items td.unit { width: 68px;  text-align: center; }
 table.items td.isi  { width: 126px; text-align: right;  }
 
 /* small tag di nama barang — tetap hitam, bukan abu */
-table.items td.name small { font-size: 9pt; color: #000; }  /* was 10pt */
+table.items td.name small { font-size: 8pt; color: #000; }  /* was 10pt */
 
 /* ---- TANGGAL ---- */
-.place-date { text-align: right; margin-top: 5px; font-size: 10pt; }  /* was 11pt */
+.place-date { text-align: right; margin-top: 5px; font-size: 9pt; }  /* was 11pt */
 
 /* ---- TANDA TANGAN ---- */
 table.ttd { width: 100%; border-collapse: collapse; margin-top: 6px; }
 table.ttd td {
     width: 25%;
     text-align: center;
-    font-size: 10pt;        /* was 11pt */
+    font-size: 9pt;        /* was 11pt */
     vertical-align: top;
     padding: 0 3px;
     line-height: 1.5;
 }
-table.ttd .role { font-weight: 700; font-size: 11pt; text-decoration: underline; }  /* was 12pt */
+table.ttd .role { font-weight: 700; font-size: 10pt; text-decoration: underline; }  /* was 12pt */
 table.ttd .sign-space { height: 42px; }
 table.ttd .name-line {
     border-top: 1px solid #000;
@@ -187,7 +188,7 @@ table.ttd .name-line {
 .distribution {
     margin-top: 5px;
     text-align: center;
-    font-size: 9pt;         /* was 10pt */
+    font-size: 8pt;         /* was 10pt */
     border-top: 1px solid #000;
     padding-top: 3px;
     line-height: 1.5;
@@ -198,7 +199,7 @@ table.ttd .name-line {
 .footnote {
     margin-top: 1px;
     text-align: right;
-    font-size: 8.5pt;       /* was 9.5pt */
+    font-size: 7.5pt;       /* was 9.5pt */
     line-height: 1.4;
     color: #000;
 }
