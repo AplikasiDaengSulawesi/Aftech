@@ -188,7 +188,8 @@ foreach($items_query as $it) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-6 col-sm-6" ondblclick="openBaseStockModal()" style="cursor: pointer;" title="Klik 2x untuk set manual jumlah Sisa di Gudang">
+                    <div class="col-xl-3 col-lg-6 col-sm-6" style="cursor: pointer;" title="Klik 2x untuk set manual jumlah Sisa di Gudang">
+                    <!-- <div class="col-xl-3 col-lg-6 col-sm-6" ondblclick="openBaseStockModal()" style="cursor: pointer;" title="Klik 2x untuk set manual jumlah Sisa di Gudang"> -->
                         <div class="widget-stat card bg-success shadow-sm card-kpi" style="transition: transform 0.2s;">
                             <div class="card-body p-4">
                                 <div class="media">
@@ -236,9 +237,9 @@ foreach($items_query as $it) {
                                         <button type="button" class="btn btn-primary btn-xs shadow-sm font-w600" data-bs-toggle="modal" data-bs-target="#modalAddStock">
                                             <i class="fas fa-plus-circle me-1"></i> Tambah Stok
                                         </button>
-                                        <button type="button" class="btn btn-danger btn-xs shadow-sm font-w600" onclick="clearActiveStock()">
+                                        <!-- <button type="button" class="btn btn-danger btn-xs shadow-sm font-w600" onclick="clearActiveStock()">
                                             <i class="fas fa-trash-restore me-1"></i> Bersihkan Stok (Replace)
-                                        </button>
+                                        </button> -->
                                         <div class="dropdown">
                                             <button class="btn btn-light btn-xs shadow-sm dropdown-toggle font-w600 w-100" type="button" data-bs-toggle="dropdown">
                                                 <i class="fas fa-columns me-1 text-primary"></i> Pilih Kolom
