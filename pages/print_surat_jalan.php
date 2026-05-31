@@ -83,7 +83,7 @@ html, body {
 }
 
 body {
-    font-family: 'Courier New', Courier, 'Lucida Console', monospace;
+    font-family: 'Calibri', 'Carlito', sans-serif;
     font-size: 10pt;
     line-height: 1.65;
     color: #000;
@@ -99,7 +99,7 @@ body {
 .kop-table {
     width: 100%;
     border-collapse: collapse;
-    border-bottom: 2px solid #000;
+    border-bottom: 1px solid #000;
     padding-bottom: 3px;
     margin-bottom: 3px;
 }
@@ -133,7 +133,7 @@ body {
 /* ---- KEPADA ---- */
 .recipient {
     margin-top: 4px;
-    border-top: 2px solid #000;
+    border-top: 1px solid #000;
     border-bottom: 1px solid #000;
     padding: 2px 0;
 }
@@ -151,7 +151,7 @@ table.items {
 }
 table.items th,
 table.items td {
-    border: 2px solid #000;   /* TEBAL — wajib untuk dot matrix / karbon */
+    border: 1px solid #000;
     padding: 2px 4px;
     vertical-align: middle;
     line-height: 1.5;
@@ -183,7 +183,7 @@ table.ttd td {
 table.ttd .role { font-weight: 700; font-size: 10pt; text-decoration: underline; }
 table.ttd .sign-space { height: 42px; }
 table.ttd .name-line {
-    border-top: 2px solid #000;
+    border-top: 1px solid #000;
     padding-top: 2px;
     display: inline-block;
     min-width: 88%;
@@ -194,7 +194,7 @@ table.ttd .name-line {
     margin-top: 5px;
     text-align: center;
     font-size: 8.5pt;
-    border-top: 2px solid #000;
+    border-top: 1px solid #000;
     padding-top: 3px;
     line-height: 1.5;
     text-transform: uppercase;
@@ -212,14 +212,14 @@ table.ttd .name-line {
 /* ---- TOOLBAR (layar saja) ---- */
 .toolbar {
     position: fixed; top: 8px; right: 12px;
-    background: #fff; border: 2px solid #000;
+    background: #fff; border: 1px solid #000;
     padding: 4px 8px;
-    font-family: 'Courier New', monospace; font-size: 11px;
+    font-family: 'Calibri', 'Carlito', sans-serif; font-size: 11px;
     z-index: 9999;
 }
 .toolbar button {
     cursor: pointer; padding: 4px 10px; margin-left: 4px;
-    font-size: 11px; font-family: 'Courier New', monospace;
+    font-size: 11px; font-family: 'Calibri', 'Carlito', sans-serif;
     border: 1px solid #000; background: #fff; color: #000;
 }
 
@@ -229,13 +229,13 @@ table.ttd .name-line {
     .sheet      { padding: 0; }
     .no-print   { display: none !important; }
 
-    /* Paksa border tetap tebal — beberapa browser mengurangi saat print */
+    /* Paksa border konsisten saat print */
     table.items th,
-    table.items td      { border: 2px solid #000 !important; background: #fff !important; color: #000 !important; }
-    table.ttd .name-line { border-top: 2px solid #000 !important; }
-    .kop-table           { border-bottom: 2px solid #000 !important; }
-    .recipient           { border-top: 2px solid #000 !important; border-bottom: 1px solid #000 !important; }
-    .distribution        { border-top: 2px solid #000 !important; }
+    table.items td      { border: 1px solid #000 !important; background: #fff !important; color: #000 !important; }
+    table.ttd .name-line { border-top: 1px solid #000 !important; }
+    .kop-table           { border-bottom: 1px solid #000 !important; }
+    .recipient           { border-top: 1px solid #000 !important; border-bottom: 1px solid #000 !important; }
+    .distribution        { border-top: 1px solid #000 !important; }
 }
 <?php if ($auto): ?>
 .toolbar { display: none !important; }
