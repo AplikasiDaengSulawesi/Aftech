@@ -1029,6 +1029,7 @@ function clearCartsFromStorage() {
         document.getElementById('shipment_date').addEventListener('change', (e) => carts[activeCartId].shipment_date = e.target.value);
 
         function renderTabs() {
+            if (!tabsContainer) return;
             tabsContainer.innerHTML = '';
             for (const id in carts) {
                 const c = carts[id];
@@ -1075,22 +1076,26 @@ function clearCartsFromStorage() {
         function switchCart(id) {
             activeCartId = id;
             const c = carts[id];
+            if (!c) return;
             document.getElementById('customer_name').value = c.customer_name;
             document.getElementById('customer_contact').value = c.customer_contact;
             document.getElementById('customer_address').value = c.customer_address;
             document.getElementById('shipment_date').value = c.shipment_date;
-            renderTabs();
+            if (tabsContainer) renderTabs();
             renderActiveCart();
             saveCartsToStorage();
         }
 
         function renderActiveCart() {
+            if (!cartContainer) return;
             cartContainer.innerHTML = '';
             const cItems = carts[activeCartId].items;
             if (Object.keys(cItems).length === 0) {
-                document.getElementById('empty-cart').style.display = 'block';
+                const emptyCartEl = document.getElementById('empty-cart');
+                if (emptyCartEl) emptyCartEl.style.display = 'block';
             } else {
-                document.getElementById('empty-cart').style.display = 'none';
+                const emptyCartEl = document.getElementById('empty-cart');
+                if (emptyCartEl) emptyCartEl.style.display = 'none';
                 for (const pid in cItems) renderBatchGridHTML(pid, cItems[pid]);
             }
             updateTotal();
@@ -1502,7 +1507,39 @@ async function toggleTorch() {
                 .replace(/'/g, '&#039;');
         }
 
-        function clearCart() { carts[activeCartId].items = {}; carts[activeCartId].customer_name = ''; carts[activeCartId].customer_contact = ''; carts[activeCartId].customer_address = ''; carts[activeCartId].shipment_date = '<?php echo date("Y-m-d"); ?>'; switchCart(activeCartId); resumeScanner(); clearCartsFromStorage(); }
+        function normalizeDisplayValue(value, fallback = '') {
+            const text = String(value ?? '').trim();
+            if (!text) return fallback;
+            if (['null', 'undefined', 'none', '(null)'].includes(text.toLowerCase())) return fallback;
+            return text;
+        }
+
+        function clearCart() {
+            if (!carts[activeCartId]) return;
+            carts[activeCartId].items = {};
+            carts[activeCartId].customer_name = '';
+            carts[activeCartId].customer_contact = '';
+            carts[activeCartId].customer_address = '';
+            carts[activeCartId].shipment_date = '<?php echo date("Y-m-d"); ?>';
+
+            const customerNameEl = document.getElementById('customer_name');
+            const customerContactEl = document.getElementById('customer_contact');
+            const customerAddressEl = document.getElementById('customer_address');
+            const shipmentDateEl = document.getElementById('shipment_date');
+            if (customerNameEl) customerNameEl.value = '';
+            if (customerContactEl) customerContactEl.value = '';
+            if (customerAddressEl) customerAddressEl.value = '';
+            if (shipmentDateEl) shipmentDateEl.value = '<?php echo date("Y-m-d"); ?>';
+
+            if (tabsContainer) {
+                switchCart(activeCartId);
+            } else {
+                renderActiveCart();
+                updateTotal();
+            }
+            resumeScanner();
+            clearCartsFromStorage();
+        }
 
         async function submitBulkShipment(e) {
             e.preventDefault();
@@ -1532,7 +1569,7 @@ async function toggleTorch() {
                     const fallbackTotal = Object.values(finalCart).reduce((acc, labels) => acc + labels.length, 0);
                     const shipmentId = Number(d?.shipment_id || 0);
                     const totalQty = Number(d?.total_qty || fallbackTotal);
-                    const customerName = (d?.customer_name || document.getElementById('customer_name').value || '').trim() || 'Customer';
+                    const customerName = normalizeDisplayValue(d?.customer_name, normalizeDisplayValue(document.getElementById('customer_name').value, 'Customer'));
                     const successMessage = `Pengiriman berhasil: ${totalQty} dus ke ${customerName}.`;
                     <?php if($append_id > 0): ?>
                     Swal.fire({

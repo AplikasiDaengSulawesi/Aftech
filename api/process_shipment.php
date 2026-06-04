@@ -125,7 +125,6 @@ if ($action === 'get_batch_data') {
         FROM production_labels p
         $where
         ORDER BY p.id DESC
-        LIMIT 30
     ";
     $res = $conn->query($sql);
     $data = [];
