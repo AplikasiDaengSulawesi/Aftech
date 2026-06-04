@@ -324,8 +324,14 @@ if ($action === 'get_batch_data') {
             }
             $final_input_method = $conn->real_escape_string(merge_shipment_input_methods($existing_method, $input_method));
             $conn->query("UPDATE outbound_shipments SET total_qty = total_qty + $total_qty, total_actual_qty = total_actual_qty + $total_actual_qty, input_method = '$final_input_method' WHERE id = $shipment_id");
+            $existing_count_res = $conn->query("SELECT COUNT(*) AS total FROM distributor_shipments WHERE shipment_id = $shipment_id");
+            if ($existing_count_res === false) {
+                throw new Exception('Gagal menghitung jumlah label existing sebelum append.');
+            }
+            $existing_shipment_count = (int)($existing_count_res->fetch_assoc()['total'] ?? 0);
         } else {
             $final_input_method = $conn->real_escape_string($input_method);
+            $existing_shipment_count = 0;
 
             // GENERATE SURAT JALAN NO
             $month = (int)date('n', strtotime($shipment_date));
@@ -397,8 +403,12 @@ if ($action === 'get_batch_data') {
             throw new Exception('Gagal memverifikasi jumlah detail pengiriman yang tersimpan.');
         }
         $persisted_total = (int)($resPersisted->fetch_assoc()['total'] ?? 0);
-        if ($persisted_total !== $total_qty || $persisted_labels !== $total_qty) {
-            throw new Exception("Jumlah label tersimpan tidak cocok. Diminta $total_qty, tersimpan $persisted_total.");
+        $expected_total = resolveExpectedShipmentCount($persisted_labels, $existing_shipment_count ?? 0, $append_to);
+        if ($persisted_total !== $expected_total) {
+            throw new Exception(formatShipmentCountMismatchMessage($append_to, $persisted_labels, $expected_total, $persisted_total));
+        }
+        if ($persisted_labels !== $total_qty) {
+            throw new Exception("Jumlah label submit saat ini tidak cocok. Diminta $total_qty, tersimpan $persisted_labels.");
         }
 
         // Log Aktivitas

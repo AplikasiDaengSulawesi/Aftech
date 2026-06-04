@@ -111,3 +111,21 @@ if (!function_exists('logShipmentSubmissionFailure')) {
         error_log(formatShipmentSubmissionFailureLog($context, $message));
     }
 }
+
+if (!function_exists('resolveExpectedShipmentCount')) {
+    function resolveExpectedShipmentCount(int $persistedLabels, int $existingCount, int $appendTo): int
+    {
+        return $appendTo > 0 ? ($existingCount + $persistedLabels) : $persistedLabels;
+    }
+}
+
+if (!function_exists('formatShipmentCountMismatchMessage')) {
+    function formatShipmentCountMismatchMessage(int $appendTo, int $persistedLabels, int $expectedTotal, int $persistedTotal): string
+    {
+        if ($appendTo > 0) {
+            return "Jumlah total label shipment susulan tidak cocok. Diminta total akhir $expectedTotal, tersimpan $persistedTotal. Label submit saat ini: $persistedLabels.";
+        }
+
+        return "Jumlah label tersimpan tidak cocok. Diminta $expectedTotal, tersimpan $persistedTotal.";
+    }
+}
