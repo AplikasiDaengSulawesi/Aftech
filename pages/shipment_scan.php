@@ -1516,8 +1516,24 @@ async function toggleTorch() {
                     <?php endif; ?>
                     if (Object.keys(carts).length > 1) { delete carts[activeCartId]; activeCartId = Object.keys(carts)[0]; switchCart(activeCartId); } else clearCart();
                     window.loadHistory();
-                } else toastr.error(d.message);
-            } catch (err) { toastr.error('Error.'); } finally { btn.disabled = false; btn.innerHTML = '<i class="fa fa-paper-plane me-2"></i> Proses Pengiriman'; }
+                } else {
+                    Swal.fire({
+                        title: 'Pengiriman Gagal',
+                        text: d.message || 'Terjadi kesalahan saat menyimpan pengiriman.',
+                        icon: 'error',
+                        confirmButtonColor: '#D50000',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            } catch (err) {
+                Swal.fire({
+                    title: 'Pengiriman Gagal',
+                    text: err?.message || 'Koneksi error.',
+                    icon: 'error',
+                    confirmButtonColor: '#D50000',
+                    confirmButtonText: 'OK'
+                });
+            } finally { btn.disabled = false; btn.innerHTML = '<i class="fa fa-paper-plane me-2"></i> Proses Pengiriman'; }
         }
 
         // --- MANUAL INPUT (TANPA BARCODE) ---

@@ -2,6 +2,7 @@
 session_start();
 include 'config.php';
 require_once __DIR__ . '/../includes/shipment_reverse_helper.php';
+require_once __DIR__ . '/../includes/shipment_submission_helper.php';
 verify_api_access();
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -11,7 +12,8 @@ header('Pragma: no-cache');
 $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
 $user = $_SESSION['full_name'] ?? 'Warehouse User';
 
-function normalize_shipment_input_method($value) {
+function normalize_shipment_input_method($value)
+{
     $value = strtolower(trim((string)$value));
     if (in_array($value, ['scan', 'manual', 'campuran'], true)) {
         return $value;
@@ -19,7 +21,8 @@ function normalize_shipment_input_method($value) {
     return 'scan';
 }
 
-function merge_shipment_input_methods($existing, $incoming) {
+function merge_shipment_input_methods($existing, $incoming)
+{
     $existing = normalize_shipment_input_method($existing);
     $incoming = normalize_shipment_input_method($incoming);
     if ($existing === $incoming) {
@@ -62,12 +65,12 @@ if ($action === 'get_batch_data') {
     // Ambil data stok gudang untuk batch ini
     $in_warehouse = [];
     $res_wh = $conn->query("SELECT label_no FROM warehouse_items WHERE production_id = $prod_id");
-    while($r = $res_wh->fetch_assoc()) $in_warehouse[] = (int)$r['label_no'];
+    while ($r = $res_wh->fetch_assoc()) $in_warehouse[] = (int)$r['label_no'];
 
     // Ambil data yang sudah terkirim dari batch ini
     $already_shipped = [];
     $res_shipped = $conn->query("SELECT label_no FROM distributor_shipments WHERE production_id = $prod_id");
-    while($r = $res_shipped->fetch_assoc()) $already_shipped[] = (int)$r['label_no'];
+    while ($r = $res_shipped->fetch_assoc()) $already_shipped[] = (int)$r['label_no'];
 
     echo json_encode([
         'status' => 'success',
@@ -83,8 +86,7 @@ if ($action === 'get_batch_data') {
             'already_shipped' => $already_shipped
         ]
     ]);
-} 
-elseif ($action === 'reverse_scan') {
+} elseif ($action === 'reverse_scan') {
     $qr_input = isset($_GET['qr']) ? (string)$_GET['qr'] : '';
 
     try {
@@ -101,8 +103,7 @@ elseif ($action === 'reverse_scan') {
             'message' => $e->getMessage()
         ]);
     }
-}
-elseif ($action === 'search_batches') {
+} elseif ($action === 'search_batches') {
     // Cari batch dengan stok tersedia (untuk input manual tanpa barcode)
     $q = isset($_GET['q']) ? $conn->real_escape_string(trim($_GET['q'])) : '';
     $where = '';
@@ -130,8 +131,7 @@ elseif ($action === 'search_batches') {
         $data[] = $r;
     }
     echo json_encode(['status' => 'success', 'data' => $data]);
-}
-elseif ($action === 'get_batch_manual') {
+} elseif ($action === 'get_batch_manual') {
     // Ambil data batch untuk input manual (tanpa validasi scanned label)
     $prod_id = isset($_GET['production_id']) ? (int)$_GET['production_id'] : 0;
     if ($prod_id <= 0) die(json_encode(['status' => 'error', 'message' => 'Production ID tidak valid']));
@@ -166,8 +166,7 @@ elseif ($action === 'get_batch_manual') {
             'already_shipped' => $already_shipped
         ]
     ]);
-}
-elseif ($action === 'create_batch_and_print') {
+} elseif ($action === 'create_batch_and_print') {
     $batch    = $conn->real_escape_string(trim($_POST['batch'] ?? ''));
     $item     = $conn->real_escape_string(trim($_POST['item'] ?? ''));
     $size     = $conn->real_escape_string(trim($_POST['size'] ?? ''));
@@ -204,7 +203,9 @@ elseif ($action === 'create_batch_and_print') {
             device_model = 'Web-Admin'";
 
     if ($conn->query($sql)) {
-        if ($prodId === 0) { $prodId = $conn->insert_id; }
+        if ($prodId === 0) {
+            $prodId = $conn->insert_id;
+        }
         $first_label = $curr_copies + 1;
         $last_label  = $curr_copies + $copies;
         $conn->begin_transaction();
@@ -235,8 +236,7 @@ elseif ($action === 'create_batch_and_print') {
     } else {
         echo json_encode(['status' => 'error', 'message' => $conn->error]);
     }
-}
-elseif ($action === 'submit_bulk') {
+} elseif ($action === 'submit_bulk') {
     $customer_name = isset($_POST['customer_name']) ? $conn->real_escape_string($_POST['customer_name']) : '';
     $customer_contact = isset($_POST['customer_contact']) ? $conn->real_escape_string($_POST['customer_contact']) : '';
     $customer_address = isset($_POST['customer_address']) ? $conn->real_escape_string($_POST['customer_address']) : '';
@@ -261,56 +261,56 @@ elseif ($action === 'submit_bulk') {
 
     $conn->begin_transaction();
     try {
-    if ($append_to == 0) {
-    // Simpan ke Master Customer jika ini pengiriman baru
-    $conn->query("INSERT INTO master_customers (name, contact, address, total_orders)
+        if ($append_to == 0) {
+            // Simpan ke Master Customer jika ini pengiriman baru
+            $conn->query("INSERT INTO master_customers (name, contact, address, total_orders)
       VALUES ('$customer_name', '$customer_contact', '$customer_address', 1)
       ON DUPLICATE KEY UPDATE
         contact=VALUES(contact),
                             address=VALUES(address),
                         total_orders = total_orders + 1");
-    }
+        }
 
         // 1. Hitung total aktual qty dan persiapkan data batch
-    $total_actual_qty = 0;
-    $batch_summaries = [];
+        $total_actual_qty = 0;
+        $batch_summaries = [];
 
         foreach ($cart as $prod_id => $labels) {
-    $prod_id = (int)$prod_id;
-    $label_count = count($labels);
+            $prod_id = (int)$prod_id;
+            $label_count = count($labels);
 
-    $p_res = $conn->query("SELECT quantity FROM production_labels WHERE id = $prod_id");
-    $p_data = $p_res->fetch_assoc();
+            $p_res = $conn->query("SELECT quantity FROM production_labels WHERE id = $prod_id");
+            $p_data = $p_res->fetch_assoc();
 
-    $unit_count = $label_count * $p_data['quantity'];
-    $total_actual_qty += $unit_count;
+            $unit_count = $label_count * $p_data['quantity'];
+            $total_actual_qty += $unit_count;
 
-    $batch_summaries[] = [
-        'production_id' => $prod_id,
-            'label_qty' => $label_count,
+            $batch_summaries[] = [
+                'production_id' => $prod_id,
+                'label_qty' => $label_count,
                 'unit_qty' => $unit_count
-        ];
-    }
-
-    // 2. Insert Header (Nota) atau Update Header Lama
-        if ($append_to > 0) {
-        $shipment_id = $append_to;
-        $existing_method = 'scan';
-        $existing_res = $conn->query("SELECT input_method FROM outbound_shipments WHERE id = $shipment_id LIMIT 1");
-        if ($existing_res && $existing_res->num_rows > 0) {
-            $existing_method = $existing_res->fetch_assoc()['input_method'] ?? 'scan';
+            ];
         }
-        $final_input_method = $conn->real_escape_string(merge_shipment_input_methods($existing_method, $input_method));
-        $conn->query("UPDATE outbound_shipments SET total_qty = total_qty + $total_qty, total_actual_qty = total_actual_qty + $total_actual_qty, input_method = '$final_input_method' WHERE id = $shipment_id");
-    } else {
-        $final_input_method = $conn->real_escape_string($input_method);
-        
-        // GENERATE SURAT JALAN NO
-        $month = (int)date('n', strtotime($shipment_date));
-        $year  = (int)date('Y', strtotime($shipment_date));
-        $ROMAN = [1=>'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-        
-        $seqStmt = $conn->prepare("
+
+        // 2. Insert Header (Nota) atau Update Header Lama
+        if ($append_to > 0) {
+            $shipment_id = $append_to;
+            $existing_method = 'scan';
+            $existing_res = $conn->query("SELECT input_method FROM outbound_shipments WHERE id = $shipment_id LIMIT 1");
+            if ($existing_res && $existing_res->num_rows > 0) {
+                $existing_method = $existing_res->fetch_assoc()['input_method'] ?? 'scan';
+            }
+            $final_input_method = $conn->real_escape_string(merge_shipment_input_methods($existing_method, $input_method));
+            $conn->query("UPDATE outbound_shipments SET total_qty = total_qty + $total_qty, total_actual_qty = total_actual_qty + $total_actual_qty, input_method = '$final_input_method' WHERE id = $shipment_id");
+        } else {
+            $final_input_method = $conn->real_escape_string($input_method);
+
+            // GENERATE SURAT JALAN NO
+            $month = (int)date('n', strtotime($shipment_date));
+            $year  = (int)date('Y', strtotime($shipment_date));
+            $ROMAN = [1 => 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+            $seqStmt = $conn->prepare("
             SELECT COALESCE(
                 MAX(CAST(SUBSTRING_INDEX(surat_jalan_no, '/', 1) AS UNSIGNED)),
                 0
@@ -320,49 +320,63 @@ elseif ($action === 'submit_bulk') {
               AND MONTH(shipment_date) = ?
               AND YEAR(shipment_date)  = ?
         ");
-        $seqStmt->bind_param("ii", $month, $year);
-        $seqStmt->execute();
-        $nextSeq = (int)$seqStmt->get_result()->fetch_assoc()['next_seq'];
-        $surat_jalan_no = sprintf('%03d/SJ-AM/%s/%d', $nextSeq, $ROMAN[$month], $year);
-        $surat_jalan_no_escaped = $conn->real_escape_string($surat_jalan_no);
+            $seqStmt->bind_param("ii", $month, $year);
+            $seqStmt->execute();
+            $nextSeq = (int)$seqStmt->get_result()->fetch_assoc()['next_seq'];
+            $surat_jalan_no = sprintf('%03d/SJ-AM/%s/%d', $nextSeq, $ROMAN[$month], $year);
+            $surat_jalan_no_escaped = $conn->real_escape_string($surat_jalan_no);
 
-        $conn->query("INSERT INTO outbound_shipments (customer_name, customer_contact, customer_address, shipment_date, total_qty, shipped_by, total_actual_qty, input_method, surat_jalan_no)
+            $conn->query("INSERT INTO outbound_shipments (customer_name, customer_contact, customer_address, shipment_date, total_qty, shipped_by, total_actual_qty, input_method, surat_jalan_no)
                       VALUES ('$customer_name', '$customer_contact', '$customer_address', '$shipment_date', $total_qty, '$user', $total_actual_qty, '$final_input_method', '$surat_jalan_no_escaped')");
-        $shipment_id = $conn->insert_id;
-    }
+            $shipment_id = $conn->insert_id;
+        }
 
-    // 3. Insert atau Update Detail per Batch
+        // 3. Insert atau Update Detail per Batch
         foreach ($batch_summaries as $b) {
-        $s_id = $shipment_id;
-    $p_id = $b['production_id'];
-    $l_q = $b['label_qty'];
-    $u_q = $b['unit_qty'];
-            
-    $chk = $conn->query("SELECT id FROM outbound_shipment_batches WHERE shipment_id = $s_id AND production_id = $p_id");
-    if ($chk->num_rows > 0) {
-    $conn->query("UPDATE outbound_shipment_batches SET label_qty = label_qty + $l_q, unit_qty = unit_qty + $u_q WHERE shipment_id = $s_id AND production_id = $p_id");
-    } else {
-    $conn->query("INSERT INTO outbound_shipment_batches (shipment_id, production_id, label_qty, unit_qty) VALUES ($s_id, $p_id, $l_q, $u_q)");
+            $s_id = $shipment_id;
+            $p_id = $b['production_id'];
+            $l_q = $b['label_qty'];
+            $u_q = $b['unit_qty'];
+
+            $chk = $conn->query("SELECT id FROM outbound_shipment_batches WHERE shipment_id = $s_id AND production_id = $p_id");
+            if ($chk->num_rows > 0) {
+                $conn->query("UPDATE outbound_shipment_batches SET label_qty = label_qty + $l_q, unit_qty = unit_qty + $u_q WHERE shipment_id = $s_id AND production_id = $p_id");
+            } else {
+                $conn->query("INSERT INTO outbound_shipment_batches (shipment_id, production_id, label_qty, unit_qty) VALUES ($s_id, $p_id, $l_q, $u_q)");
             }
-    }
+        }
 
-    // 4. Insert Detail Serialized (Label per Label)
-    $stmt = $conn->prepare("INSERT INTO distributor_shipments (shipment_id, production_id, label_no) VALUES (?, ?, ?)");
+        // 4. Insert Detail Serialized (Label per Label)
+        $stmt = $conn->prepare("INSERT INTO distributor_shipments (shipment_id, production_id, label_no) VALUES (?, ?, ?)");
+        if (!$stmt) {
+            throw new Exception('Gagal menyiapkan statement detail pengiriman.');
+        }
 
-    foreach ($cart as $prod_id => $labels) {
-        $prod_id = (int)$prod_id;
-            foreach ($labels as $label_no) {
-                $label_no = (int)$label_no;
-
-                // Pastikan tidak dobel
-                $check = $conn->query("SELECT id FROM distributor_shipments WHERE production_id = $prod_id AND label_no = $label_no FOR UPDATE");
-                if ($check->num_rows > 0) {
-                    throw new Exception("Dus #$label_no pada Batch terkait sudah dikirim oleh proses lain.");
-                }
-
-                $stmt->bind_param("iii", $shipment_id, $prod_id, $label_no);
-                $stmt->execute();
+        $persisted_labels = persistShipmentLabelsWithGuard($cart, function (int $prod_id, int $label_no) use ($conn, $stmt, $shipment_id) {
+            // Pastikan tidak dobel dan gagal keras bila ada masalah query.
+            $check = $conn->query("SELECT id FROM distributor_shipments WHERE production_id = $prod_id AND label_no = $label_no FOR UPDATE");
+            if ($check === false) {
+                throw new Exception("Gagal memeriksa status Dus #$label_no pada batch ID #$prod_id.");
             }
+            if ($check->num_rows > 0) {
+                throw new Exception("Dus #$label_no pada Batch terkait sudah dikirim oleh proses lain.");
+            }
+
+            $stmt->bind_param("iii", $shipment_id, $prod_id, $label_no);
+            if (!$stmt->execute()) {
+                throw new Exception("Gagal menyimpan Dus #$label_no pada batch ID #$prod_id: " . $stmt->error);
+            }
+
+            return true;
+        });
+
+        $resPersisted = $conn->query("SELECT COUNT(*) AS total FROM distributor_shipments WHERE shipment_id = $shipment_id");
+        if ($resPersisted === false) {
+            throw new Exception('Gagal memverifikasi jumlah detail pengiriman yang tersimpan.');
+        }
+        $persisted_total = (int)($resPersisted->fetch_assoc()['total'] ?? 0);
+        if ($persisted_total !== $total_qty || $persisted_labels !== $total_qty) {
+            throw new Exception("Jumlah label tersimpan tidak cocok. Diminta $total_qty, tersimpan $persisted_total.");
         }
 
         // Log Aktivitas
@@ -379,7 +393,7 @@ elseif ($action === 'submit_bulk') {
             $total_paket_all = $headerData['total_qty'];
             $no_resi = $seq . '-' . $datetime_str . '-' . $total_paket_all . '-' . $initials;
             $surat_jalan_info = !empty($headerData['surat_jalan_no']) ? " (Surat Jalan: {$headerData['surat_jalan_no']})" : "";
-            
+
             if ($append_to > 0) {
                 $conn->query("INSERT INTO activity_logs (action, details) VALUES ('PENGIRIMAN', 'Tambah susulan $total_qty dus ke No. Resi #$no_resi')");
             } else {
@@ -398,10 +412,22 @@ elseif ($action === 'submit_bulk') {
         echo json_encode(['status' => 'success', 'message' => "Berhasil mengirim $total_qty dus ke $customer_name", 'shipment_id' => $shipment_id]);
     } catch (Exception $e) {
         $conn->rollback();
+        $logContext = [
+            'shipment_id' => isset($shipment_id) ? $shipment_id : null,
+            'customer_name' => $customer_name,
+            'total_qty' => $total_qty,
+            'details' => [
+                'append_to' => $append_to,
+                'persisted_total' => isset($persisted_total) ? $persisted_total : null,
+            ],
+        ];
+        if ($e instanceof ShipmentSubmissionException) {
+            $logContext = array_merge($logContext, $e->getContext());
+        }
+        logShipmentSubmissionFailure($logContext, $e->getMessage());
         echo json_encode(['status' => 'error', 'message' => 'Gagal simpan: ' . $e->getMessage()]);
     }
-}
-elseif ($action === 'history') {
+} elseif ($action === 'history') {
     session_write_close();
     header('Pragma: no-cache');
     header('Cache-Control: no-cache, must-revalidate');
@@ -422,9 +448,18 @@ elseif ($action === 'history') {
     $stats = $statsRes->fetch_assoc();
 
     $bulan_indonesia = [
-        '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
-        '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
-        '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
+        '01' => 'Januari',
+        '02' => 'Februari',
+        '03' => 'Maret',
+        '04' => 'April',
+        '05' => 'Mei',
+        '06' => 'Juni',
+        '07' => 'Juli',
+        '08' => 'Agustus',
+        '09' => 'September',
+        '10' => 'Oktober',
+        '11' => 'November',
+        '12' => 'Desember'
     ];
     $bulan_ini = $bulan_indonesia[date('m')] . ' ' . date('Y');
 
@@ -438,8 +473,8 @@ elseif ($action === 'history') {
             ORDER BY s.id DESC LIMIT 5";
     $res = $conn->query($sql);
     $data = [];
-    while($row = $res->fetch_assoc()) $data[] = $row;
-    
+    while ($row = $res->fetch_assoc()) $data[] = $row;
+
     echo json_encode([
         'data' => $data,
         'stats' => [
@@ -450,4 +485,3 @@ elseif ($action === 'history') {
         ]
     ]);
 }
-?>
