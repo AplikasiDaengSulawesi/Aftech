@@ -259,9 +259,12 @@ if ($action === 'get_batch_data') {
         echo json_encode(['status' => 'error', 'message' => $conn->error]);
     }
 } elseif ($action === 'submit_bulk') {
-    $customer_name = isset($_POST['customer_name']) ? $conn->real_escape_string($_POST['customer_name']) : '';
-    $customer_contact = isset($_POST['customer_contact']) ? $conn->real_escape_string($_POST['customer_contact']) : '';
-    $customer_address = isset($_POST['customer_address']) ? $conn->real_escape_string($_POST['customer_address']) : '';
+    $customer_name_raw = trim((string)($_POST['customer_name'] ?? ''));
+    $customer_contact_raw = trim((string)($_POST['customer_contact'] ?? ''));
+    $customer_address_raw = trim((string)($_POST['customer_address'] ?? ''));
+    $customer_name = $conn->real_escape_string($customer_name_raw);
+    $customer_contact = $conn->real_escape_string($customer_contact_raw);
+    $customer_address = $conn->real_escape_string($customer_address_raw);
     $shipment_date = isset($_POST['shipment_date']) ? $conn->real_escape_string($_POST['shipment_date']) : date('Y-m-d');
     $cart_json = isset($_POST['cart']) ? $_POST['cart'] : '';
     $append_to = isset($_POST['append_to']) ? (int)$_POST['append_to'] : 0;
@@ -269,7 +272,7 @@ if ($action === 'get_batch_data') {
 
     $cart = json_decode($cart_json, true);
 
-    if (empty($customer_name) || empty($cart)) {
+    if ($customer_name_raw === '' || empty($cart)) {
         die(json_encode(['status' => 'error', 'message' => 'Data customer atau keranjang kosong!']));
     }
 
@@ -441,11 +444,12 @@ if ($action === 'get_batch_data') {
 
         $conn->commit();
         session_write_close(); // Lepas lock session segera
+        $safe_customer_name = $customer_name_raw !== '' ? $customer_name_raw : 'Customer';
         echo json_encode([
             'status' => 'success',
-            'message' => "Berhasil mengirim $total_qty dus ke $customer_name",
+            'message' => "Berhasil mengirim $total_qty dus ke $safe_customer_name",
             'shipment_id' => $shipment_id,
-            'customer_name' => $customer_name,
+            'customer_name' => $safe_customer_name,
             'total_qty' => $total_qty,
             'input_method' => $final_input_method ?? $input_method,
         ]);

@@ -1532,8 +1532,8 @@ async function toggleTorch() {
                     const fallbackTotal = Object.values(finalCart).reduce((acc, labels) => acc + labels.length, 0);
                     const shipmentId = Number(d?.shipment_id || 0);
                     const totalQty = Number(d?.total_qty || fallbackTotal);
-                    const customerName = (d?.customer_name || document.getElementById('customer_name').value || '').trim() || 'customer';
-                    const successMessage = d?.message || `Berhasil mengirim ${totalQty} dus ke ${customerName}`;
+                    const customerName = (d?.customer_name || document.getElementById('customer_name').value || '').trim() || 'Customer';
+                    const successMessage = `Pengiriman berhasil: ${totalQty} dus ke ${customerName}.`;
                     <?php if($append_id > 0): ?>
                     Swal.fire({
                         title: 'Berhasil Susulan',
