@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../includes/db.php';
+require_once '../includes/warehouse_barcode_helper.php';
 date_default_timezone_set('Asia/Makassar');
 
 // Pastikan user sudah login agar tidak di-redirect
@@ -17,27 +18,17 @@ $batch = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$batch) die("Data batch tidak ditemukan.");
 
-// Cek apakah ada request label spesifik (misal dari hasil pemilihan di Peta Gudang)
-$selected_labels = [];
-if (!empty($_GET['labels'])) {
-    $selected_labels = array_filter(array_map('intval', explode(',', $_GET['labels'])));
-}
+$stmtWh = $pdo->prepare("SELECT label_no FROM warehouse_items WHERE production_id = ? ORDER BY label_no ASC");
+$stmtWh->execute([$id]);
+$warehouseLabels = array_map('intval', $stmtWh->fetchAll(PDO::FETCH_COLUMN));
 
-if (!empty($selected_labels)) {
-    // Hanya ambil label yang dikirim & masih ada di gudang
-    $inClause = implode(',', array_fill(0, count($selected_labels), '?'));
-    $params = array_merge([$id], $selected_labels);
-    $stmtWh = $pdo->prepare("SELECT label_no FROM warehouse_items WHERE production_id = ? AND label_no IN ($inClause) ORDER BY label_no ASC");
-    $stmtWh->execute($params);
-} else {
-    // Jika tidak ada parameter labels spesifik, ambil semua label yang ada di gudang
-    $stmtWh = $pdo->prepare("SELECT label_no FROM warehouse_items WHERE production_id = ? ORDER BY label_no ASC");
-    $stmtWh->execute([$id]);
-}
+$stmtShipped = $pdo->prepare("SELECT label_no FROM distributor_shipments WHERE production_id = ? ORDER BY label_no ASC");
+$stmtShipped->execute([$id]);
+$shippedLabels = array_map('intval', $stmtShipped->fetchAll(PDO::FETCH_COLUMN));
 
-$labels = $stmtWh->fetchAll(PDO::FETCH_COLUMN);
+$entries = buildWarehouseBarcodeEntries((int)$batch['copies'], $warehouseLabels, $shippedLabels);
 
-if (empty($labels)) die("Tidak ada stok di gudang untuk batch ini / label yang dipilih.");
+if (empty($entries)) die("Tidak ada label untuk batch ini.");
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -54,6 +45,9 @@ if (empty($labels)) die("Tidak ada stok di gudang untuk batch ini / label yang d
         .qr-code { display: flex; justify-content: center; margin-bottom: 8px; }
         .qr-text { font-size: 9px; word-break: break-all; font-weight: 600; color: #555; font-family: monospace; }
         .qr-label-no { font-size: 13px; font-weight: 900; color: #D50000; margin-bottom: 5px; }
+        .qr-status { display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px; padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.2px; }
+        .qr-status.shipped { background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; }
+        .qr-status.pending { background: #fff8e1; color: #ef6c00; border: 1px solid #ffe0b2; }
         
         @media print {
             body { background: #fff; padding: 0; }
@@ -76,15 +70,18 @@ if (empty($labels)) die("Tidak ada stok di gudang untuk batch ini / label yang d
         <div class="header">
             <h2>QR Code Stok Gudang</h2>
             <div style="font-size: 14px;">Batch: <strong><?php echo htmlspecialchars($batch['batch']); ?></strong> | Item: <strong><?php echo htmlspecialchars($batch['item']); ?></strong></div>
-            <div style="font-size: 12px; margin-top: 5px; color: #666;">Total Tersedia / Terpilih: <?php echo count($labels); ?> Dus</div>
+            <div style="font-size: 12px; margin-top: 5px; color: #666;">Total Label Dalam Batch: <?php echo count($entries); ?> Dus</div>
         </div>
         
         <div class="grid">
-            <?php foreach ($labels as $no): 
+            <?php foreach ($entries as $entry): 
+                $no = $entry['label_no'];
                 $qrString = $no . '-' . $batch['batch'];
+                $statusClass = $entry['is_shipped'] ? 'shipped' : 'pending';
             ?>
             <div class="qr-card">
                 <div class="qr-label-no">DUS #<?php echo $no; ?></div>
+                <div class="qr-status <?php echo $statusClass; ?>"><?php echo htmlspecialchars($entry['status']); ?></div>
                 <div class="qr-code" id="qr-<?php echo $no; ?>"></div>
                 <div class="qr-text"><?php echo htmlspecialchars($qrString); ?></div>
             </div>
