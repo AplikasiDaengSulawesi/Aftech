@@ -441,7 +441,14 @@ if ($action === 'get_batch_data') {
 
         $conn->commit();
         session_write_close(); // Lepas lock session segera
-        echo json_encode(['status' => 'success', 'message' => "Berhasil mengirim $total_qty dus ke $customer_name", 'shipment_id' => $shipment_id]);
+        echo json_encode([
+            'status' => 'success',
+            'message' => "Berhasil mengirim $total_qty dus ke $customer_name",
+            'shipment_id' => $shipment_id,
+            'customer_name' => $customer_name,
+            'total_qty' => $total_qty,
+            'input_method' => $final_input_method ?? $input_method,
+        ]);
     } catch (Exception $e) {
         $conn->rollback();
         $logContext = [

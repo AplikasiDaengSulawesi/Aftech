@@ -1493,6 +1493,15 @@ async function toggleTorch() {
             document.getElementById('btn-submit').disabled = (t === 0);
         }
 
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
         function clearCart() { carts[activeCartId].items = {}; carts[activeCartId].customer_name = ''; carts[activeCartId].customer_contact = ''; carts[activeCartId].customer_address = ''; carts[activeCartId].shipment_date = '<?php echo date("Y-m-d"); ?>'; switchCart(activeCartId); resumeScanner(); clearCartsFromStorage(); }
 
         async function submitBulkShipment(e) {
@@ -1520,13 +1529,24 @@ async function toggleTorch() {
                 const res = await fetch('../api/process_shipment.php?action=submit_bulk', { method: 'POST', body: f });
                 const d = await res.json();
                 if (d.status === 'success') {
-                    toastr.success(d.message);
+                    const fallbackTotal = Object.values(finalCart).reduce((acc, labels) => acc + labels.length, 0);
+                    const shipmentId = Number(d?.shipment_id || 0);
+                    const totalQty = Number(d?.total_qty || fallbackTotal);
+                    const customerName = (d?.customer_name || document.getElementById('customer_name').value || '').trim() || 'customer';
+                    const successMessage = d?.message || `Berhasil mengirim ${totalQty} dus ke ${customerName}`;
                     <?php if($append_id > 0): ?>
-                    Swal.fire({ title: 'Berhasil Susulan', text: "Kembali ke data histori?", icon: 'success', showCancelButton: true, confirmButtonColor: '#1A237E', confirmButtonText: 'Ya' }).then((r) => { if (r.isConfirmed) window.location.href = 'shipment_data.php'; else clearCart(); });
+                    Swal.fire({
+                        title: 'Berhasil Susulan',
+                        html: `<div class="mb-2">${escapeHtml(successMessage)}</div><div>Kembali ke data histori?</div>`,
+                        icon: 'success',
+                        showCancelButton: true,
+                        confirmButtonColor: '#1A237E',
+                        confirmButtonText: 'Ya'
+                    }).then((r) => { if (r.isConfirmed) window.location.href = 'shipment_data.php'; else clearCart(); });
                     <?php else: ?>
                     Swal.fire({
                         title: 'Pengiriman Berhasil',
-                        text: "Pilih format cetak Surat Jalan:",
+                        html: `<div class="mb-2">${escapeHtml(successMessage)}</div><div>Pilih format cetak Surat Jalan:</div>`,
                         icon: 'success',
                         showCancelButton: true,
                         showDenyButton: true,
@@ -1536,8 +1556,8 @@ async function toggleTorch() {
                         denyButtonText: 'Nota A4 (Digital)',
                         cancelButtonText: 'Nanti Saja'
                     }).then((r) => {
-                        if (r.isConfirmed) downloadSuratJalan(d.shipment_id);
-                        else if (r.isDenied) window.open(`print_invoice.php?id=${d.shipment_id}`, '_blank');
+                        if (r.isConfirmed && shipmentId > 0) downloadSuratJalan(shipmentId);
+                        else if (r.isDenied && shipmentId > 0) window.open(`print_invoice.php?id=${shipmentId}`, '_blank');
                     });
                     <?php endif; ?>
                     if (Object.keys(carts).length > 1) { delete carts[activeCartId]; activeCartId = Object.keys(carts)[0]; switchCart(activeCartId); } else clearCart();
