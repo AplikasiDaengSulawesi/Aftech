@@ -614,6 +614,20 @@ function clearCartsFromStorage() {
             return { key: 'legacy', icon: 'fa-clock', label: 'Tanpa Data' };
         }
 
+        function getBatchSourceMeta(inputMethod) {
+            const normalized = String(inputMethod || '').toLowerCase();
+            if (normalized === 'manual') {
+                return { key: 'manual', icon: 'fa-box-open', label: 'Tambah Stok Gudang' };
+            }
+            if (normalized === 'campuran') {
+                return { key: 'campuran', icon: 'fa-exchange-alt', label: 'Campuran' };
+            }
+            if (normalized === 'scan') {
+                return { key: 'scan', icon: 'fa-industry', label: 'Hasil Produksi' };
+            }
+            return { key: 'legacy', icon: 'fa-question-circle', label: 'Tidak Diketahui' };
+        }
+
         function normalizeItemInputMethod(inputMethod, scannedLabel) {
             if (inputMethod === 'manual' || inputMethod === 'scan' || inputMethod === 'campuran') {
                 return inputMethod;
@@ -1375,11 +1389,12 @@ async function toggleTorch() {
 
         function renderBatchGridHTML(pid, batchData) {
             const div = document.createElement('div');
+            const isManualBatch = batchData.input_method === 'manual';
             div.className = 'batch-card'; div.id = `batch-card-${pid}`;
             const availableLabels = batchData.in_warehouse.filter(x => !batchData.already_shipped.includes(x)).sort((a, b) => a - b);
             const availableCount = availableLabels.length;
             
-            if (batchData.input_method === 'manual') {
+            if (isManualBatch) {
                 div.innerHTML = `
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div><h5 class="text-primary mb-0">#${batchData.batch}</h5><small class="text-black font-w600">${batchData.item} (${batchData.size})</small></div>
@@ -1395,7 +1410,18 @@ async function toggleTorch() {
                 `;
                 cartContainer.appendChild(div);
             } else {
-                div.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><div><h5 class="text-primary mb-0">#${batchData.batch}</h5><small class="text-black font-w600">${batchData.item} (${batchData.size})</small></div><div class="d-flex align-items-center gap-2"><button type="button" class="btn btn-outline-primary btn-sm" id="btn-selectall-${pid}" onclick="selectAllInBatch(${pid})"><i class="fa fa-check-double me-1"></i> Pilih Semua (${availableCount})</button><div class="text-primary font-w800" style="font-size: 14px;"><span id="count-${pid}">${batchData.selected.size}</span> Dipilih</div></div></div><div class="cinema-grid-bulk" id="grid-${pid}"></div>`;
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <h5 class="text-primary mb-0">#${batchData.batch}</h5>
+                            <small class="text-black font-w600">${batchData.item} (${batchData.size})</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btn-selectall-${pid}" onclick="selectAllInBatch(${pid})"><i class="fa fa-check-double me-1"></i> Pilih Semua (${availableCount})</button>
+                            <div class="text-primary font-w800" style="font-size: 14px;"><span id="count-${pid}">${batchData.selected.size}</span> Dipilih</div>
+                        </div>
+                    </div>
+                    <div class="cinema-grid-bulk" id="grid-${pid}"></div>`;
                 cartContainer.appendChild(div);
                 const gridEl = document.getElementById(`grid-${pid}`);
                 for (let i = 1; i <= batchData.copies; i++) {
@@ -1559,11 +1585,13 @@ async function toggleTorch() {
                 let html = '<div class="list-group">';
                 result.data.forEach(b => {
                     const inCart = !!carts[activeCartId].items[b.id];
+                    const sourceMeta = getBatchSourceMeta(b.input_method);
                     html += `
                         <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="pickManualBatch(${b.id})" ${inCart ? 'disabled' : ''}>
                             <div class="text-start">
                                 <div class="text-primary font-w700" style="font-size: 14px;">#${b.batch}</div>
                                 <small class="text-black font-w600">${b.item} (${b.size} ${b.unit})</small>
+                                <div class="mt-1"><span class="badge badge-light border text-dark" style="font-size:10px;"><i class="fa ${sourceMeta.icon} me-1"></i>${sourceMeta.label}</span></div>
                             </div>
                             <div class="text-end">
                                 ${inCart ? '<span class="badge badge-secondary text-white" style="font-size: 11px;">Sudah di Keranjang</span>' : `<span class="badge badge-success text-white" style="font-size: 12px;">${b.available} Tersedia</span>`}
@@ -1593,7 +1621,11 @@ async function toggleTorch() {
                 }
                 addToCart(result.data);
                 bootstrap.Modal.getInstance(document.getElementById('modalManualAdd')).hide();
-                toastr.success(`Batch #${result.data.batch} ditambahkan. Pilih nomor dus di grid.`);
+                const batchMeta = getBatchSourceMeta(result.data.input_method);
+                const nextMessage = batchMeta.key === 'manual'
+                    ? `Batch #${result.data.batch} ditambahkan. Isi jumlah dus yang akan dikirim.`
+                    : `Batch #${result.data.batch} ditambahkan. Pilih nomor label di grid.`;
+                toastr.success(nextMessage);
                 const card = document.getElementById(`batch-card-${result.data.production_id}`);
                 if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             } catch (e) {

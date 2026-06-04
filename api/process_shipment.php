@@ -113,7 +113,15 @@ if ($action === 'get_batch_data') {
     $sql = "
         SELECT p.id, p.batch, p.item, p.size, p.unit, p.copies,
                (SELECT COUNT(*) FROM warehouse_items w WHERE w.production_id = p.id) AS wh_count,
-               (SELECT COUNT(*) FROM distributor_shipments d WHERE d.production_id = p.id) AS ship_count
+               (SELECT COUNT(*) FROM distributor_shipments d WHERE d.production_id = p.id) AS ship_count,
+               (
+                   SELECT CASE
+                       WHEN COUNT(DISTINCT COALESCE(NULLIF(w2.input_method, ''), 'scan')) > 1 THEN 'campuran'
+                       ELSE MAX(COALESCE(NULLIF(w2.input_method, ''), 'scan'))
+                   END
+                   FROM warehouse_items w2
+                   WHERE w2.production_id = p.id
+               ) AS batch_input_method
         FROM production_labels p
         $where
         ORDER BY p.id DESC
@@ -127,7 +135,8 @@ if ($action === 'get_batch_data') {
         $r['id'] = (int)$r['id'];
         $r['copies'] = (int)$r['copies'];
         $r['available'] = $avail;
-        unset($r['wh_count'], $r['ship_count']);
+        $r['input_method'] = normalize_shipment_input_method($r['batch_input_method'] ?? 'scan');
+        unset($r['wh_count'], $r['ship_count'], $r['batch_input_method']);
         $data[] = $r;
     }
     echo json_encode(['status' => 'success', 'data' => $data]);
@@ -148,6 +157,19 @@ if ($action === 'get_batch_data') {
     $res_shipped = $conn->query("SELECT label_no FROM distributor_shipments WHERE production_id = $prod_id");
     while ($r = $res_shipped->fetch_assoc()) $already_shipped[] = (int)$r['label_no'];
 
+    $batch_input_method = 'scan';
+    $res_method = $conn->query("
+        SELECT CASE
+            WHEN COUNT(DISTINCT COALESCE(NULLIF(input_method, ''), 'scan')) > 1 THEN 'campuran'
+            ELSE MAX(COALESCE(NULLIF(input_method, ''), 'scan'))
+        END AS batch_input_method
+        FROM warehouse_items
+        WHERE production_id = $prod_id
+    ");
+    if ($res_method && $rowMethod = $res_method->fetch_assoc()) {
+        $batch_input_method = normalize_shipment_input_method($rowMethod['batch_input_method'] ?? 'scan');
+    }
+
     if (count($in_warehouse) - count($already_shipped) <= 0) {
         die(json_encode(['status' => 'error', 'message' => 'Batch ini tidak memiliki stok tersedia']));
     }
@@ -160,7 +182,7 @@ if ($action === 'get_batch_data') {
             'item' => $prod['item'],
             'size' => $prod['size'] . ' ' . $prod['unit'],
             'copies' => (int)$prod['copies'],
-            'input_method' => 'manual',
+            'input_method' => $batch_input_method,
             'scanned_label' => null,
             'in_warehouse' => $in_warehouse,
             'already_shipped' => $already_shipped
