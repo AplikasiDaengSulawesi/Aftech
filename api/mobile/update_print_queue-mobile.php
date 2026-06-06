@@ -22,10 +22,18 @@ if (!$data || !isset($data['queue_ids']) || !is_array($data['queue_ids']) || emp
 $queue_ids = array_map('intval', $data['queue_ids']);
 $ids_string = implode(',', $queue_ids);
 
+$now = date('Y-m-d H:i:s');
+
 try {
-    $sql = "UPDATE print_queues SET status = 'printed' WHERE id IN ($ids_string)";
+    $sql = "UPDATE print_queues
+            SET status = 'printed', printed_at = '$now'
+            WHERE id IN ($ids_string) AND status = 'pending'";
     if ($conn->query($sql)) {
-        echo json_encode(["status" => "success", "message" => "Status antrian berhasil diupdate"]);
+        echo json_encode([
+            "status" => "success",
+            "message" => "Status antrian berhasil diupdate",
+            "updated_at" => $now
+        ]);
     } else {
         echo json_encode(["status" => "error", "message" => "Gagal update antrian: " . $conn->error]);
     }

@@ -42,6 +42,7 @@ API key didapat dari endpoint `check_access` setelah device disetujui admin. Mek
 | 10 | GET | `get_labels_report-mobile.php` | ✅ | Laporan label per-batch dengan array `labels` + status |
 | 11 | GET | `get_print_queue-mobile.php` | ✅ | Ambil daftar antrian label yang harus dicetak |
 | 12 | POST | `update_print_queue-mobile.php` | ✅ | Update status antrian cetak menjadi sudah dicetak (`printed`) |
+| 13 | POST | `sync_production-mobile.php` | ✅ | Bulk sync data produksi dari mobile |
 
 ---
 
@@ -469,6 +470,112 @@ Kirimkan array dari ID antrian (`queue_ids`) yang sudah selesai dicetak.
 **Response sukses:**
 ```json
 { "status": "success", "message": "Status antrian berhasil diupdate" }
+```
+
+---
+
+## 13. `POST /api/mobile/sync_production-mobile.php`
+
+Bulk sync data produksi. Endpoint ini menerima satu item produksi atau array `items`, lalu memprosesnya satu per satu dengan perilaku yang sama seperti `save_label-mobile.php`.
+
+**Request body (JSON):**
+```json
+{
+  "device_id": "BP2A.250605.031.A3",
+  "device_model": "SM-A556E",
+  "input_method": "scan",
+  "items": [
+    {
+      "batch": "080326-01C-SED-1000-RAMA-100PCS",
+      "item": "SEDOTAN",
+      "size": "100",
+      "unit": "PCS",
+      "machine": "THERMO TINGGI 01",
+      "shift": "SHIFT C",
+      "quantity": "1000",
+      "operator": "rahmat",
+      "qc": "mamat",
+      "production_date": "08-03-2026",
+      "production_time": "02:53:49",
+      "copies": 10
+    }
+  ]
+}
+```
+
+**Aturan input:**
+- `items` boleh diisi satu object `production` langsung, atau array `items`
+- `device_id`, `device_model`, dan `input_method` di level atas menjadi default untuk semua item
+- `input_method` hanya `scan` atau `manual`, selain itu fallback ke `scan`
+- `production_date` tetap format `dd-MM-yyyy`
+- `copies` harus lebih besar dari 0
+
+**Response sukses / parsial:**
+```json
+{
+  "status": "success",
+  "message": "Semua data berhasil disimpan.",
+  "summary": {
+    "total": 1,
+    "success": 1,
+    "failed": 0
+  },
+  "items": [
+    {
+      "status": "success",
+      "message": "Berhasil Disimpan",
+      "production_id": 120,
+      "batch": "080326-01C-SED-1000-RAMA-100PCS",
+      "copies": 10,
+      "first_label_no": 11,
+      "last_label_no": 20,
+      "input_method": "scan",
+      "label_nos": [11,12,13,14,15,16,17,18,19,20],
+      "qr_codes": [
+        "11-080326-01C-SED-1000-RAMA-100PCS",
+        "12-080326-01C-SED-1000-RAMA-100PCS"
+      ]
+    }
+  ]
+}
+```
+
+Jika sebagian item gagal, `status` menjadi `partial_success` dan ringkasannya akan seperti ini:
+```json
+{
+  "status": "partial_success",
+  "message": "Sebagian data berhasil disimpan.",
+  "summary": {
+    "total": 2,
+    "success": 1,
+    "failed": 1
+  },
+  "items": [
+    {
+      "status": "success",
+      "message": "Berhasil Disimpan",
+      "production_id": 120,
+      "batch": "080326-01C-SED-1000-RAMA-100PCS",
+      "copies": 10,
+      "first_label_no": 11,
+      "last_label_no": 20,
+      "input_method": "scan",
+      "label_nos": [11,12,13,14,15,16,17,18,19,20],
+      "qr_codes": ["11-080326-01C-SED-1000-RAMA-100PCS"]
+    },
+    {
+      "index": 1,
+      "status": "error",
+      "message": "Input tidak valid. Field qc wajib diisi.",
+      "batch": "080326-1A-BOT-500-RAMA-330ML"
+    }
+  ]
+}
+```
+
+Item yang gagal akan punya struktur:
+```json
+{ "status": "error", "message": "..." }
 ```
 
 ---

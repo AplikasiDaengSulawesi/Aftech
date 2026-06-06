@@ -1,40 +1,64 @@
 <?php
 include '../config.php';
 verify_api_access();
+require_once __DIR__ . '/../../includes/mobile_production_sync_helper.php';
 
 $data = json_decode(file_get_contents("php://input"), true);
 
-if ($data) {
-    $input_method_raw = strtolower(trim((string)($data['input_method'] ?? 'scan')));
-    $warehouse_input_method = in_array($input_method_raw, ['scan', 'manual'], true) ? $input_method_raw : 'scan';
-    $item     = $conn->real_escape_string($data['item']);
-    $size     = $conn->real_escape_string($data['size']);
-    $unit     = $conn->real_escape_string($data['unit']);
-    $batch    = $conn->real_escape_string($data['batch']);
-    $machine  = $conn->real_escape_string($data['machine']);
-    $shift    = $conn->real_escape_string($data['shift']);
-    $quantity = $conn->real_escape_string($data['quantity']);
-    $operator = $conn->real_escape_string($data['operator']);
-    $qc       = $conn->real_escape_string($data['qc']);
-    $device    = $conn->real_escape_string($data['device_model'] ?? 'Unknown');
-    $device_id = $conn->real_escape_string($data['device_id'] ?? '');
-    
-    // --- FIX: KONVERSI TANGGAL dd-MM-yyyy ke yyyy-MM-dd ---
-    $rawDate = $data['production_date']; // Contoh: 06-03-2026
-    $dateObj = DateTime::createFromFormat('d-m-Y', $rawDate);
-    $formattedDate = $dateObj ? $dateObj->format('Y-m-d') : date('Y-m-d');
-    
-    $time     = $conn->real_escape_string($data['production_time']);
-    $copies   = (int)$data['copies'];
+if (!$data) {
+    echo json_encode(["status" => "error", "message" => "Input tidak valid. Payload JSON tidak ditemukan."]);
+    exit;
+}
 
-    // Cek jumlah copies sebelum INSERT (jika batch sudah ada)
+$requiredFields = ['item', 'size', 'unit', 'batch', 'machine', 'shift', 'quantity', 'operator', 'qc', 'production_date', 'production_time', 'copies'];
+foreach ($requiredFields as $field) {
+    if (!isset($data[$field]) || trim((string) $data[$field]) === '') {
+        echo json_encode(["status" => "error", "message" => "Input tidak valid. Field $field wajib diisi."]);
+        exit;
+    }
+}
+
+$input_method_raw = normalizeMobileInputMethod($data['input_method'] ?? 'scan');
+$item = $conn->real_escape_string(trim((string) $data['item']));
+$size = $conn->real_escape_string(trim((string) $data['size']));
+$unit = $conn->real_escape_string(trim((string) $data['unit']));
+$batch = $conn->real_escape_string(trim((string) $data['batch']));
+$machine = $conn->real_escape_string(trim((string) $data['machine']));
+$shift = $conn->real_escape_string(trim((string) $data['shift']));
+$quantity = $conn->real_escape_string(trim((string) $data['quantity']));
+$operator = $conn->real_escape_string(trim((string) $data['operator']));
+$qc = $conn->real_escape_string(trim((string) $data['qc']));
+$device = $conn->real_escape_string(trim((string) ($data['device_model'] ?? 'Unknown')));
+$device_id = $conn->real_escape_string(trim((string) ($data['device_id'] ?? '')));
+$formattedDate = normalizeMobileProductionDate((string) $data['production_date']);
+$time = $conn->real_escape_string(trim((string) $data['production_time']));
+$copies = (int) $data['copies'];
+
+if ($formattedDate === null) {
+    echo json_encode(["status" => "error", "message" => "Input tidak valid. production_date harus berformat dd-MM-yyyy."]);
+    exit;
+}
+
+if ($copies <= 0) {
+    echo json_encode(["status" => "error", "message" => "Input tidak valid. copies harus lebih besar dari 0."]);
+    exit;
+}
+
+$conn->begin_transaction();
+
+try {
     $curr_copies = 0;
     $prodId = 0;
-    $resBatch = $conn->query("SELECT id, copies FROM production_labels WHERE batch='$batch' LIMIT 1");
-    if ($resBatch && $resBatch->num_rows > 0) {
+
+    $resBatch = $conn->query("SELECT id, copies FROM production_labels WHERE batch='$batch' LIMIT 1 FOR UPDATE");
+    if ($resBatch === false) {
+        throw new RuntimeException($conn->error);
+    }
+
+    if ($resBatch->num_rows > 0) {
         $rowBatch = $resBatch->fetch_assoc();
-        $curr_copies = (int)$rowBatch['copies'];
-        $prodId = (int)$rowBatch['id'];
+        $curr_copies = (int) $rowBatch['copies'];
+        $prodId = (int) $rowBatch['id'];
     }
 
     $sql = "INSERT INTO production_labels (item, size, unit, batch, machine, shift, quantity, operator, qc, production_date, production_time, copies, device_model, device_id)
@@ -43,62 +67,63 @@ if ($data) {
             copies = copies + VALUES(copies),
             shift = VALUES(shift),
             qc = VALUES(qc),
-            production_time = '$time',
-            device_model = '$device',
-            device_id = '$device_id'";
+            production_time = VALUES(production_time),
+            device_model = VALUES(device_model),
+            device_id = VALUES(device_id)";
 
-    if ($conn->query($sql) === TRUE) {
-        if ($prodId === 0) {
-            $prodId = $conn->insert_id;
+    if ($conn->query($sql) !== true) {
+        throw new RuntimeException($conn->error);
+    }
+
+    if ($prodId === 0) {
+        $prodId = (int) $conn->insert_id;
+    }
+
+    $range = buildMobileLabelRange($curr_copies, $copies, $batch);
+    $label_nos = $range['label_nos'];
+    $qr_codes = $range['qr_codes'];
+
+    foreach ($label_nos as $index => $label_no) {
+        $qr = $qr_codes[$index];
+        if ($conn->query("INSERT INTO print_queues (production_id, batch, label_no, qr_code) VALUES ($prodId, '$batch', $label_no, '$qr')") !== true) {
+            throw new RuntimeException($conn->error);
+        }
+    }
+
+    $qc_check_res = $conn->query("SELECT setting_value FROM app_settings WHERE setting_key='qc_checker_enabled'");
+    if ($qc_check_res === false) {
+        throw new RuntimeException($conn->error);
+    }
+
+    $is_qc_enabled = ($row = $qc_check_res->fetch_assoc()) ? (int) $row['setting_value'] : 0;
+
+    if (!$is_qc_enabled) {
+        if ($conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prodId, 'Auto-System')") !== true) {
+            throw new RuntimeException($conn->error);
         }
 
-        // Range label_no yang baru diterbitkan (mode append aman)
-        $first_label_no = $curr_copies + 1;
-        $last_label_no  = $curr_copies + $copies;
-        $label_nos = [];
-        $qr_codes  = [];
-        for ($i = $first_label_no; $i <= $last_label_no; $i++) {
-            $label_nos[] = $i;
-            $qr_codes[]  = $i . '-' . $batch;
-            
-            // Tambahkan ke antrian cetak
-            $qr = $i . '-' . $batch;
-            $conn->query("INSERT INTO print_queues (production_id, batch, label_no, qr_code) VALUES ($prodId, '$batch', $i, '$qr')");
-        }
-
-        // Cek status QC Checker
-        $qc_check_res = $conn->query("SELECT setting_value FROM app_settings WHERE setting_key='qc_checker_enabled'");
-        $is_qc_enabled = ($qc_check_res && $row = $qc_check_res->fetch_assoc()) ? (int)$row['setting_value'] : 0;
-
-        // Jika QC dimatikan, otomatis masuk ke gudang
-        if (!$is_qc_enabled) {
-            $conn->begin_transaction();
-            try {
-                $conn->query("INSERT IGNORE INTO warehouse_transfers (production_id, transferred_by) VALUES ($prodId, 'Auto-System')");
-
-                foreach ($label_nos as $label_no) {
-                    $conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prodId, $label_no, 'Auto-System', '$warehouse_input_method')");
-                }
-                $conn->commit();
-            } catch (Exception $e) {
-                $conn->rollback();
+        foreach ($label_nos as $label_no) {
+            if ($conn->query("INSERT IGNORE INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prodId, $label_no, 'Auto-System', '$input_method_raw')") !== true) {
+                throw new RuntimeException($conn->error);
             }
         }
-
-        echo json_encode([
-            "status"         => "success",
-            "message"        => "Berhasil Disimpan",
-            "production_id"  => $prodId,
-            "batch"          => $batch,
-            "copies"         => $copies,
-            "first_label_no" => $first_label_no,
-            "last_label_no"  => $last_label_no,
-            "input_method"   => $warehouse_input_method,
-            "label_nos"      => $label_nos,
-            "qr_codes"       => $qr_codes
-        ]);
-    } else {
-        echo json_encode(["status" => "error", "message" => $conn->error]);
     }
+
+    $conn->commit();
+
+    echo json_encode([
+        "status" => "success",
+        "message" => "Berhasil Disimpan",
+        "production_id" => $prodId,
+        "batch" => $batch,
+        "copies" => $copies,
+        "first_label_no" => $range['first_label_no'],
+        "last_label_no" => $range['last_label_no'],
+        "input_method" => $input_method_raw,
+        "label_nos" => $label_nos,
+        "qr_codes" => $qr_codes,
+    ]);
+} catch (Throwable $e) {
+    $conn->rollback();
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
-?>
