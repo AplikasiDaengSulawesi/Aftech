@@ -1285,6 +1285,51 @@ async function toggleTorch() {
             };
         }
 
+        async function handleReverseConfirmation(decodedText, warningMessage, reason) {
+            const confirmResult = await Swal.fire({
+                title: 'Barcode belum terdaftar',
+                text: warningMessage || 'Barcode ini belum terdaftar. Ingin direverse?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#D50000',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Reverse',
+                cancelButtonText: 'Tidak',
+                reverseButtons: true,
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            });
+
+            if (!confirmResult.isConfirmed) {
+                new Audio('../assets/sounds/alert.wav').play().catch(e => {});
+                updateStatus('info', 'Dibatalkan', 'Barcode tidak direverse. Scanner siap kembali.');
+                setTimeout(resumeScanner, 800);
+                return;
+            }
+
+            updateStatus('info', 'Memproses reverse...', 'Merekonstruksi data barcode dari scan...');
+            try {
+                const forceReverse = reason === 'batch_not_found' ? '&force_reverse=1' : '';
+                const reverseRes = await fetch(`../api/process_shipment.php?action=reverse_scan&qr=${encodeURIComponent(decodedText)}${forceReverse}`);
+                const reverseResult = await reverseRes.json();
+                if (reverseResult.status === 'success') {
+                    new Audio('../assets/sounds/success.wav').play().catch(e => {});
+                    const statusCopy = getSuccessStatusForResult(reverseResult.data);
+                    updateStatus('success', statusCopy.title, statusCopy.message);
+                    addToCart(reverseResult.data);
+                    setTimeout(resumeScanner, 800);
+                } else {
+                    new Audio('../assets/sounds/reject.wav').play().catch(e => {});
+                    updateStatus('error', 'DITOLAK', reverseResult.message);
+                    setTimeout(resumeScanner, 2000);
+                }
+            } catch (e) {
+                new Audio('../assets/sounds/alert.wav').play().catch(e => {});
+                updateStatus('error', 'SERVER ERROR', 'Gagal menjalankan reverse');
+                setTimeout(resumeScanner, 2000);
+            }
+        }
+
         function resumeScanner() { isProcessing = false; if (html5QrCode && html5QrCode.getState() === 3) html5QrCode.resume(); updateStatus('info', 'Scanner Ready', getScanReadyMessage()); }
 
         async function onScanSuccess(decodedText) {
@@ -1328,7 +1373,10 @@ async function toggleTorch() {
                 const action = isReverse ? 'reverse_scan' : 'get_batch_data';
                 const res = await fetch(`../api/process_shipment.php?action=${action}&qr=${encodeURIComponent(decodedText)}`);
                 const result = await res.json();
-                if(result.status === 'success') {
+                if(result.status === 'reverse_required') {
+                    updateStatus('warning', 'BARCODE TIDAK TERDAFTAR', result.message || 'Barcode ini belum terdaftar.');
+                    await handleReverseConfirmation(decodedText, result.message || 'Barcode ini belum terdaftar. Ingin direverse?', result?.data?.reason || null);
+                } else if(result.status === 'success') {
                     new Audio('../assets/sounds/success.wav').play().catch(e => {});
                     const statusCopy = getSuccessStatusForResult(result.data);
                     updateStatus('success', statusCopy.title, statusCopy.message);

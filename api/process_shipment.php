@@ -43,7 +43,19 @@ if ($action === 'get_batch_data') {
 
     // Cek Data Produksi
     $res = $conn->query("SELECT id, item, size, unit, machine, copies FROM production_labels WHERE batch = '$batch'");
-    if ($res->num_rows === 0) die(json_encode(['status' => 'error', 'message' => 'Batch tidak ditemukan di sistem']));
+    if ($res->num_rows === 0) {
+        echo json_encode([
+            'status' => 'reverse_required',
+            'message' => 'Batch tidak ditemukan di sistem. Ingin direverse untuk merekonstruksi label dari scan ini?',
+            'data' => [
+                'qr' => $qr_input,
+                'scanned_label' => $scanned_label,
+                'batch' => $batch,
+                'reason' => 'batch_not_found',
+            ]
+        ]);
+        exit;
+    }
     $prod = $res->fetch_assoc();
     $prod_id = $prod['id'];
 
@@ -54,7 +66,17 @@ if ($action === 'get_batch_data') {
         if ($scanned_label <= (int)$prod['copies']) {
             $conn->query("INSERT INTO warehouse_items (production_id, label_no, transferred_by, input_method) VALUES ($prod_id, $scanned_label, '$user', 'scan')");
         } else {
-            die(json_encode(['status' => 'error', 'message' => "Dus #$scanned_label belum masuk ke Gudang dan diluar kuota produksi!"]));
+            echo json_encode([
+                'status' => 'reverse_required',
+                'message' => "Dus #$scanned_label belum masuk ke Gudang dan diluar kuota produksi. Ingin direverse untuk merekonstruksi label ini?",
+                'data' => [
+                    'qr' => $qr_input,
+                    'scanned_label' => $scanned_label,
+                    'batch' => $batch,
+                    'reason' => 'out_of_quota',
+                ]
+            ]);
+            exit;
         }
     }
 
@@ -88,10 +110,11 @@ if ($action === 'get_batch_data') {
     ]);
 } elseif ($action === 'reverse_scan') {
     $qr_input = isset($_GET['qr']) ? (string)$_GET['qr'] : '';
+    $force_reverse = isset($_GET['force_reverse']) && (string)$_GET['force_reverse'] === '1';
 
     try {
         $helper = new ShipmentReverseHelper($conn);
-        $payload = $helper->reverseScan($qr_input, $user);
+        $payload = $helper->reverseScan($qr_input, $user, $force_reverse);
 
         echo json_encode([
             'status' => 'success',

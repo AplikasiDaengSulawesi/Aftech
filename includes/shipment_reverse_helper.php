@@ -72,19 +72,43 @@ class ShipmentReverseHelper
         }
     }
 
-    public function reverseScan(string $barcode, string $user): array
+    public function isReverseEligibleBarcode(string $barcode): bool
+    {
+        try {
+            $parsedBarcode = $this->parseBarcode($barcode);
+            $parsedBatch = $this->parseBatch($parsedBarcode['batch']);
+            $productionDate = $this->parseProductionDate($parsedBatch['date_code']);
+            $this->assertReverseAllowedDate($productionDate);
+
+            return true;
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    public function canBypassReverseCutoff(?string $reason): bool
+    {
+        return $reason === 'batch_not_found';
+    }
+
+    public function reverseScan(string $barcode, string $user, bool $allowDateOverride = false): array
     {
         $parsedBarcode = $this->parseBarcode($barcode);
         $parsedBatch = $this->parseBatch($parsedBarcode['batch']);
         $productionDate = $this->parseProductionDate($parsedBatch['date_code']);
-        $this->assertReverseAllowedDate($productionDate);
+
+        if (! $allowDateOverride) {
+            $this->assertReverseAllowedDate($productionDate);
+        }
 
         $this->conn->begin_transaction();
         try {
             $existingBatch = $this->findProductionByBatch($parsedBarcode['batch']);
 
             if ($existingBatch) {
-                $this->assertReverseAllowedDate((string)$existingBatch['production_date']);
+                if (! $allowDateOverride) {
+                    $this->assertReverseAllowedDate((string)$existingBatch['production_date']);
+                }
                 $productionId = (int)$existingBatch['id'];
                 $reverseStatus = $this->syncExistingBatch($productionId, $parsedBarcode['label_no'], $user, $parsedBarcode['batch']);
             } else {
